@@ -1,7 +1,7 @@
 # ADR-007: OpenTofu Over Terraform
 
 **Date:** 2026-03-25
-**Status:** Proposed
+**Status:** Accepted
 **Affected Modules:** W-OTF (replaces W-TF), W-XT
 
 ---

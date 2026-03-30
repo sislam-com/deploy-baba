@@ -45,6 +45,10 @@ xtask/src/
 │   └── bootstrap.rs S3 state bucket + DynamoDB lock + SSM sentinel + tofu init
 ├── cache.rs         agent cache management: status | refresh | clear
 │                    reads/writes .agent-cache/index.json; updates git SHA fields
+├── resume/
+│   ├── mod.rs       CLI subcommand: resume generate | resume upload
+│   ├── generate.rs  reads DB → builds resume struct → serializes to JSON/PDF
+│   └── upload.rs    uploads generated resume artifact to S3; returns download URL
 └── database/
     ├── mod.rs       SQLite + S3 config from stack.toml
     ├── backup.rs    VACUUM INTO + gzip + S3 upload + retention pruning
@@ -114,6 +118,7 @@ Note: `-chdir=<dir>` must come before the subcommand name.
 | W-XT.4.2 | Remove or wire EnvironmentInterpolator | OPEN | Dead code warning; either use in build.rs or delete |
 | W-XT.4.3 | Fully implement bootstrap.rs | OPEN | Fixed in DRL but needs `just infra-bootstrap` to be tested end-to-end |
 | W-XT.4.4 | cache.rs subcommand | DONE | Replaces inline Python heredoc in justfile (which `just` could not parse); implements status/refresh/clear via serde_json |
+| W-XT.4.5 | Resume generate + S3 upload | DONE | `xtask/src/resume/` — reads DB, builds resume artifact, uploads to S3, returns presigned download URL |
 
 ---
 

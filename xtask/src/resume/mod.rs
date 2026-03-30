@@ -62,9 +62,10 @@ pub async fn execute(action: ResumeAction) -> anyhow::Result<()> {
             output_dir,
             format,
         } => generate::generate_resume(&db_path, &output_dir, &format),
-        ResumeAction::Upload { profile, output_dir } => {
-            upload::upload_resume_files(&output_dir, profile).await
-        }
+        ResumeAction::Upload {
+            profile,
+            output_dir,
+        } => upload::upload_resume_files(&output_dir, profile).await,
         ResumeAction::All {
             profile,
             db_path,

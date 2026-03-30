@@ -1,5 +1,5 @@
 # W-AUTH: Cognito Authentication & Admin Dashboard
-**Path:** `services/ui/src/auth.rs`, `services/ui/src/middleware.rs`, `services/ui/src/routes/auth.rs`, `services/ui/src/routes/api/admin.rs`, `infra/cognito.tf` | **Status:** TODO
+**Path:** `services/ui/src/auth.rs`, `services/ui/src/middleware.rs`, `services/ui/src/routes/auth.rs`, `services/ui/src/routes/api/admin.rs`, `infra/cognito.tf` | **Status:** DONE
 **Depends on:** W-UI (ui-service), W-OTF (infra) | **Depended on by:** —
 → ADR-008 (Cognito Authentication)
 
@@ -220,34 +220,34 @@ W-AUTH.4.22 (dashboard.rs refactor — 6 handlers + template structs)
 
 | ID | Task | Status | Notes |
 |----|------|--------|-------|
-| W-AUTH.4.1 | Create `infra/cognito.tf` | TODO | User pool, domain, client, admin user |
-| W-AUTH.4.2 | Add Cognito SSM params to `infra/ssm.tf` | TODO | 3 params under `cognito-*` prefix |
-| W-AUTH.4.3 | Add Cognito env vars to `infra/lambda.tf` | TODO | 5 env vars: POOL_ID, CLIENT_ID, DOMAIN, REGION, APP_DOMAIN |
-| W-AUTH.4.4 | Add variables + outputs to `infra/variables.tf`, `infra/outputs.tf` | TODO | `admin_email`, `cognito_temp_password` (sensitive); 3 outputs |
-| W-AUTH.4.5 | Add workspace deps (jsonwebtoken, reqwest, axum-extra) | TODO | `Cargo.toml` workspace + `services/ui/Cargo.toml` |
-| W-AUTH.4.6 | Create `services/ui/src/auth.rs` | TODO | AuthConfig, JWKS fetch, JWT RS256 validation, dev-mode bypass |
-| W-AUTH.4.7 | Create `services/ui/src/state.rs` | TODO | AppState with `FromRef`; zero changes to existing handlers |
-| W-AUTH.4.8 | Create `services/ui/src/middleware.rs` | TODO | `require_auth` — cookie/header extraction, 302 vs 401 branching |
-| W-AUTH.4.9 | Update `services/ui/src/main.rs` | TODO | Init AuthConfig, construct AppState, pass to router::build |
-| W-AUTH.4.10 | Create `services/ui/src/routes/auth.rs` | TODO | login redirect, callback (code exchange + cookie), logout |
-| W-AUTH.4.11 | Create `services/ui/src/routes/api/admin.rs` | TODO | Full CRUD: POST/PUT/DELETE for jobs, job_details, competencies, evidence |
-| W-AUTH.4.12 | Create `services/ui/src/routes/dashboard.rs` | TODO | Minimal handler — serves DashboardTemplate (Askama) |
-| W-AUTH.4.13 | Create `services/ui/templates/dashboard.html` | TODO | Tailwind master/detail; JS fetches public APIs; submits to admin API |
-| W-AUTH.4.14 | Add login button to `services/ui/templates/base.html` nav | TODO | `<a href="/auth/login">Login</a>` alongside existing nav links |
-| W-AUTH.4.15 | Wire all new routes into `services/ui/src/router.rs` | TODO | `/auth/*`, `/dashboard` (protected), `/api/admin/*` (protected) |
+| W-AUTH.4.1 | Create `infra/cognito.tf` | DONE | User pool, domain, client, admin user |
+| W-AUTH.4.2 | Add Cognito SSM params to `infra/ssm.tf` | DONE | 3 params under `cognito-*` prefix |
+| W-AUTH.4.3 | Add Cognito env vars to `infra/lambda.tf` | DONE | 5 env vars: POOL_ID, CLIENT_ID, DOMAIN, REGION, APP_DOMAIN |
+| W-AUTH.4.4 | Add variables + outputs to `infra/variables.tf`, `infra/outputs.tf` | DONE | `admin_email`, `cognito_temp_password` (sensitive); 3 outputs |
+| W-AUTH.4.5 | Add workspace deps (jsonwebtoken, reqwest, axum-extra) | DONE | `Cargo.toml` workspace + `services/ui/Cargo.toml` |
+| W-AUTH.4.6 | Create `services/ui/src/auth.rs` | DONE | AuthConfig, JWKS fetch, JWT RS256 validation, dev-mode bypass |
+| W-AUTH.4.7 | Create `services/ui/src/state.rs` | DONE | AppState with `FromRef`; zero changes to existing handlers |
+| W-AUTH.4.8 | Create `services/ui/src/middleware.rs` | DONE | `require_auth` — cookie/header extraction, 302 vs 401 branching |
+| W-AUTH.4.9 | Update `services/ui/src/main.rs` | DONE | Init AuthConfig, construct AppState, pass to router::build |
+| W-AUTH.4.10 | Create `services/ui/src/routes/auth.rs` | DONE | login redirect, callback (code exchange + cookie), logout |
+| W-AUTH.4.11 | Create `services/ui/src/routes/api/admin.rs` | DONE | Full CRUD: POST/PUT/DELETE for jobs, job_details, competencies, evidence |
+| W-AUTH.4.12 | Create `services/ui/src/routes/dashboard.rs` | DONE | Minimal handler — serves DashboardTemplate (Askama) |
+| W-AUTH.4.13 | Create `services/ui/templates/dashboard.html` | DONE | Tailwind master/detail; JS fetches public APIs; submits to admin API |
+| W-AUTH.4.14 | Add login button to `services/ui/templates/base.html` nav | DONE | `<a href="/auth/login">Login</a>` alongside existing nav links |
+| W-AUTH.4.15 | Wire all new routes into `services/ui/src/router.rs` | DONE | `/auth/*`, `/dashboard` (protected), `/api/admin/*` (protected) |
 | W-AUTH.4.16 | Create `plans/modules/auth.md` | DONE | This file |
 | W-AUTH.4.17 | Create `plans/adr/ADR-008-cognito-authentication.md` | DONE | Decision record |
 | W-AUTH.4.18 | Update `plans/INDEX.md` + cross-cutting files | DONE | W-AUTH row, ADR-008, Cognito topology + IAM |
 | W-AUTH.4.19 | Add OpenAPI security scheme + admin endpoint docs | DONE | cookieAuth/bearerAuth, 12 admin paths, ToSchema on input types |
 | W-AUTH.4.20 | Fix Lambda 504 — lazy JWKS fetch with 5s timeout | SUPERSEDED | Deferred fetch still failed (VPC has no NAT Gateway). Replaced by W-AUTH.4.21. |
 | W-AUTH.4.21 | Fix Cognito callback 504 — implicit grant + JWKS from env var | DONE | `allowed_oauth_flows=["implicit"]`; `allow_admin_create_user_only=true` (no self-signup); `data "http" cognito_jwks`; `COGNITO_JWKS` env var; HTML callback page + `/auth/set-session` endpoint; zero Lambda outbound calls |
-| W-AUTH.4.22 | Refactor `dashboard.rs` — split into 6 handlers + template structs | TODO | Home (counts), Jobs list, Job detail, Job new, Competencies list, Competency detail |
-| W-AUTH.4.23 | Create `templates/dashboard_home.html` — summary tiles with counts | TODO | Extends base.html; 4 tiles linking to list views |
-| W-AUTH.4.24 | Create `templates/dashboard_jobs_list.html` — job master list | TODO | Breadcrumb nav; rows link to `/dashboard/jobs/{slug}` |
-| W-AUTH.4.25 | Create `templates/dashboard_job_detail.html` — job detail + sub-records | TODO | Type-ahead nav, editable job form, inline job_details forms, inline evidence forms |
-| W-AUTH.4.26 | Create `templates/dashboard_competencies_list.html` + `dashboard_competency_detail.html` | TODO | List + detail views for competencies with linked evidence |
-| W-AUTH.4.27 | Update `router.rs` — mount 6 dashboard routes with auth middleware | TODO | Replace single `/dashboard` route; literal `/new` before `/:slug` |
-| W-AUTH.4.28 | Delete `templates/dashboard.html` monolith | TODO | Replaced by 5 new templates |
+| W-AUTH.4.22 | Refactor `dashboard.rs` — split into 6 handlers + template structs | DONE | Home (counts), Jobs list, Job detail, Job new, Competencies list, Competency detail |
+| W-AUTH.4.23 | Create `templates/dashboard_home.html` — summary tiles with counts | DONE | Extends base.html; 4 tiles linking to list views |
+| W-AUTH.4.24 | Create `templates/dashboard_jobs_list.html` — job master list | DONE | Breadcrumb nav; rows link to `/dashboard/jobs/{slug}` |
+| W-AUTH.4.25 | Create `templates/dashboard_job_detail.html` — job detail + sub-records | DONE | Type-ahead nav, editable job form, inline job_details forms, inline evidence forms |
+| W-AUTH.4.26 | Create `templates/dashboard_competencies_list.html` + `dashboard_competency_detail.html` | DONE | List + detail views for competencies with linked evidence |
+| W-AUTH.4.27 | Update `router.rs` — mount 6 dashboard routes with auth middleware | DONE | Replace single `/dashboard` route; literal `/new` before `/:slug` |
+| W-AUTH.4.28 | Delete `templates/dashboard.html` monolith | DONE | Replaced by 5 new templates |
 
 ---
 

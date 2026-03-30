@@ -28,6 +28,10 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "006_seed_competency_evidence",
         include_str!("../migrations/006_seed_competency_evidence.sql"),
     ),
+    (
+        "007_seed_personal_projects",
+        include_str!("../migrations/007_seed_personal_projects.sql"),
+    ),
 ];
 
 pub struct Db {

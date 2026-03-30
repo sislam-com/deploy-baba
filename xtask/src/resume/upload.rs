@@ -5,10 +5,7 @@ use aws_sdk_s3::primitives::ByteStream;
 use std::fs;
 use std::path::Path;
 
-pub async fn upload_resume_files(
-    output_dir: &Path,
-    profile: Option<String>,
-) -> anyhow::Result<()> {
+pub async fn upload_resume_files(output_dir: &Path, profile: Option<String>) -> anyhow::Result<()> {
     println!("Uploading resume files to S3...");
 
     let config = crate::aws::create_aws_config(profile.clone()).await?;

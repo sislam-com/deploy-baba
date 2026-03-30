@@ -158,9 +158,8 @@ fn load_job_details(conn: &Connection) -> anyhow::Result<Vec<JobDetail>> {
 }
 
 fn load_competencies(conn: &Connection) -> anyhow::Result<Vec<Competency>> {
-    let mut stmt = conn.prepare(
-        "SELECT id, name, description FROM competencies ORDER BY sort_order",
-    )?;
+    let mut stmt =
+        conn.prepare("SELECT id, name, description FROM competencies ORDER BY sort_order")?;
 
     let comps = stmt
         .query_map([], |row| {
@@ -286,7 +285,10 @@ fn generate_functional(
     // Group evidence by competency
     let mut evidence_by_comp: HashMap<i64, Vec<&Evidence>> = HashMap::new();
     for ev in evidence {
-        evidence_by_comp.entry(ev.competency_id).or_default().push(ev);
+        evidence_by_comp
+            .entry(ev.competency_id)
+            .or_default()
+            .push(ev);
     }
 
     md.push_str("## Core Competencies\n\n");
@@ -357,18 +359,13 @@ fn write_and_convert(md: &str, output_dir: &Path, format_name: &str) -> anyhow::
     let pdf_path = output_dir.join(format!("{}.pdf", stem));
 
     // Write markdown
-    fs::write(&md_path, md)
-        .with_context(|| format!("Failed to write {}", md_path.display()))?;
+    fs::write(&md_path, md).with_context(|| format!("Failed to write {}", md_path.display()))?;
     println!("  Written: {}", md_path.display());
 
     // Convert to DOCX
     println!("  Converting to DOCX...");
-    run_pandoc(&[
-        md_path.to_str().unwrap(),
-        "-o",
-        docx_path.to_str().unwrap(),
-    ])
-    .with_context(|| "pandoc DOCX conversion failed")?;
+    run_pandoc(&[md_path.to_str().unwrap(), "-o", docx_path.to_str().unwrap()])
+        .with_context(|| "pandoc DOCX conversion failed")?;
     println!("  Written: {}", docx_path.display());
 
     // Convert to PDF via weasyprint
