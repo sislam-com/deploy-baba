@@ -1,5 +1,6 @@
 use axum::{response::Html, routing::get, Router};
 use tower_http::cors::CorsLayer;
+use tower_http::services::ServeDir;
 use tower_http::trace::TraceLayer;
 use utoipa::OpenApi;
 
@@ -47,6 +48,7 @@ pub fn build(state: AppState) -> Router {
 
     Router::new()
         .route("/", get(routes::resume::handler))
+        .nest_service("/resume", ServeDir::new("target/resume"))
         .route("/health", get(routes::health::get_health))
         .nest("/api", api_routes)
         .nest("/api/admin", admin_routes)

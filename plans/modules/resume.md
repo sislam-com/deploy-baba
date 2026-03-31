@@ -44,7 +44,8 @@ services/ui/
 │   ├── 003_seed_jobs.sql                # 9 positions (personal-projects → openpages)
 │   ├── 004_seed_job_details.sql         # All accomplishment bullets + sub-engagements
 │   ├── 005_seed_competencies.sql        # 6 competency categories
-│   └── 006_seed_competency_evidence.sql # Cross-references
+│   ├── 006_seed_competency_evidence.sql # Cross-references
+│   └── 007_seed_personal_projects.sql   # Personal projects job details seed
 ├── src/
 │   ├── db.rs                            # Db struct, open(), migration runner
 │   └── routes/
@@ -54,6 +55,12 @@ services/ui/
 │           └── competencies.rs          # GET /api/competencies, GET /api/competencies/{slug}
 └── templates/
     └── resume.html                      # Dual-view: timeline + capabilities toggle
+
+xtask resume generation (W-XT.4.5):
+xtask/src/resume/
+├── mod.rs                               # CLI subcommand: resume generate | resume upload
+├── generate.rs                          # Reads DB → builds resume struct → serializes to JSON/PDF
+└── upload.rs                            # Uploads generated resume artifact to S3
 ```
 
 ---
@@ -78,7 +85,7 @@ URL state: `/?view=capabilities` — updated via `history.pushState`.
 - Migrations embedded at compile time via `include_str!` (safe for Lambda, no FS access needed)
 - Tracks applied migrations in `_migrations` table (name UNIQUE)
 - Idempotent: `CREATE TABLE IF NOT EXISTS`, `INSERT OR IGNORE`
-- Future content: add `007_*.sql` — runner picks it up automatically, no Rust changes needed
+- `007_seed_personal_projects.sql` is now present — runner picks up new migrations automatically, no Rust changes needed
 - WAL mode + `PRAGMA foreign_keys=ON` enabled at open time
 
 ---

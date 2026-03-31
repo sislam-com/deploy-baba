@@ -10,18 +10,55 @@
                 <h1 class="text-4xl font-bold text-white mb-1">Sharful Islam</h1>
                 <p class="text-cyan-400 text-lg">Full-Stack SaaS Engineer · 20+ years</p>
             </div>
-            <!-- View toggle -->
-            <div class="flex items-center bg-gray-800 rounded-lg p-1 border border-gray-700">
-                <button id="btn-timeline"
-                    class="px-4 py-2 rounded-md text-sm font-medium transition view-btn active-view"
-                    data-view="timeline">
-                    📅 Timeline
-                </button>
-                <button id="btn-capabilities"
-                    class="px-4 py-2 rounded-md text-sm font-medium transition view-btn"
-                    data-view="capabilities">
-                    ⚡ Capabilities
-                </button>
+            <!-- Controls: view toggle + download -->
+            <div class="flex flex-col sm:flex-row items-center gap-3">
+                <div class="flex items-center bg-gray-800 rounded-lg p-1 border border-gray-700">
+                    <button id="btn-timeline"
+                        class="px-4 py-2 rounded-md text-sm font-medium transition view-btn active-view"
+                        data-view="timeline">
+                        📅 Timeline
+                    </button>
+                    <button id="btn-capabilities"
+                        class="px-4 py-2 rounded-md text-sm font-medium transition view-btn"
+                        data-view="capabilities">
+                        ⚡ Capabilities
+                    </button>
+                </div>
+
+                <!-- Download Resume dropdown -->
+                <div class="relative" id="download-menu-wrapper">
+                    <button id="download-btn"
+                        class="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-cyan-600 hover:bg-cyan-500 text-white transition"
+                        onclick="toggleDownloadMenu()">
+                        Download Resume
+                        <span id="download-caret" class="text-xs">▾</span>
+                    </button>
+                    <div id="download-menu"
+                        class="hidden absolute right-0 mt-2 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10 overflow-hidden">
+                        <div class="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500 border-b border-gray-700">PDF</div>
+                        <a href="/resume/sharful-islam-resume-chronological.pdf"
+                            class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition"
+                            download>
+                            Chronological
+                        </a>
+                        <a href="/resume/sharful-islam-resume-functional.pdf"
+                            class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition"
+                            download>
+                            Functional (by skill)
+                        </a>
+                        <div class="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500 border-t border-b border-gray-700">DOCX</div>
+                        <a href="/resume/sharful-islam-resume-chronological.docx"
+                            class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition"
+                            download>
+                            Chronological
+                        </a>
+                        <a href="/resume/sharful-islam-resume-functional.docx"
+                            class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition"
+                            download>
+                            Functional (by skill)
+                        </a>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -116,6 +153,24 @@
 </style>
 
 <script>
+// Download menu toggle
+function toggleDownloadMenu() {
+    const menu = document.getElementById('download-menu');
+    const caret = document.getElementById('download-caret');
+    const isOpen = !menu.classList.contains('hidden');
+    menu.classList.toggle('hidden', isOpen);
+    caret.textContent = isOpen ? '▾' : '▴';
+}
+
+// Close download menu when clicking outside
+document.addEventListener('click', function(e) {
+    const wrapper = document.getElementById('download-menu-wrapper');
+    if (wrapper && !wrapper.contains(e.target)) {
+        document.getElementById('download-menu').classList.add('hidden');
+        document.getElementById('download-caret').textContent = '▾';
+    }
+});
+
 // View toggle
 const params = new URLSearchParams(window.location.search);
 let currentView = params.get('view') === 'capabilities' ? 'capabilities' : 'timeline';

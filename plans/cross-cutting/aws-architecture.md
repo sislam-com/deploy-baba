@@ -38,20 +38,22 @@
                                               │ (login form)
                                         POST credentials
                                               │
-                                        302 to /auth/callback?code=xxx
+                                        302 to /auth/callback#id_token=xxx (fragment — not sent to server)
                                               │
                     ┌─────────────────────────▼────────────────────┐
-                    │  Lambda: POST /oauth2/token to Cognito       │
-                    │  Validate ID token (RS256, JWKS cached)      │
-                    │  Set auth_token cookie (HttpOnly, SameSite)  │
-                    │  302 → /dashboard                            │
+                    │  Lambda: return HTML page                    │
+                    │  JS: extract id_token from window.location.hash │
+                    │  JS: POST {"id_token": "..."} to /auth/set-session │
+                    │  Lambda: validate JWT (RS256, JWKS from env) │
+                    │  Lambda: set auth_token cookie (HttpOnly, SameSite) │
+                    │  JS: redirect to /dashboard                  │
                     └──────────────────────────────────────────────┘
 
                     ┌──────────────────────────────────────────┐
   Cognito ────────► │  aws_cognito_user_pool "baba"            │
                     │  User: baba-admin (email verified)        │
                     │  Domain: deploy-baba-prod.auth.*          │
-                    │  Client: baba_web (public, PKCE)          │
+                    │  Client: baba_web (public, implicit grant) │
                     └──────────────────────────────────────────┘
 ```
 
@@ -162,7 +164,7 @@ Managed in `infra/`:
 | `aws_route53_record` ×2 | `cdn.tf` | apex + www |
 | `aws_cognito_user_pool` | `cognito.tf` | **W-AUTH** — baba user pool |
 | `aws_cognito_user_pool_domain` | `cognito.tf` | **W-AUTH** — hosted UI domain |
-| `aws_cognito_user_pool_client` | `cognito.tf` | **W-AUTH** — public PKCE client |
+| `aws_cognito_user_pool_client` | `cognito.tf` | **W-AUTH** — public implicit grant client |
 | `aws_cognito_user` | `cognito.tf` | **W-AUTH** — baba-admin user |
 
 ---

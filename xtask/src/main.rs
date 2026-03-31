@@ -14,6 +14,7 @@ mod database;
 mod deploy;
 mod infra;
 mod quality;
+mod resume;
 mod test;
 
 #[derive(Parser)]
@@ -71,6 +72,11 @@ enum Commands {
         #[command(subcommand)]
         action: database::DatabaseAction,
     },
+    /// Resume generation and upload
+    Resume {
+        #[command(subcommand)]
+        action: resume::ResumeAction,
+    },
     /// Publish/release operations
     Publish {
         /// Target environment (dev, staging, prod)
@@ -102,6 +108,7 @@ async fn run() -> anyhow::Result<()> {
         Commands::Deploy { action } => deploy::execute(action).await,
         Commands::Cache { action } => cache::execute(action).await,
         Commands::Database { action } => database::execute(action).await,
+        Commands::Resume { action } => resume::execute(action).await,
         Commands::Publish {
             environment,
             dry_run,

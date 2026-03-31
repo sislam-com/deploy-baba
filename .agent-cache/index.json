@@ -2,7 +2,7 @@
   "_meta": {
     "description": "Global agent cache for deploy-baba. Claude reads this on startup to avoid re-exploring unchanged code.",
     "generated_by": "just cache-refresh",
-    "last_updated": "2026-03-27",
+    "last_updated": "2026-03-30",
     "schema_version": "1.0.0",
     "usage": "Check git.sha against `git rev-parse HEAD`. If match: use cached data. If mismatch: re-scan changed components only, then update this file."
   },
@@ -12,7 +12,9 @@
     "ADR-003": "Lambda Function URL — no API Gateway",
     "ADR-004": "Dual-mode entry point — runtime env var detection (local vs Lambda)",
     "ADR-005": "(see plans/adr/)",
-    "ADR-006": "(see plans/adr/)"
+    "ADR-006": "(see plans/adr/)",
+    "ADR-007": "OpenTofu over Terraform — MPL-2.0; `tofu` CLI; drop-in HCL compatible (Accepted)",
+    "ADR-008": "Cognito Authentication — implicit grant, JWKS from env var, HttpOnly cookie, dev-mode bypass"
   },
   "crates": {
     "api-core": {
@@ -248,11 +250,11 @@
     "migrations_path": "services/ui/migrations/"
   },
   "git": {
-    "branch": "feat/dashboard",
-    "last_commit": "implement agent cache for token savings, update ui for dash",
+    "branch": "feat/resume",
+    "last_commit": "Revert lambda policy changes and update plans.",
     "remote": "git@github.com:shantopagla/deploy-baba.git",
-    "sha": "0a8613fd30818b424dbfe44fd4132d6c4b828d0b",
-    "short_sha": "0a8613f"
+    "sha": "a37c4d9b366a89f63db529e1e97f9b1c6c1556d9",
+    "short_sha": "a37c4d9"
   },
   "infra": {
     "aws_region": "us-east-1",
@@ -281,6 +283,7 @@
       "lambda.tf",
       "efs.tf",
       "s3.tf",
+      "s3-assets.tf",
       "cdn.tf",
       "iam.tf",
       "cognito.tf",
@@ -310,7 +313,7 @@
     "template_engine": "askama (compile-time Jinja2-like) + askama_axum integration"
   },
   "plans": {
-    "adr_count": 6,
+    "adr_count": 8,
     "adr_dir": "plans/adr/",
     "conventions": "plans/CONVENTIONS.md",
     "cross_cutting_dir": "plans/cross-cutting/",
@@ -336,18 +339,18 @@
     },
     "drift_dir": "plans/drift/",
     "index": "plans/INDEX.md",
-    "module_count": 14,
+    "module_count": 17,
     "modules_dir": "plans/modules/"
   },
   "project": {
-    "adr_count": 6,
+    "adr_count": 8,
     "description": "Zero-cost Rust portfolio and deployment automation platform hosted on AWS Lambda",
     "license": "MIT OR Apache-2.0",
     "name": "deploy-baba",
     "plans_index": "plans/INDEX.md",
     "rust_edition": "2021",
     "rust_msrv": "1.75",
-    "status": "~85% complete",
+    "status": "~90% complete",
     "task_runner": "just",
     "tech_stack": [
       "rust",

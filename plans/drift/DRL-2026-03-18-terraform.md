@@ -104,15 +104,15 @@ fails if the file doesn't exist before any deploy has ever run.
 
 ---
 
-## Entry 6: Terraform provider deprecation warnings [OPEN]
+## Entry 6: Terraform provider deprecation warnings [RESOLVED]
 
 | File | Warning | Status | Fix |
 |------|---------|--------|-----|
-| `infra/eventbridge.tf:6` | `is_enabled` deprecated — use `state` | OPEN | Replace with `state = "ENABLED"` |
-| `infra/s3.tf:41` | lifecycle rule missing `filter {}` block | OPEN | Add `filter {}` to each rule |
+| `infra/eventbridge.tf:6` | `is_enabled` deprecated — use `state` | RESOLVED | Fixed: `state = "ENABLED"` already in code. Confirmed by DRL-2026-03-25-opentofu. |
+| `infra/s3.tf:41` | lifecycle rule missing `filter {}` block | RESOLVED | Fixed: `filter {}` already present in code. Confirmed by DRL-2026-03-25-opentofu. |
 
-These are warnings in provider v5.100 but will become errors in a future version.
-**Required actions:** W-TF.4.1 and W-TF.4.2.
+Both items were fixed in code before this log was written.
+See DRL-2026-03-25-opentofu for confirmation of W-TF.4.1 and W-TF.4.2 resolution.
 
 ---
 
@@ -122,8 +122,8 @@ These are warnings in provider v5.100 but will become errors in a future version
 - [x] `infra/outputs.tf` — cloudfront_distribution_id, cloudfront_domain_name, site_url
 - [ ] **W-XT.4.3** — Implement `xtask/src/infra/bootstrap.rs` (S3 + DynamoDB + SSM)
 - [ ] **W-DX.5** — Add `just lambda-build`; wire into `just infra-apply`
-- [ ] **W-TF.4.1** — Fix `eventbridge.tf`: replace `is_enabled` with `state = "ENABLED"`
-- [ ] **W-TF.4.2** — Fix `s3.tf` lifecycle rules: add `filter {}` block
+- [x] **W-TF.4.1** — Fix `eventbridge.tf`: replace `is_enabled` with `state = "ENABLED"` — RESOLVED
+- [x] **W-TF.4.2** — Fix `s3.tf` lifecycle rules: add `filter {}` block — RESOLVED
 - [ ] `terraform plan` clean (zero errors, zero warnings)
 - [ ] `terraform apply` — 28 resources created
 - [ ] CloudFront propagates (~5–15 min)

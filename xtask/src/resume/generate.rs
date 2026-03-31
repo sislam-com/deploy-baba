@@ -1,0 +1,399 @@
+//! Resume markdown generation and pandoc conversion
+
+use anyhow::Context;
+use rusqlite::{Connection, OpenFlags};
+use std::collections::HashMap;
+use std::fs;
+use std::path::Path;
+use std::process::Command;
+
+use super::ResumeFormat;
+
+const HEADER: &str = "# Sharful Islam
+**Full-Stack SaaS Engineer · 20+ Years**
+
+shan2pagla@gmail.com · [GitHub](https://github.com/shantopagle) · [LinkedIn](https://www.linkedin.com/in/sharful-islam-b6bb4512/) · [sislam.com](https://sislam.com)
+
+---
+
+";
+
+const SUMMARY: &str = "## Professional Summary
+
+Full-stack engineer with 20+ years of experience building and scaling SaaS platforms — from \
+front-end modernization to backend architecture, API design, and cloud infrastructure. \
+Proven track record leading platform operations, mentoring teams, and delivering zero-downtime \
+migrations. Recent focus on Rust systems programming, zero-cost cloud deployment (AWS Lambda + \
+SQLite on EFS), and AI-augmented development workflows.
+
+";
+
+const EDUCATION: &str = "## Education
+
+**B.S., Computer Information Systems** — Rutgers University, New Brunswick, NJ
+
+";
+
+struct Job {
+    id: i64,
+    company: String,
+    title: String,
+    start_date: String,
+    end_date: String,
+    summary: String,
+    tech_stack: Vec<String>,
+}
+
+struct JobDetail {
+    job_id: i64,
+    detail_text: String,
+    category: String,
+}
+
+struct Competency {
+    id: i64,
+    name: String,
+    description: String,
+}
+
+struct Evidence {
+    competency_id: i64,
+    job_id: i64,
+    text: String,
+}
+
+pub fn generate_resume(
+    db_path: &Path,
+    output_dir: &Path,
+    format: &ResumeFormat,
+) -> anyhow::Result<()> {
+    check_pandoc()?;
+
+    fs::create_dir_all(output_dir)
+        .with_context(|| format!("Failed to create output dir: {}", output_dir.display()))?;
+
+    let conn = Connection::open_with_flags(db_path, OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .with_context(|| format!("Failed to open database: {}", db_path.display()))?;
+
+    let jobs = load_jobs(&conn)?;
+    let details = load_job_details(&conn)?;
+    let competencies = load_competencies(&conn)?;
+    let evidence = load_evidence(&conn)?;
+
+    match format {
+        ResumeFormat::Chronological => {
+            generate_chronological(&jobs, &details, output_dir)?;
+        }
+        ResumeFormat::Functional => {
+            generate_functional(&jobs, &details, &competencies, &evidence, output_dir)?;
+        }
+        ResumeFormat::All => {
+            generate_chronological(&jobs, &details, output_dir)?;
+            generate_functional(&jobs, &details, &competencies, &evidence, output_dir)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn check_pandoc() -> anyhow::Result<()> {
+    let status = Command::new("pandoc").arg("--version").output();
+    match status {
+        Ok(out) if out.status.success() => Ok(()),
+        _ => Err(anyhow::anyhow!(
+            "pandoc not found. Install it with: brew install pandoc\n\
+             For PDF support also install: brew install weasyprint"
+        )),
+    }
+}
+
+fn load_jobs(conn: &Connection) -> anyhow::Result<Vec<Job>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, company, title, start_date, \
+         COALESCE(end_date, 'Present') as end_date, summary, \
+         COALESCE(tech_stack, '') as tech_stack \
+         FROM jobs ORDER BY sort_order",
+    )?;
+
+    let jobs = stmt
+        .query_map([], |row| {
+            let tech_raw: String = row.get(6)?;
+            let tech_stack = tech_raw
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
+            Ok(Job {
+                id: row.get(0)?,
+                company: row.get(1)?,
+                title: row.get(2)?,
+                start_date: row.get(3)?,
+                end_date: row.get(4)?,
+                summary: row.get(5)?,
+                tech_stack,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(jobs)
+}
+
+fn load_job_details(conn: &Connection) -> anyhow::Result<Vec<JobDetail>> {
+    let mut stmt = conn.prepare(
+        "SELECT job_id, detail_text, COALESCE(category, 'responsibility') as category \
+         FROM job_details ORDER BY job_id, sort_order",
+    )?;
+
+    let details = stmt
+        .query_map([], |row| {
+            Ok(JobDetail {
+                job_id: row.get(0)?,
+                detail_text: row.get(1)?,
+                category: row.get(2)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(details)
+}
+
+fn load_competencies(conn: &Connection) -> anyhow::Result<Vec<Competency>> {
+    let mut stmt =
+        conn.prepare("SELECT id, name, description FROM competencies ORDER BY sort_order")?;
+
+    let comps = stmt
+        .query_map([], |row| {
+            Ok(Competency {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                description: row.get(2)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(comps)
+}
+
+fn load_evidence(conn: &Connection) -> anyhow::Result<Vec<Evidence>> {
+    let mut stmt = conn.prepare(
+        "SELECT ce.competency_id, ce.job_id, \
+         COALESCE(ce.highlight_text, jd.detail_text, '') as text \
+         FROM competency_evidence ce \
+         LEFT JOIN job_details jd ON ce.detail_id = jd.id \
+         ORDER BY ce.competency_id, ce.sort_order",
+    )?;
+
+    let evidence = stmt
+        .query_map([], |row| {
+            Ok(Evidence {
+                competency_id: row.get(0)?,
+                job_id: row.get(1)?,
+                text: row.get(2)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(evidence)
+}
+
+fn generate_chronological(
+    jobs: &[Job],
+    details: &[JobDetail],
+    output_dir: &Path,
+) -> anyhow::Result<()> {
+    println!("  Generating chronological resume...");
+
+    let mut md = String::new();
+    md.push_str(HEADER);
+    md.push_str(SUMMARY);
+    md.push_str("## Experience\n\n");
+
+    // Group details by job_id
+    let mut details_by_job: HashMap<i64, Vec<&JobDetail>> = HashMap::new();
+    for d in details {
+        details_by_job.entry(d.job_id).or_default().push(d);
+    }
+
+    for job in jobs {
+        md.push_str(&format!(
+            "### {} — {}\n*{} – {}*\n\n{}\n\n",
+            job.title, job.company, job.start_date, job.end_date, job.summary
+        ));
+
+        if let Some(job_details) = details_by_job.get(&job.id) {
+            // Group by category
+            let mut by_cat: HashMap<&str, Vec<&&JobDetail>> = HashMap::new();
+            for d in job_details {
+                by_cat.entry(&d.category).or_default().push(d);
+            }
+
+            // Category display order
+            for cat in &["achievement", "responsibility", "sub-engagement"] {
+                if let Some(items) = by_cat.get(*cat) {
+                    let label = match *cat {
+                        "achievement" => "**Achievements**",
+                        "responsibility" => "**Responsibilities**",
+                        "sub-engagement" => "**Client Engagements**",
+                        _ => cat,
+                    };
+                    md.push_str(&format!("{}\n\n", label));
+                    for item in items {
+                        md.push_str(&format!("- {}\n", item.detail_text));
+                    }
+                    md.push('\n');
+                }
+            }
+        }
+
+        if !job.tech_stack.is_empty() {
+            md.push_str(&format!(
+                "*Technologies: {}*\n\n",
+                job.tech_stack.join(", ")
+            ));
+        }
+
+        md.push_str("---\n\n");
+    }
+
+    // Aggregate tech skills
+    let all_tech = aggregate_tech(jobs);
+    md.push_str("## Technical Skills\n\n");
+    md.push_str(&all_tech);
+    md.push('\n');
+
+    md.push_str(EDUCATION);
+
+    write_and_convert(&md, output_dir, "chronological")
+}
+
+fn generate_functional(
+    jobs: &[Job],
+    _details: &[JobDetail],
+    competencies: &[Competency],
+    evidence: &[Evidence],
+    output_dir: &Path,
+) -> anyhow::Result<()> {
+    println!("  Generating functional resume...");
+
+    let mut md = String::new();
+    md.push_str(HEADER);
+    md.push_str(SUMMARY);
+
+    // Build lookup maps
+    let job_map: HashMap<i64, &Job> = jobs.iter().map(|j| (j.id, j)).collect();
+
+    // Group evidence by competency
+    let mut evidence_by_comp: HashMap<i64, Vec<&Evidence>> = HashMap::new();
+    for ev in evidence {
+        evidence_by_comp
+            .entry(ev.competency_id)
+            .or_default()
+            .push(ev);
+    }
+
+    md.push_str("## Core Competencies\n\n");
+
+    for comp in competencies {
+        md.push_str(&format!("### {}\n\n{}\n\n", comp.name, comp.description));
+
+        if let Some(evs) = evidence_by_comp.get(&comp.id) {
+            // Group by company
+            let mut by_company: HashMap<i64, Vec<&&Evidence>> = HashMap::new();
+            for ev in evs {
+                by_company.entry(ev.job_id).or_default().push(ev);
+            }
+
+            for (job_id, items) in &by_company {
+                if let Some(job) = job_map.get(job_id) {
+                    md.push_str(&format!("*{}*\n\n", job.company));
+                    for item in items {
+                        if !item.text.is_empty() {
+                            md.push_str(&format!("- {}\n", item.text));
+                        }
+                    }
+                    md.push('\n');
+                }
+            }
+        }
+
+        md.push_str("---\n\n");
+    }
+
+    md.push_str("## Employment History\n\n");
+    for job in jobs {
+        md.push_str(&format!(
+            "- **{}** @ {} ({} – {})\n",
+            job.title, job.company, job.start_date, job.end_date
+        ));
+    }
+    md.push('\n');
+
+    let all_tech = aggregate_tech(jobs);
+    md.push_str("## Technical Skills\n\n");
+    md.push_str(&all_tech);
+    md.push('\n');
+
+    md.push_str(EDUCATION);
+
+    write_and_convert(&md, output_dir, "functional")
+}
+
+fn aggregate_tech(jobs: &[Job]) -> String {
+    let mut seen = std::collections::HashSet::new();
+    let mut all: Vec<String> = Vec::new();
+    for job in jobs {
+        for tech in &job.tech_stack {
+            if seen.insert(tech.clone()) {
+                all.push(tech.clone());
+            }
+        }
+    }
+    format!("{}\n", all.join(", "))
+}
+
+fn write_and_convert(md: &str, output_dir: &Path, format_name: &str) -> anyhow::Result<()> {
+    let stem = format!("sharful-islam-resume-{}", format_name);
+
+    let md_path = output_dir.join(format!("{}.md", stem));
+    let docx_path = output_dir.join(format!("{}.docx", stem));
+    let pdf_path = output_dir.join(format!("{}.pdf", stem));
+
+    // Write markdown
+    fs::write(&md_path, md).with_context(|| format!("Failed to write {}", md_path.display()))?;
+    println!("  Written: {}", md_path.display());
+
+    // Convert to DOCX
+    println!("  Converting to DOCX...");
+    run_pandoc(&[md_path.to_str().unwrap(), "-o", docx_path.to_str().unwrap()])
+        .with_context(|| "pandoc DOCX conversion failed")?;
+    println!("  Written: {}", docx_path.display());
+
+    // Convert to PDF via weasyprint
+    println!("  Converting to PDF...");
+    run_pandoc(&[
+        md_path.to_str().unwrap(),
+        "--pdf-engine=weasyprint",
+        "-o",
+        pdf_path.to_str().unwrap(),
+    ])
+    .with_context(|| "pandoc PDF conversion failed")?;
+    println!("  Written: {}", pdf_path.display());
+
+    Ok(())
+}
+
+fn run_pandoc(args: &[&str]) -> anyhow::Result<()> {
+    let status = Command::new("pandoc")
+        .args(args)
+        .status()
+        .context("Failed to spawn pandoc")?;
+
+    if !status.success() {
+        return Err(anyhow::anyhow!(
+            "pandoc exited with status: {}",
+            status.code().unwrap_or(-1)
+        ));
+    }
+
+    Ok(())
+}

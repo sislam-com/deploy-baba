@@ -1,6 +1,6 @@
 # deploy-baba — Plan Index
-**GitHub:** `shantopagla/deploy-baba` | **Last updated:** 2026-03-26
-**Source repo:** `~/shanto` (Baba Toolchain, ~85K LOC) | **Status:** ~85% complete
+**GitHub:** `shantopagla/deploy-baba` | **Last updated:** 2026-03-30
+**Source repo:** `~/shanto` (Baba Toolchain, ~85K LOC) | **Status:** ~90% complete
 
 See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming rules.
 
@@ -21,12 +21,12 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | api-merger | W-APIM | `crates/api-merger/` | DONE | Per-crate README |
 | infra-types | W-INFR | `crates/infra-types/` | DONE | Per-crate README |
 | ui-service | W-UI | `services/ui/` | DONE | utoipa-rapidoc wiring (using inline HTML) |
-| resume | W-RSM | `services/ui/migrations/`, `routes/resume.rs`, `routes/api/jobs.rs`, `routes/api/competencies.rs` | DONE | Functional view grouping (W-RSM.8.1), print CSS (W-RSM.8.3) |
-| xtask | W-XT | `xtask/` | WIP | CLI naming mismatch (`fmt` vs `Format`), `EnvironmentInterpolator` unused |
+| resume | W-RSM | `services/ui/migrations/`, `routes/resume.rs`, `routes/api/jobs.rs`, `routes/api/competencies.rs` | DONE | 7 migrations (007 personal-projects seed added); xtask resume generate/upload done; Functional view grouping (W-RSM.8.1), print CSS (W-RSM.8.3) |
+| xtask | W-XT | `xtask/` | WIP | Resume generate + S3 upload done (W-XT.4.5); `EnvironmentInterpolator` unused (W-XT.4.2) |
 | terraform | W-TF | `infra/` | SUPERSEDED | Replaced by W-OTF (OpenTofu). W-TF.4.1 and W-TF.4.2 already fixed in code. |
 | opentofu | W-OTF | `infra/` + `xtask/src/infra/` | WIP | Install `tofu` binary (W-OTF.4.1 OPEN); smoke test (W-OTF.4.7 BLOCKED); docs (W-OTF.4.9 TODO) |
 | dx-justfile | W-DX | `justfile`, `docs/`, `examples/` | WIP | Per-crate READMEs, integration tests |
-| auth | W-AUTH | `services/ui/src/auth.rs`, `routes/auth.rs`, `routes/api/admin.rs`, `routes/dashboard.rs`, `infra/cognito.tf` | WIP | W-AUTH.4.22–4.28 dashboard master/detail refactoring (summary tiles, slug-routed job detail, inline sub-record editing, type-ahead navigation) |
+| auth | W-AUTH | `services/ui/src/auth.rs`, `routes/auth.rs`, `routes/api/admin.rs`, `routes/dashboard.rs`, `infra/cognito.tf` | DONE | W-AUTH.POST-FIX (CloudFront OAC body hash) |
 
 ---
 
@@ -37,7 +37,10 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 2. ~~**W-AUTH.4.20**~~ — Fix Lambda 504: lazy JWKS fetch — **SUPERSEDED** by W-AUTH.4.21
 3. ~~**W-AUTH.4.21**~~ — Fix callback 504: implicit grant + JWKS from env — **DONE** (`allowed_oauth_flows=["implicit"]`; `data "http" cognito_jwks`; `COGNITO_JWKS` env var; HTML callback + `/auth/set-session`; self-sign-up disabled)
 4. **W-AUTH.4.19** — OpenAPI security scheme + admin endpoint docs (`cookieAuth`/`bearerAuth`, 12 admin paths, `ToSchema` on input types)
-5. **W-AUTH.4.22–4.28** — Dashboard master/detail refactoring (summary tiles, slug-routed job detail, inline sub-record editing, type-ahead navigation)
+5. ~~**W-AUTH.4.22–4.28**~~ — Dashboard master/detail refactoring — **DONE** (6 routes, 5 templates, type-ahead nav, dashboard.html monolith deleted)
+
+### P0.5 — Live Site Post-Incident
+1. **W-AUTH.POST-FIX** — POST/PUT requests fail through CloudFront OAC (body hash mismatch with `AllViewerExceptHostHeader`). Dashboard edit forms are broken. Investigate Option C (CloudFront custom origin without OAC body signing) before next auth work. See `DRL-2026-03-27-function-url-auth`.
 
 ### P1 — Must Fix (blocking clean CI)
 1. ~~**W-XT.4.1**~~ — CLI naming: 3 justfile mismatches fixed (`fmt`→`format`, `--crate`→`crate` subcommand, `gate`→`all`) — **RESOLVED**
@@ -82,6 +85,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | DRL-2026-03-18-terraform | 2026-03-18 | Terraform first-run gaps | 6 entries |
 | DRL-2026-03-18-xtask | 2026-03-18 | xtask/justfile gaps | 7 entries |
 | DRL-2026-03-25-opentofu | 2026-03-25 | OpenTofu migration audit | 6 entries |
+| DRL-2026-03-27-function-url-auth | 2026-03-27 | Lambda Function URL auth incident + revert | 2 entries + 2 open items (W-AUTH.POST-FIX, DRL-FUA-2) |
 
 ---
 
@@ -146,3 +150,5 @@ shantopagla/deploy-baba/
 | 7 | Examples + docs | TODO |
 | 8 | Quality pass | TODO |
 | 9 | Publish | TODO |
+
+**Overall: ~90% complete**

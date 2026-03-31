@@ -16,6 +16,9 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 flate2 = { workspace = true }
 
+# Database
+rusqlite = { workspace = true }
+
 # AWS SDK
 aws-config = { workspace = true }
 aws-sdk-sts = { workspace = true }

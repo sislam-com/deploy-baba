@@ -84,7 +84,8 @@ variable "admin_email" {
 }
 
 variable "cognito_temp_password" {
-  description = "Temporary password for baba-admin (must be changed on first login)"
+  description = "Temporary password for baba-admin (must be changed on first login). Ignored after initial user creation (lifecycle.ignore_changes)."
   type        = string
   sensitive   = true
+  default     = "unused-after-first-apply"
 }

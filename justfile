@@ -195,6 +195,20 @@ db-restore-version VERSION PROFILE="default":
 db-list-backups PROFILE="default":
     just aws-check {{PROFILE}} && cargo xtask database list-backups --profile {{PROFILE}}
 
+# ── Resume Generation ────────────────────────────────────────────────────────
+
+# Generate resume files (2 formats × DOCX + PDF) from SQLite — outputs to target/resume/
+resume-generate DB="deploy-baba.db":
+    cargo xtask resume generate --db-path {{DB}}
+
+# Upload generated resume files to S3 assets bucket
+resume-upload PROFILE="default":
+    just aws-check {{PROFILE}} && cargo xtask resume upload --profile {{PROFILE}}
+
+# Full pipeline: generate + upload
+resume PROFILE="default" DB="deploy-baba.db":
+    just resume-generate {{DB}} && just resume-upload {{PROFILE}}
+
 # ── crates.io ────────────────────────────────────────────────────────────────
 
 # Dry-run publish for all library crates
