@@ -127,6 +127,14 @@ publish-dry:
     cargo xtask publish dry-run
 publish:
     just quality && cargo xtask publish release
+
+# ── Agent Cache ───────────────────────────────────────────────────────────────
+cache-status:
+    cargo xtask cache status
+cache-refresh:
+    cargo xtask cache refresh
+cache-clear:
+    cargo xtask cache clear
 ```
 
 ---

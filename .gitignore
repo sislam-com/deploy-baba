@@ -34,3 +34,7 @@ target/lambda/
 deploy-baba.db
 deploy-baba.db-wal
 deploy-baba.db-shm
+
+# Agent cache — index.json is committed (project knowledge), tmp files are not
+.agent-cache/*.tmp
+.agent-cache/*.lock

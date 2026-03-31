@@ -1,0 +1,415 @@
+{% extends "base.html" %}
+
+{% block title %}{% if is_new %}New Job{% else %}{{ job.company }}{% endif %} — Dashboard{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <!-- Toast -->
+  <div id="toast" class="hidden fixed top-4 right-4 z-50 px-4 py-3 rounded-lg text-sm font-medium shadow-lg"></div>
+
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <nav class="text-sm text-gray-400 mb-1">
+        <a href="/dashboard" class="hover:text-white transition">Dashboard</a>
+        <span class="mx-2">›</span>
+        <a href="/dashboard/jobs" class="hover:text-white transition">Jobs</a>
+        <span class="mx-2">›</span>
+        <span class="text-white">{% if is_new %}New Job{% else %}{{ job.company }}{% endif %}</span>
+      </nav>
+      <h1 class="text-2xl font-bold text-white">{% if is_new %}New Job{% else %}{{ job.company }}{% endif %}</h1>
+      <p class="text-gray-400 text-xs mt-1">{{ username }}</p>
+    </div>
+    <a href="/auth/logout"
+       class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded-lg text-sm transition">
+      Logout
+    </a>
+  </div>
+
+  {% if !is_new %}
+  <!-- Job navigation dropdown -->
+  <div class="mb-6 bg-gray-800 rounded-xl p-4 flex items-center gap-3">
+    <label class="text-xs text-gray-400 flex-shrink-0">Jump to job:</label>
+    <select id="job-nav-select" class="form-input flex-1">
+      <option value="">— select —</option>
+      {% for j in all_jobs %}
+      <option value="{{ j.slug }}"{% if j.slug == job.slug %} selected{% endif %}>{{ j.label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  {% endif %}
+
+  <!-- Job form -->
+  <div class="bg-gray-800 rounded-xl p-6 mb-6">
+    <h2 class="text-base font-semibold text-white mb-4">Job</h2>
+    <form id="job-form" class="space-y-4">
+      <input type="hidden" id="job-id" value="{{ job.id }}">
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Slug</label>
+          <input name="slug" value="{{ job.slug }}" class="form-input w-full">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Company</label>
+          <input name="company" value="{{ job.company }}" class="form-input w-full">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Title</label>
+          <input name="title" value="{{ job.title }}" class="form-input w-full">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Location</label>
+          <input name="location" value="{{ job.location }}" class="form-input w-full">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Start Date</label>
+          <input name="start_date" value="{{ job.start_date }}" class="form-input w-full">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">End Date</label>
+          <input name="end_date" value="{{ job.end_date }}" placeholder="Leave blank for Present" class="form-input w-full">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Sort Order</label>
+          <input name="sort_order" type="number" value="{{ job.sort_order }}" class="form-input w-full">
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs text-gray-400 mb-1">Summary</label>
+        <textarea name="summary" rows="3" class="form-input w-full">{{ job.summary }}</textarea>
+      </div>
+      <div>
+        <label class="block text-xs text-gray-400 mb-1">Tech Stack (comma-separated)</label>
+        <input name="tech_stack" value="{{ job.tech_stack }}" class="form-input w-full">
+      </div>
+      <div class="flex gap-3 pt-2">
+        <button type="submit"
+                class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm transition font-medium">
+          {% if is_new %}Create{% else %}Save{% endif %}
+        </button>
+        {% if !is_new %}
+        <button type="button" id="delete-job-btn"
+                class="px-4 py-2 bg-red-900 hover:bg-red-700 text-red-300 hover:text-white rounded-lg text-sm transition">
+          Delete Job
+        </button>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+
+  {% if !is_new %}
+  <!-- Job Details sub-section -->
+  <div class="bg-gray-800 rounded-xl p-6 mb-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-base font-semibold text-white">Job Details</h2>
+      <button onclick="addDetailForm()"
+              class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm transition">
+        + New Detail
+      </button>
+    </div>
+
+    <div id="details-list" class="space-y-3">
+      {% for detail in details %}
+      <div class="detail-row bg-gray-700 rounded-lg p-4" data-id="{{ detail.id }}">
+        <form class="detail-form space-y-3" onsubmit="saveDetail(event, {{ detail.id }})">
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Detail Text</label>
+            <textarea name="detail_text" rows="2" class="form-input w-full">{{ detail.detail_text }}</textarea>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Category</label>
+              <input name="category" value="{{ detail.category }}" class="form-input w-full">
+            </div>
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Sort Order</label>
+              <input name="sort_order" type="number" value="{{ detail.sort_order }}" class="form-input w-full">
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <button type="submit"
+                    class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs transition">Save</button>
+            <button type="button" onclick="deleteDetail(event, {{ detail.id }})"
+                    class="px-3 py-1.5 bg-gray-600 hover:bg-red-700 text-gray-300 hover:text-white rounded-lg text-xs transition">Delete</button>
+          </div>
+        </form>
+      </div>
+      {% else %}
+      <p id="details-empty" class="text-gray-500 text-sm">No details yet.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Evidence sub-section -->
+  <div class="bg-gray-800 rounded-xl p-6 mb-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-base font-semibold text-white">Evidence</h2>
+      <button onclick="addEvidenceForm()"
+              class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm transition">
+        + New Evidence
+      </button>
+    </div>
+
+    <div id="evidence-list" class="space-y-3">
+      {% for ev in evidence %}
+      <div class="evidence-row bg-gray-700 rounded-lg p-4" data-id="{{ ev.id }}">
+        <form class="evidence-form space-y-3" onsubmit="saveEvidence(event, {{ ev.id }})">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Competency</label>
+              <select name="competency_id" class="form-input w-full">
+                {% for comp in all_competencies %}
+                <option value="{{ comp.id }}"{% if comp.id == ev.competency_id %} selected{% endif %}>{{ comp.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Detail ID (optional)</label>
+              <input name="detail_id" type="number" value="{{ ev.detail_id }}" class="form-input w-full">
+            </div>
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Sort Order</label>
+              <input name="sort_order" type="number" value="{{ ev.sort_order }}" class="form-input w-full">
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Highlight Text (optional)</label>
+            <textarea name="highlight_text" rows="2" class="form-input w-full">{{ ev.highlight_text }}</textarea>
+          </div>
+          <div class="flex gap-2">
+            <button type="submit"
+                    class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs transition">Save</button>
+            <button type="button" onclick="deleteEvidence(event, {{ ev.id }})"
+                    class="px-3 py-1.5 bg-gray-600 hover:bg-red-700 text-gray-300 hover:text-white rounded-lg text-xs transition">Delete</button>
+          </div>
+        </form>
+      </div>
+      {% else %}
+      <p id="evidence-empty" class="text-gray-500 text-sm">No evidence linked yet.</p>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<style>
+  .form-input {
+    background-color: #374151;
+    border: 1px solid #4b5563;
+    color: #f9fafb;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    width: 100%;
+  }
+  .form-input:focus {
+    outline: none;
+    border-color: #06b6d4;
+    box-shadow: 0 0 0 1px #06b6d4;
+  }
+  .form-input option {
+    background-color: #374151;
+    color: #f9fafb;
+  }
+</style>
+
+<script>
+const JOB_ID = document.getElementById('job-id')?.value;
+
+// ── Job nav select ────────────────────────────────────────────────────────────
+const jobNavSelect = document.getElementById('job-nav-select');
+if (jobNavSelect) {
+  jobNavSelect.addEventListener('change', () => {
+    const slug = jobNavSelect.value;
+    if (slug) window.location.href = '/dashboard/jobs/' + slug;
+  });
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function toast(msg, type = 'success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `fixed top-4 right-4 z-50 px-4 py-3 rounded-lg text-sm font-medium shadow-lg ${
+    type === 'error' ? 'bg-red-600 text-white' : 'bg-green-600 text-white'
+  }`;
+  el.classList.remove('hidden');
+  setTimeout(() => el.classList.add('hidden'), 3000);
+}
+
+async function apiFetch(url, opts = {}) {
+  try {
+    const r = await fetch(url, opts);
+    if (!r.ok) {
+      const text = await r.text();
+      throw new Error(text || `${r.status} ${r.statusText}`);
+    }
+    if (r.status === 204) return null;
+    return await r.json();
+  } catch (e) {
+    toast(e.message, 'error');
+    return null;
+  }
+}
+
+function formDataFromForm(form) {
+  const data = {};
+  form.querySelectorAll('[name]').forEach(el => {
+    const val = el.value.trim();
+    data[el.name] = val === '' ? null : (el.type === 'number' ? Number(val) : val);
+  });
+  return data;
+}
+
+// ── Job form ──────────────────────────────────────────────────────────────────
+document.getElementById('job-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const id = JOB_ID;
+  const data = formDataFromForm(e.target);
+  const isNew = !id || id === '0';
+  const url = isNew ? '/api/admin/jobs' : `/api/admin/jobs/${id}`;
+  const method = isNew ? 'POST' : 'PUT';
+  const result = await apiFetch(url, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (result) {
+    toast(isNew ? 'Job created' : 'Job updated');
+    const currentSlug = window.location.pathname.split('/').pop();
+    if (result.slug && (isNew || result.slug !== currentSlug)) {
+      window.location.href = '/dashboard/jobs/' + result.slug;
+    }
+  }
+});
+
+const deleteJobBtn = document.getElementById('delete-job-btn');
+if (deleteJobBtn) {
+  deleteJobBtn.addEventListener('click', async () => {
+    if (!confirm('Delete this job and all its details?')) return;
+    await apiFetch(`/api/admin/jobs/${JOB_ID}`, { method: 'DELETE' });
+    toast('Job deleted');
+    setTimeout(() => { window.location.href = '/dashboard/jobs'; }, 800);
+  });
+}
+
+// ── Job Details ───────────────────────────────────────────────────────────────
+function addDetailForm() {
+  document.getElementById('details-empty')?.remove();
+  const list = document.getElementById('details-list');
+  const div = document.createElement('div');
+  div.className = 'detail-row bg-gray-700 rounded-lg p-4';
+  div.innerHTML = `
+    <form class="detail-form space-y-3" onsubmit="saveDetail(event, null)">
+      <div>
+        <label class="block text-xs text-gray-400 mb-1">Detail Text</label>
+        <textarea name="detail_text" rows="2" class="form-input w-full"></textarea>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Category</label>
+          <input name="category" class="form-input w-full">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Sort Order</label>
+          <input name="sort_order" type="number" value="0" class="form-input w-full">
+        </div>
+      </div>
+      <div class="flex gap-2">
+        <button type="submit" class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs transition">Save</button>
+        <button type="button" onclick="this.closest('.detail-row').remove()"
+                class="px-3 py-1.5 bg-gray-600 hover:bg-gray-500 text-gray-300 rounded-lg text-xs transition">Cancel</button>
+      </div>
+    </form>`;
+  list.appendChild(div);
+}
+
+async function saveDetail(e, id) {
+  e.preventDefault();
+  const data = formDataFromForm(e.target);
+  const url = id ? `/api/admin/jobs/${JOB_ID}/details/${id}` : `/api/admin/jobs/${JOB_ID}/details`;
+  const method = id ? 'PUT' : 'POST';
+  const result = await apiFetch(url, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (result) {
+    toast(id ? 'Detail saved' : 'Detail created');
+    if (!id) window.location.reload();
+  }
+}
+
+async function deleteDetail(e, id) {
+  e.preventDefault();
+  if (!confirm('Delete this detail?')) return;
+  await apiFetch(`/api/admin/jobs/${JOB_ID}/details/${id}`, { method: 'DELETE' });
+  toast('Detail deleted');
+  e.target.closest('.detail-row').remove();
+}
+
+// ── Evidence ──────────────────────────────────────────────────────────────────
+function addEvidenceForm() {
+  document.getElementById('evidence-empty')?.remove();
+  const list = document.getElementById('evidence-list');
+  // Competency options cloned from existing server-rendered select (if any)
+  const existingSelect = document.querySelector('.evidence-form select[name=competency_id]');
+  const compOptions = existingSelect
+    ? existingSelect.innerHTML
+    : '{% for comp in all_competencies %}<option value="{{ comp.id }}">{{ comp.name }}</option>{% endfor %}';
+  const div = document.createElement('div');
+  div.className = 'evidence-row bg-gray-700 rounded-lg p-4';
+  div.innerHTML = `
+    <form class="evidence-form space-y-3" onsubmit="saveEvidence(event, null)">
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Competency</label>
+          <select name="competency_id" class="form-input w-full">${compOptions}</select>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Detail ID (optional)</label>
+          <input name="detail_id" type="number" class="form-input w-full">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Sort Order</label>
+          <input name="sort_order" type="number" value="0" class="form-input w-full">
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs text-gray-400 mb-1">Highlight Text (optional)</label>
+        <textarea name="highlight_text" rows="2" class="form-input w-full"></textarea>
+      </div>
+      <div class="flex gap-2">
+        <button type="submit" class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs transition">Save</button>
+        <button type="button" onclick="this.closest('.evidence-row').remove()"
+                class="px-3 py-1.5 bg-gray-600 hover:bg-gray-500 text-gray-300 rounded-lg text-xs transition">Cancel</button>
+      </div>
+    </form>`;
+  list.appendChild(div);
+}
+
+async function saveEvidence(e, id) {
+  e.preventDefault();
+  const data = formDataFromForm(e.target);
+  data.job_id = Number(JOB_ID);
+  const url = id ? `/api/admin/evidence/${id}` : '/api/admin/evidence';
+  const method = id ? 'PUT' : 'POST';
+  const result = await apiFetch(url, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (result) {
+    toast(id ? 'Evidence saved' : 'Evidence created');
+    if (!id) window.location.reload();
+  }
+}
+
+async function deleteEvidence(e, id) {
+  e.preventDefault();
+  if (!confirm('Delete this evidence link?')) return;
+  await apiFetch(`/api/admin/evidence/${id}`, { method: 'DELETE' });
+  toast('Evidence deleted');
+  e.target.closest('.evidence-row').remove();
+}
+</script>
+{% endblock %}

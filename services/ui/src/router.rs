@@ -15,9 +15,29 @@ pub fn build(state: AppState) -> Router {
         axum::middleware::from_fn_with_state(state.clone(), crate::middleware::require_auth),
     );
 
-    // Dashboard — protected by require_auth middleware
+    // Dashboard routes — all protected by require_auth middleware
     let dashboard_route = Router::new()
-        .route("/dashboard", get(routes::dashboard::dashboard_handler))
+        .route("/dashboard", get(routes::dashboard::dashboard_home))
+        .route(
+            "/dashboard/jobs",
+            get(routes::dashboard::dashboard_jobs_list),
+        )
+        .route(
+            "/dashboard/jobs/new",
+            get(routes::dashboard::dashboard_job_new),
+        )
+        .route(
+            "/dashboard/jobs/:slug",
+            get(routes::dashboard::dashboard_job_detail),
+        )
+        .route(
+            "/dashboard/competencies",
+            get(routes::dashboard::dashboard_competencies_list),
+        )
+        .route(
+            "/dashboard/competencies/:slug",
+            get(routes::dashboard::dashboard_competency_detail),
+        )
         .route_layer(axum::middleware::from_fn_with_state(
             state.clone(),
             crate::middleware::require_auth,

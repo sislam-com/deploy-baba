@@ -204,3 +204,17 @@ publish-dry:
 # Publish all library crates in dependency order
 publish:
     just quality && cargo xtask publish release
+
+# ── Agent Cache ──────────────────────────────────────────────────────────────
+
+# Show cache age and whether it's stale vs current HEAD
+cache-status:
+    cargo xtask cache status
+
+# Re-scan the codebase and rewrite .agent-cache/index.json
+cache-refresh:
+    cargo xtask cache refresh
+
+# Delete the cache to force a full re-scan next session
+cache-clear:
+    cargo xtask cache clear

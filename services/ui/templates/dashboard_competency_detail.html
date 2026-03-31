@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+
+{% block title %}{{ competency.name }} — Dashboard{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <!-- Toast -->
+  <div id="toast" class="hidden fixed top-4 right-4 z-50 px-4 py-3 rounded-lg text-sm font-medium shadow-lg"></div>
+
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <nav class="text-sm text-gray-400 mb-1">
+        <a href="/dashboard" class="hover:text-white transition">Dashboard</a>
+        <span class="mx-2">›</span>
+        <a href="/dashboard/competencies" class="hover:text-white transition">Competencies</a>
+        <span class="mx-2">›</span>
+        <span class="text-white">{{ competency.name }}</span>
+      </nav>
+      <h1 class="text-2xl font-bold text-white">{{ competency.name }}</h1>
+      <p class="text-gray-400 text-xs mt-1">{{ username }}</p>
+    </div>
+    <a href="/auth/logout"
+       class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded-lg text-sm transition">
+      Logout
+    </a>
+  </div>
+
+  <!-- Competency form -->
+  <div class="bg-gray-800 rounded-xl p-6 mb-6">
+    <h2 class="text-base font-semibold text-white mb-4">Competency</h2>
+    <form id="comp-form" class="space-y-4">
+      <input type="hidden" id="comp-id" value="{{ competency.id }}">
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Slug</label>
+          <input name="slug" value="{{ competency.slug }}" class="form-input w-full">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Name</label>
+          <input name="name" value="{{ competency.name }}" class="form-input w-full">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Icon</label>
+          <input name="icon" value="{{ competency.icon }}" class="form-input w-full">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Sort Order</label>
+          <input name="sort_order" type="number" value="{{ competency.sort_order }}" class="form-input w-full">
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs text-gray-400 mb-1">Description</label>
+        <textarea name="description" rows="3" class="form-input w-full">{{ competency.description }}</textarea>
+      </div>
+      <div class="flex gap-3 pt-2">
+        <button type="submit"
+                class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm transition font-medium">
+          Save
+        </button>
+        <button type="button" id="delete-comp-btn"
+                class="px-4 py-2 bg-red-900 hover:bg-red-700 text-red-300 hover:text-white rounded-lg text-sm transition">
+          Delete
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Evidence sub-section -->
+  <div class="bg-gray-800 rounded-xl p-6 mb-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-base font-semibold text-white">Evidence</h2>
+      <button onclick="addEvidenceForm()"
+              class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm transition">
+        + New Evidence
+      </button>
+    </div>
+
+    <div id="evidence-list" class="space-y-3">
+      {% for ev in evidence %}
+      <div class="evidence-row bg-gray-700 rounded-lg p-4" data-id="{{ ev.id }}">
+        <form class="evidence-form space-y-3" onsubmit="saveEvidence(event, {{ ev.id }}, {{ ev.job_id }})">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Job</label>
+              <select name="job_slug" class="form-input w-full">
+                {% for j in all_jobs %}
+                <option value="{{ j.slug }}"{% if j.slug == ev.job_slug %} selected{% endif %}>{{ j.label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Detail ID (optional)</label>
+              <input name="detail_id" type="number" value="{{ ev.detail_id }}" class="form-input w-full">
+            </div>
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Sort Order</label>
+              <input name="sort_order" type="number" value="{{ ev.sort_order }}" class="form-input w-full">
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Highlight Text (optional)</label>
+            <textarea name="highlight_text" rows="2" class="form-input w-full">{{ ev.highlight_text }}</textarea>
+          </div>
+          {% if ev.detail_text != "" %}
+          <p class="text-gray-500 text-xs italic">Linked detail: {{ ev.detail_text }}</p>
+          {% endif %}
+          <div class="flex gap-2">
+            <button type="submit"
+                    class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs transition">Save</button>
+            <button type="button" onclick="deleteEvidence(event, {{ ev.id }})"
+                    class="px-3 py-1.5 bg-gray-600 hover:bg-red-700 text-gray-300 hover:text-white rounded-lg text-xs transition">Delete</button>
+          </div>
+        </form>
+      </div>
+      {% else %}
+      <p id="evidence-empty" class="text-gray-500 text-sm">No evidence linked yet.</p>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<style>
+  .form-input {
+    background-color: #374151;
+    border: 1px solid #4b5563;
+    color: #f9fafb;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    width: 100%;
+  }
+  .form-input:focus {
+    outline: none;
+    border-color: #06b6d4;
+    box-shadow: 0 0 0 1px #06b6d4;
+  }
+  .form-input option {
+    background-color: #374151;
+    color: #f9fafb;
+  }
+</style>
+
+<script>
+const COMP_ID = document.getElementById('comp-id').value;
+
+// Server-rendered job slug→label map for new evidence forms
+const JOB_OPTIONS_HTML = `{% for j in all_jobs %}<option value="{{ j.slug }}">{{ j.label }}</option>{% endfor %}`;
+
+function toast(msg, type = 'success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `fixed top-4 right-4 z-50 px-4 py-3 rounded-lg text-sm font-medium shadow-lg ${
+    type === 'error' ? 'bg-red-600 text-white' : 'bg-green-600 text-white'
+  }`;
+  el.classList.remove('hidden');
+  setTimeout(() => el.classList.add('hidden'), 3000);
+}
+
+async function apiFetch(url, opts = {}) {
+  try {
+    const r = await fetch(url, opts);
+    if (!r.ok) {
+      const text = await r.text();
+      throw new Error(text || `${r.status} ${r.statusText}`);
+    }
+    if (r.status === 204) return null;
+    return await r.json();
+  } catch (e) {
+    toast(e.message, 'error');
+    return null;
+  }
+}
+
+function formDataFromForm(form) {
+  const data = {};
+  form.querySelectorAll('[name]').forEach(el => {
+    const val = el.value.trim();
+    data[el.name] = val === '' ? null : (el.type === 'number' ? (val === '' ? null : Number(val)) : val);
+  });
+  return data;
+}
+
+// Resolve job slug to numeric id via public API
+async function resolveJobId(slug) {
+  const jobs = await apiFetch('/api/jobs');
+  if (!jobs) return null;
+  const job = jobs.find(j => j.slug === slug);
+  return job ? job.id : null;
+}
+
+// ── Competency form ───────────────────────────────────────────────────────────
+document.getElementById('comp-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const data = formDataFromForm(e.target);
+  const result = await apiFetch(`/api/admin/competencies/${COMP_ID}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (result) {
+    toast('Competency updated');
+    if (result.slug && result.slug !== window.location.pathname.split('/').pop()) {
+      window.location.href = '/dashboard/competencies/' + result.slug;
+    }
+  }
+});
+
+document.getElementById('delete-comp-btn').addEventListener('click', async () => {
+  if (!confirm('Delete this competency?')) return;
+  await apiFetch(`/api/admin/competencies/${COMP_ID}`, { method: 'DELETE' });
+  toast('Competency deleted');
+  setTimeout(() => { window.location.href = '/dashboard/competencies'; }, 800);
+});
+
+// ── Evidence ──────────────────────────────────────────────────────────────────
+function addEvidenceForm() {
+  document.getElementById('evidence-empty')?.remove();
+  const list = document.getElementById('evidence-list');
+  const div = document.createElement('div');
+  div.className = 'evidence-row bg-gray-700 rounded-lg p-4';
+  div.innerHTML = `
+    <form class="evidence-form space-y-3" onsubmit="saveEvidence(event, null, null)">
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Job</label>
+          <select name="job_slug" class="form-input w-full">${JOB_OPTIONS_HTML}</select>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Detail ID (optional)</label>
+          <input name="detail_id" type="number" class="form-input w-full">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Sort Order</label>
+          <input name="sort_order" type="number" value="0" class="form-input w-full">
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs text-gray-400 mb-1">Highlight Text (optional)</label>
+        <textarea name="highlight_text" rows="2" class="form-input w-full"></textarea>
+      </div>
+      <div class="flex gap-2">
+        <button type="submit" class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs transition">Save</button>
+        <button type="button" onclick="this.closest('.evidence-row').remove()"
+                class="px-3 py-1.5 bg-gray-600 hover:bg-gray-500 text-gray-300 rounded-lg text-xs transition">Cancel</button>
+      </div>
+    </form>`;
+  list.appendChild(div);
+}
+
+async function saveEvidence(e, id, existingJobId) {
+  e.preventDefault();
+  const data = formDataFromForm(e.target);
+  data.competency_id = Number(COMP_ID);
+
+  // Resolve job_id from slug if changed, otherwise use existing
+  const jobSlug = e.target.querySelector('[name=job_slug]').value;
+  let jobId = existingJobId;
+  if (!jobId || jobSlug) {
+    jobId = await resolveJobId(jobSlug);
+    if (!jobId) return;
+  }
+  data.job_id = jobId;
+  delete data.job_slug;
+
+  const url = id ? `/api/admin/evidence/${id}` : '/api/admin/evidence';
+  const method = id ? 'PUT' : 'POST';
+  const result = await apiFetch(url, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (result) {
+    toast(id ? 'Evidence saved' : 'Evidence created');
+    if (!id) window.location.reload();
+  }
+}
+
+async function deleteEvidence(e, id) {
+  e.preventDefault();
+  if (!confirm('Delete this evidence link?')) return;
+  await apiFetch(`/api/admin/evidence/${id}`, { method: 'DELETE' });
+  toast('Evidence deleted');
+  e.target.closest('.evidence-row').remove();
+}
+</script>
+{% endblock %}

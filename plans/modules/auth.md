@@ -168,15 +168,22 @@ On success: `Claims` injected into request extensions via `.extensions_mut().ins
 | `Max-Age` | 3600 (1h) | Matches Cognito ID token TTL |
 | `Path` | `/` | Available site-wide |
 
-### 3.5 Dashboard — `services/ui/templates/dashboard.html`
+### 3.5 Dashboard — server-rendered master/detail architecture
 
-Client-rendered master/detail layout:
-- **Left sidebar:** accordion — Jobs → Job Details → Competencies → Evidence
-- **Right panel:** editable form for selected item; submit via PUT to `/api/admin/*`
-- **Data source:** existing public GET APIs (`/api/jobs`, `/api/competencies`)
-- **Toast notifications:** success/error feedback without full page reload
+Multi-route, multi-template architecture replacing the single-page monolith:
 
-Extends `base.html`; styled with Tailwind (same as rest of site).
+| Route | Template | Purpose |
+|-------|----------|---------|
+| `GET /dashboard` | `dashboard_home.html` | Summary tiles with entity counts |
+| `GET /dashboard/jobs` | `dashboard_jobs_list.html` | Job master list; rows link to detail |
+| `GET /dashboard/jobs/new` | `dashboard_job_detail.html` | Empty form; `is_new=true` |
+| `GET /dashboard/jobs/:slug` | `dashboard_job_detail.html` | Job + details + evidence; type-ahead nav |
+| `GET /dashboard/competencies` | `dashboard_competencies_list.html` | Competency master list |
+| `GET /dashboard/competencies/:slug` | `dashboard_competency_detail.html` | Competency + linked evidence |
+
+Each template extends `base.html`; styled with Tailwind. JavaScript uses `fetch()` to call existing
+`/api/admin/*` CRUD endpoints — no new API routes needed. Type-ahead navigation on job detail page
+uses a JS map of `{label: slug}` built from server-rendered data.
 
 ### 3.6 Dependency Graph
 
@@ -197,6 +204,14 @@ W-AUTH.4.5 (workspace deps)
                    ├─► W-AUTH.4.13 (dashboard.html)
                    ├─► W-AUTH.4.14 (base.html login button)
                    └─► W-AUTH.4.15 (router.rs wiring)
+
+W-AUTH.4.22 (dashboard.rs refactor — 6 handlers + template structs)
+    ├─► W-AUTH.4.23 (dashboard_home.html — summary tiles)
+    ├─► W-AUTH.4.24 (dashboard_jobs_list.html — master list)
+    ├─► W-AUTH.4.25 (dashboard_job_detail.html — detail + sub-records + type-ahead)
+    ├─► W-AUTH.4.26 (dashboard_competencies_list.html + dashboard_competency_detail.html)
+    ├─► W-AUTH.4.27 (router.rs — mount 6 routes with auth middleware)
+    └─► W-AUTH.4.28 (delete dashboard.html monolith)
 ```
 
 ---
@@ -226,6 +241,13 @@ W-AUTH.4.5 (workspace deps)
 | W-AUTH.4.19 | Add OpenAPI security scheme + admin endpoint docs | DONE | cookieAuth/bearerAuth, 12 admin paths, ToSchema on input types |
 | W-AUTH.4.20 | Fix Lambda 504 — lazy JWKS fetch with 5s timeout | SUPERSEDED | Deferred fetch still failed (VPC has no NAT Gateway). Replaced by W-AUTH.4.21. |
 | W-AUTH.4.21 | Fix Cognito callback 504 — implicit grant + JWKS from env var | DONE | `allowed_oauth_flows=["implicit"]`; `allow_admin_create_user_only=true` (no self-signup); `data "http" cognito_jwks`; `COGNITO_JWKS` env var; HTML callback page + `/auth/set-session` endpoint; zero Lambda outbound calls |
+| W-AUTH.4.22 | Refactor `dashboard.rs` — split into 6 handlers + template structs | TODO | Home (counts), Jobs list, Job detail, Job new, Competencies list, Competency detail |
+| W-AUTH.4.23 | Create `templates/dashboard_home.html` — summary tiles with counts | TODO | Extends base.html; 4 tiles linking to list views |
+| W-AUTH.4.24 | Create `templates/dashboard_jobs_list.html` — job master list | TODO | Breadcrumb nav; rows link to `/dashboard/jobs/{slug}` |
+| W-AUTH.4.25 | Create `templates/dashboard_job_detail.html` — job detail + sub-records | TODO | Type-ahead nav, editable job form, inline job_details forms, inline evidence forms |
+| W-AUTH.4.26 | Create `templates/dashboard_competencies_list.html` + `dashboard_competency_detail.html` | TODO | List + detail views for competencies with linked evidence |
+| W-AUTH.4.27 | Update `router.rs` — mount 6 dashboard routes with auth middleware | TODO | Replace single `/dashboard` route; literal `/new` before `/:slug` |
+| W-AUTH.4.28 | Delete `templates/dashboard.html` monolith | TODO | Replaced by 5 new templates |
 
 ---
 

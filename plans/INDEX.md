@@ -26,7 +26,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | terraform | W-TF | `infra/` | SUPERSEDED | Replaced by W-OTF (OpenTofu). W-TF.4.1 and W-TF.4.2 already fixed in code. |
 | opentofu | W-OTF | `infra/` + `xtask/src/infra/` | WIP | Install `tofu` binary (W-OTF.4.1 OPEN); smoke test (W-OTF.4.7 BLOCKED); docs (W-OTF.4.9 TODO) |
 | dx-justfile | W-DX | `justfile`, `docs/`, `examples/` | WIP | Per-crate READMEs, integration tests |
-| auth | W-AUTH | `services/ui/src/auth.rs`, `routes/auth.rs`, `routes/api/admin.rs`, `infra/cognito.tf` | WIP | W-AUTH.4.1–4.15 DONE (code compiles, Cognito infra deployed); W-AUTH.4.19 TODO (OpenAPI security scheme + admin endpoint docs) |
+| auth | W-AUTH | `services/ui/src/auth.rs`, `routes/auth.rs`, `routes/api/admin.rs`, `routes/dashboard.rs`, `infra/cognito.tf` | WIP | W-AUTH.4.22–4.28 dashboard master/detail refactoring (summary tiles, slug-routed job detail, inline sub-record editing, type-ahead navigation) |
 
 ---
 
@@ -37,6 +37,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 2. ~~**W-AUTH.4.20**~~ — Fix Lambda 504: lazy JWKS fetch — **SUPERSEDED** by W-AUTH.4.21
 3. ~~**W-AUTH.4.21**~~ — Fix callback 504: implicit grant + JWKS from env — **DONE** (`allowed_oauth_flows=["implicit"]`; `data "http" cognito_jwks`; `COGNITO_JWKS` env var; HTML callback + `/auth/set-session`; self-sign-up disabled)
 4. **W-AUTH.4.19** — OpenAPI security scheme + admin endpoint docs (`cookieAuth`/`bearerAuth`, 12 admin paths, `ToSchema` on input types)
+5. **W-AUTH.4.22–4.28** — Dashboard master/detail refactoring (summary tiles, slug-routed job detail, inline sub-record editing, type-ahead navigation)
 
 ### P1 — Must Fix (blocking clean CI)
 1. ~~**W-XT.4.1**~~ — CLI naming: 3 justfile mismatches fixed (`fmt`→`format`, `--crate`→`crate` subcommand, `gate`→`all`) — **RESOLVED**

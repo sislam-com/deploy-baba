@@ -5,6 +5,50 @@ It includes global instructions (inlined from `~/CLAUDE.md`) plus project-specif
 
 ---
 
+## ⚡ Agent Cache Protocol — READ THIS FIRST ON EVERY STARTUP
+
+Before exploring any files, always run the cache check sequence:
+
+```
+1. Read `.agent-cache/index.json`          ← full project knowledge snapshot
+2. Run: git rev-parse HEAD                 ← get current SHA
+3. Compare SHA to index.json `git.sha`
+```
+
+**If SHAs match** → cache is fresh. Use `.agent-cache/index.json` as ground truth.
+Skip re-reading Cargo.toml files, plans, crate structure, ADRs, and infra layout.
+Only read source files for the specific task at hand.
+
+**If SHAs differ** → cache is stale for changed components only.
+Run: `git diff --name-only <cached_sha> HEAD` to find changed files.
+Re-read only the files in changed components. Skip everything else.
+
+**After any new discovery** → update `.agent-cache/index.json` with findings.
+Update `git.sha`, `last_updated`, and the relevant component's `git_sha_at_scan`.
+
+### What the cache contains
+
+| Key | Contents |
+|-----|----------|
+| `project` | Name, status, tech stack, task runner |
+| `crates.*` | Per-crate: description, dependencies, dependents, role, open issues |
+| `services.ui` | Routes dir, templates dir, framework, auth, open issues |
+| `infra` | OpenTofu files, AWS resources, open issues |
+| `plans` | Priority queue (P0→P3), module status, ADRs |
+| `database` | Engine, location, migration path |
+| `key_commands` | All `just` commands |
+| `known_patterns` | Error handling, async, templating conventions |
+| `adrs` | All 6 architecture decisions at a glance |
+
+### Cache management
+- `just cache-status` — show cache age and staleness vs current HEAD
+- `just cache-refresh` — re-scan the codebase and rewrite the cache
+- `just cache-clear` — delete cache to force a full re-scan next session
+
+---
+
+---
+
 ## About Me
 
 - **Name:** shantopagla

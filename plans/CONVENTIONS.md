@@ -42,6 +42,7 @@ Example: `DRL-2026-03-18-terraform.md`
 | `OTF` | opentofu | `infra/` + `xtask/src/infra/` |
 | `DX` | justfile + docs + examples | `justfile`, `docs/`, `examples/` |
 | `PUB` | Publishing | crates.io release |
+| `AUTH` | auth | `services/ui/src/auth.rs`, `routes/auth.rs`, `routes/api/admin.rs`, `routes/dashboard.rs` |
 
 ---
 

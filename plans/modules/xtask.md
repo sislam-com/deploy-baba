@@ -24,7 +24,7 @@ just <command> → justfile recipe → cargo xtask <subcommand> → actual tooli
 ```
 xtask/src/
 ├── main.rs          clap dispatcher: build | test | coverage | quality |
-│                    aws | infra | deploy | database | publish
+│                    aws | infra | deploy | cache | database | publish
 ├── build.rs         fmt [--check], lint, compile
 ├── test.rs          unit, all, --crate, quarantine isolation
 ├── coverage.rs      per-crate floors, HTML report, --open flag
@@ -43,6 +43,8 @@ xtask/src/
 │   ├── mod.rs       tofu wrapper, reads AWS profile + region from stack.toml
 │   ├── tofu.rs      init, plan, apply, destroy, output (-json)
 │   └── bootstrap.rs S3 state bucket + DynamoDB lock + SSM sentinel + tofu init
+├── cache.rs         agent cache management: status | refresh | clear
+│                    reads/writes .agent-cache/index.json; updates git SHA fields
 └── database/
     ├── mod.rs       SQLite + S3 config from stack.toml
     ├── backup.rs    VACUUM INTO + gzip + S3 upload + retention pruning
@@ -111,6 +113,7 @@ Note: `-chdir=<dir>` must come before the subcommand name.
 | W-XT.4.1 | Fix CLI naming mismatch | FIXED | 3 justfile mismatches corrected: `fmt`→`format` (build), `--crate`→`crate` subcommand (test), `gate`→`all` (quality) |
 | W-XT.4.2 | Remove or wire EnvironmentInterpolator | OPEN | Dead code warning; either use in build.rs or delete |
 | W-XT.4.3 | Fully implement bootstrap.rs | OPEN | Fixed in DRL but needs `just infra-bootstrap` to be tested end-to-end |
+| W-XT.4.4 | cache.rs subcommand | DONE | Replaces inline Python heredoc in justfile (which `just` could not parse); implements status/refresh/clear via serde_json |
 
 ---
 

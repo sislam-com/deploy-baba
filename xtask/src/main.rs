@@ -8,6 +8,7 @@ use std::process::exit;
 
 mod aws;
 mod build;
+mod cache;
 mod coverage;
 mod database;
 mod deploy;
@@ -60,6 +61,11 @@ enum Commands {
         #[command(subcommand)]
         action: deploy::DeployAction,
     },
+    /// Agent cache management (status/refresh/clear)
+    Cache {
+        #[command(subcommand)]
+        action: cache::CacheAction,
+    },
     /// Database operations (backup/restore)
     Database {
         #[command(subcommand)]
@@ -94,6 +100,7 @@ async fn run() -> anyhow::Result<()> {
         Commands::Aws { action } => aws::execute(action).await,
         Commands::Infra { action } => infra::execute(action).await,
         Commands::Deploy { action } => deploy::execute(action).await,
+        Commands::Cache { action } => cache::execute(action).await,
         Commands::Database { action } => database::execute(action).await,
         Commands::Publish {
             environment,
