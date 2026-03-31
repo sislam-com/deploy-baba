@@ -1,0 +1,7 @@
+target/
+.git/
+*.db
+infra/
+.terraform/
+.tofu/
+plans/
