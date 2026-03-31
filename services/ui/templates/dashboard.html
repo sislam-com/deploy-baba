@@ -1,0 +1,549 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — Sharful Islam{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-8">
+    <div>
+      <h1 class="text-2xl font-bold text-white">Admin Dashboard</h1>
+      <p class="text-gray-400 text-sm mt-1">Logged in as <span class="text-cyan-400">{{ username }}</span></p>
+    </div>
+    <a href="/auth/logout"
+       class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded-lg text-sm transition">
+      Logout
+    </a>
+  </div>
+
+  <div class="flex gap-6">
+    <!-- Sidebar -->
+    <aside class="w-64 flex-shrink-0">
+      <nav class="space-y-1">
+        <button onclick="showSection('jobs')"
+                class="section-btn w-full text-left px-4 py-2 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition text-sm font-medium">
+          Jobs
+        </button>
+        <button onclick="showSection('job-details')"
+                class="section-btn w-full text-left px-4 py-2 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition text-sm font-medium">
+          Job Details
+        </button>
+        <button onclick="showSection('competencies')"
+                class="section-btn w-full text-left px-4 py-2 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition text-sm font-medium">
+          Competencies
+        </button>
+        <button onclick="showSection('evidence')"
+                class="section-btn w-full text-left px-4 py-2 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition text-sm font-medium">
+          Evidence
+        </button>
+      </nav>
+    </aside>
+
+    <!-- Main panel -->
+    <main class="flex-1 min-w-0">
+      <!-- Toast -->
+      <div id="toast" class="hidden fixed top-4 right-4 z-50 px-4 py-3 rounded-lg text-sm font-medium shadow-lg"></div>
+
+      <!-- Jobs section -->
+      <section id="section-jobs" class="hidden">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold text-white">Jobs</h2>
+          <button onclick="newJob()" class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm transition">+ New</button>
+        </div>
+        <div id="jobs-list" class="space-y-2 mb-6"></div>
+        <form id="job-form" class="hidden bg-gray-800 rounded-xl p-6 space-y-4">
+          <input type="hidden" id="job-id">
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Slug</label>
+              <input name="slug" class="form-input w-full">
+            </div>
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Company</label>
+              <input name="company" class="form-input w-full">
+            </div>
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Title</label>
+              <input name="title" class="form-input w-full">
+            </div>
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Location</label>
+              <input name="location" class="form-input w-full">
+            </div>
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Start Date</label>
+              <input name="start_date" class="form-input w-full">
+            </div>
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">End Date</label>
+              <input name="end_date" placeholder="Leave blank for Present" class="form-input w-full">
+            </div>
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Sort Order</label>
+              <input name="sort_order" type="number" class="form-input w-full">
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Summary</label>
+            <textarea name="summary" rows="3" class="form-input w-full"></textarea>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Tech Stack (comma-separated)</label>
+            <input name="tech_stack" class="form-input w-full">
+          </div>
+          <div class="flex gap-3 pt-2">
+            <button type="submit" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm transition">Save</button>
+            <button type="button" onclick="cancelForm('job-form')" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm transition">Cancel</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Job Details section -->
+      <section id="section-job-details" class="hidden">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold text-white">Job Details</h2>
+        </div>
+        <div class="mb-4">
+          <label class="block text-xs text-gray-400 mb-1">Select Job</label>
+          <select id="jd-job-select" onchange="loadJobDetails()" class="form-input w-64">
+            <option value="">— pick a job —</option>
+          </select>
+        </div>
+        <button onclick="newJobDetail()" class="mb-4 px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm transition hidden" id="jd-new-btn">+ New Detail</button>
+        <div id="job-details-list" class="space-y-2 mb-6"></div>
+        <form id="jd-form" class="hidden bg-gray-800 rounded-xl p-6 space-y-4">
+          <input type="hidden" id="jd-id">
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Detail Text</label>
+            <textarea name="detail_text" rows="3" class="form-input w-full"></textarea>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Category</label>
+              <input name="category" class="form-input w-full">
+            </div>
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Sort Order</label>
+              <input name="sort_order" type="number" class="form-input w-full">
+            </div>
+          </div>
+          <div class="flex gap-3 pt-2">
+            <button type="submit" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm transition">Save</button>
+            <button type="button" onclick="cancelForm('jd-form')" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm transition">Cancel</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Competencies section -->
+      <section id="section-competencies" class="hidden">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold text-white">Competencies</h2>
+          <button onclick="newCompetency()" class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm transition">+ New</button>
+        </div>
+        <div id="competencies-list" class="space-y-2 mb-6"></div>
+        <form id="comp-form" class="hidden bg-gray-800 rounded-xl p-6 space-y-4">
+          <input type="hidden" id="comp-id">
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Slug</label>
+              <input name="slug" class="form-input w-full">
+            </div>
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Name</label>
+              <input name="name" class="form-input w-full">
+            </div>
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Icon</label>
+              <input name="icon" class="form-input w-full">
+            </div>
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Sort Order</label>
+              <input name="sort_order" type="number" class="form-input w-full">
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Description</label>
+            <textarea name="description" rows="3" class="form-input w-full"></textarea>
+          </div>
+          <div class="flex gap-3 pt-2">
+            <button type="submit" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm transition">Save</button>
+            <button type="button" onclick="cancelForm('comp-form')" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm transition">Cancel</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Evidence section -->
+      <section id="section-evidence" class="hidden">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold text-white">Evidence</h2>
+          <button onclick="newEvidence()" class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm transition">+ New</button>
+        </div>
+        <div id="evidence-list" class="space-y-2 mb-6"></div>
+        <form id="ev-form" class="hidden bg-gray-800 rounded-xl p-6 space-y-4">
+          <input type="hidden" id="ev-id">
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Competency</label>
+              <select name="competency_id" id="ev-comp-select" class="form-input w-full"></select>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Job</label>
+              <select name="job_id" id="ev-job-select" class="form-input w-full"></select>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Detail ID (optional)</label>
+              <input name="detail_id" type="number" class="form-input w-full">
+            </div>
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Sort Order</label>
+              <input name="sort_order" type="number" class="form-input w-full">
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Highlight Text (optional)</label>
+            <textarea name="highlight_text" rows="2" class="form-input w-full"></textarea>
+          </div>
+          <div class="flex gap-3 pt-2">
+            <button type="submit" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm transition">Save</button>
+            <button type="button" onclick="cancelForm('ev-form')" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm transition">Cancel</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Empty state -->
+      <div id="section-empty" class="text-center py-20 text-gray-500">
+        Select a section from the sidebar to get started.
+      </div>
+    </main>
+  </div>
+</div>
+
+<style>
+  .form-input {
+    background-color: #374151; /* gray-700 */
+    border: 1px solid #4b5563; /* gray-600 */
+    color: #f9fafb; /* gray-50 */
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    width: 100%;
+  }
+  .form-input:focus {
+    outline: none;
+    border-color: #06b6d4; /* cyan-500 */
+    box-shadow: 0 0 0 1px #06b6d4;
+  }
+  .form-input option {
+    background-color: #374151;
+    color: #f9fafb;
+  }
+</style>
+
+<script>
+// ── State ───────────────────────────────────────────────────────────────────
+let allJobs = [];
+let allCompetencies = [];
+let currentSection = null;
+let editingJobId = null;  // for job-details context
+
+// ── Init ────────────────────────────────────────────────────────────────────
+(async function init() {
+  [allJobs, allCompetencies] = await Promise.all([
+    apiFetch('/api/jobs'),
+    apiFetch('/api/competencies'),
+  ]);
+
+  // Populate job-details job selector
+  const sel = document.getElementById('jd-job-select');
+  allJobs.forEach(j => {
+    const opt = document.createElement('option');
+    opt.value = j.id;
+    opt.textContent = `${j.company} — ${j.title}`;
+    sel.appendChild(opt);
+  });
+
+  // Populate evidence selects
+  populateSelect('ev-comp-select', allCompetencies, c => `${c.name}`);
+  populateSelect('ev-job-select', allJobs, j => `${j.company} — ${j.title}`);
+})();
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+async function apiFetch(url, opts = {}) {
+  try {
+    const r = await fetch(url, opts);
+    if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+    if (r.status === 204) return null;
+    return await r.json();
+  } catch (e) {
+    toast(e.message, 'error');
+    return null;
+  }
+}
+
+function toast(msg, type = 'success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `fixed top-4 right-4 z-50 px-4 py-3 rounded-lg text-sm font-medium shadow-lg ${
+    type === 'error' ? 'bg-red-600 text-white' : 'bg-green-600 text-white'
+  }`;
+  el.classList.remove('hidden');
+  setTimeout(() => el.classList.add('hidden'), 3000);
+}
+
+function populateSelect(id, items, label) {
+  const sel = document.getElementById(id);
+  sel.innerHTML = '';
+  items.forEach(item => {
+    const opt = document.createElement('option');
+    opt.value = item.id;
+    opt.textContent = label(item);
+    sel.appendChild(opt);
+  });
+}
+
+function showSection(name) {
+  document.querySelectorAll('[id^="section-"]').forEach(el => el.classList.add('hidden'));
+  document.getElementById(`section-${name}`).classList.remove('hidden');
+  document.getElementById('section-empty').classList.add('hidden');
+
+  document.querySelectorAll('.section-btn').forEach(b => b.classList.remove('bg-gray-700', 'text-white'));
+  event.target.classList.add('bg-gray-700', 'text-white');
+
+  currentSection = name;
+  if (name === 'jobs') loadJobs();
+  if (name === 'competencies') loadCompetencies();
+  if (name === 'evidence') loadEvidence();
+}
+
+function cancelForm(formId) {
+  document.getElementById(formId).classList.add('hidden');
+}
+
+function formData(formId) {
+  const form = document.getElementById(formId);
+  const data = {};
+  form.querySelectorAll('[name]').forEach(el => {
+    const val = el.value.trim();
+    data[el.name] = val === '' ? null : (el.type === 'number' ? Number(val) : val);
+  });
+  return data;
+}
+
+// ── Jobs ─────────────────────────────────────────────────────────────────────
+async function loadJobs() {
+  allJobs = await apiFetch('/api/jobs') || allJobs;
+  const list = document.getElementById('jobs-list');
+  list.innerHTML = allJobs.map(j => `
+    <div class="flex items-center justify-between bg-gray-800 rounded-lg px-4 py-3">
+      <div>
+        <span class="text-white font-medium">${j.company}</span>
+        <span class="text-gray-400 text-sm ml-2">${j.title}</span>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="editJob(${j.id})" class="text-xs px-2 py-1 bg-gray-700 hover:bg-cyan-700 text-gray-300 hover:text-white rounded transition">Edit</button>
+        <button onclick="deleteJob(${j.id})" class="text-xs px-2 py-1 bg-gray-700 hover:bg-red-700 text-gray-300 hover:text-white rounded transition">Delete</button>
+      </div>
+    </div>`).join('');
+}
+
+function newJob() {
+  document.getElementById('job-id').value = '';
+  document.getElementById('job-form').reset();
+  document.getElementById('job-form').classList.remove('hidden');
+}
+
+function editJob(id) {
+  const j = allJobs.find(x => x.id === id);
+  if (!j) return;
+  const form = document.getElementById('job-form');
+  document.getElementById('job-id').value = j.id;
+  form.querySelector('[name=slug]').value = j.slug || '';
+  form.querySelector('[name=company]').value = j.company || '';
+  form.querySelector('[name=title]').value = j.title || '';
+  form.querySelector('[name=location]').value = j.location || '';
+  form.querySelector('[name=start_date]').value = j.start_date || '';
+  form.querySelector('[name=end_date]').value = j.end_date || '';
+  form.querySelector('[name=summary]').value = j.summary || '';
+  form.querySelector('[name=tech_stack]').value = j.tech_stack ? j.tech_stack.join(', ') : '';
+  form.querySelector('[name=sort_order]').value = j.sort_order ?? 0;
+  form.classList.remove('hidden');
+}
+
+async function deleteJob(id) {
+  if (!confirm('Delete this job?')) return;
+  await apiFetch(`/api/admin/jobs/${id}`, { method: 'DELETE' });
+  toast('Job deleted');
+  loadJobs();
+}
+
+document.getElementById('job-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const id = document.getElementById('job-id').value;
+  const data = formData('job-form');
+  const url = id ? `/api/admin/jobs/${id}` : '/api/admin/jobs';
+  const method = id ? 'PUT' : 'POST';
+  const result = await apiFetch(url, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (result) {
+    toast(id ? 'Job updated' : 'Job created');
+    document.getElementById('job-form').classList.add('hidden');
+    loadJobs();
+  }
+});
+
+// ── Job Details ───────────────────────────────────────────────────────────────
+async function loadJobDetails() {
+  const jobId = document.getElementById('jd-job-select').value;
+  editingJobId = jobId;
+  document.getElementById('jd-new-btn').classList.toggle('hidden', !jobId);
+  if (!jobId) { document.getElementById('job-details-list').innerHTML = ''; return; }
+
+  const data = await apiFetch(`/api/jobs/${allJobs.find(j => j.id == jobId)?.slug}`);
+  const list = document.getElementById('job-details-list');
+  if (!data) return;
+  list.innerHTML = data.details.map(d => `
+    <div class="flex items-start justify-between bg-gray-800 rounded-lg px-4 py-3">
+      <p class="text-gray-300 text-sm pr-4">${d.detail_text}</p>
+      <div class="flex gap-2 flex-shrink-0">
+        <button onclick="editDetail(${JSON.stringify(d).replace(/"/g, '&quot;')})" class="text-xs px-2 py-1 bg-gray-700 hover:bg-cyan-700 text-gray-300 hover:text-white rounded transition">Edit</button>
+        <button onclick="deleteDetail(${jobId}, ${d.id})" class="text-xs px-2 py-1 bg-gray-700 hover:bg-red-700 text-gray-300 hover:text-white rounded transition">Delete</button>
+      </div>
+    </div>`).join('');
+}
+
+function newJobDetail() {
+  document.getElementById('jd-id').value = '';
+  document.getElementById('jd-form').reset();
+  document.getElementById('jd-form').classList.remove('hidden');
+}
+
+function editDetail(d) {
+  document.getElementById('jd-id').value = d.id;
+  const form = document.getElementById('jd-form');
+  form.querySelector('[name=detail_text]').value = d.detail_text || '';
+  form.querySelector('[name=category]').value = d.category || '';
+  form.querySelector('[name=sort_order]').value = d.sort_order ?? 0;
+  form.classList.remove('hidden');
+}
+
+async function deleteDetail(jobId, id) {
+  if (!confirm('Delete this detail?')) return;
+  await apiFetch(`/api/admin/jobs/${jobId}/details/${id}`, { method: 'DELETE' });
+  toast('Detail deleted');
+  loadJobDetails();
+}
+
+document.getElementById('jd-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const id = document.getElementById('jd-id').value;
+  const data = formData('jd-form');
+  const jobId = editingJobId;
+  const url = id ? `/api/admin/jobs/${jobId}/details/${id}` : `/api/admin/jobs/${jobId}/details`;
+  const method = id ? 'PUT' : 'POST';
+  const result = await apiFetch(url, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (result) {
+    toast(id ? 'Detail updated' : 'Detail created');
+    document.getElementById('jd-form').classList.add('hidden');
+    loadJobDetails();
+  }
+});
+
+// ── Competencies ──────────────────────────────────────────────────────────────
+async function loadCompetencies() {
+  allCompetencies = await apiFetch('/api/competencies') || allCompetencies;
+  const list = document.getElementById('competencies-list');
+  list.innerHTML = allCompetencies.map(c => `
+    <div class="flex items-center justify-between bg-gray-800 rounded-lg px-4 py-3">
+      <div>
+        <span class="text-white font-medium">${c.name}</span>
+        <span class="text-gray-400 text-sm ml-2">${c.slug}</span>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="editCompetency(${c.id})" class="text-xs px-2 py-1 bg-gray-700 hover:bg-cyan-700 text-gray-300 hover:text-white rounded transition">Edit</button>
+        <button onclick="deleteCompetency(${c.id})" class="text-xs px-2 py-1 bg-gray-700 hover:bg-red-700 text-gray-300 hover:text-white rounded transition">Delete</button>
+      </div>
+    </div>`).join('');
+}
+
+function newCompetency() {
+  document.getElementById('comp-id').value = '';
+  document.getElementById('comp-form').reset();
+  document.getElementById('comp-form').classList.remove('hidden');
+}
+
+function editCompetency(id) {
+  const c = allCompetencies.find(x => x.id === id);
+  if (!c) return;
+  const form = document.getElementById('comp-form');
+  document.getElementById('comp-id').value = c.id;
+  form.querySelector('[name=slug]').value = c.slug || '';
+  form.querySelector('[name=name]').value = c.name || '';
+  form.querySelector('[name=description]').value = c.description || '';
+  form.querySelector('[name=icon]').value = c.icon || '';
+  form.querySelector('[name=sort_order]').value = c.sort_order ?? 0;
+  form.classList.remove('hidden');
+}
+
+async function deleteCompetency(id) {
+  if (!confirm('Delete this competency?')) return;
+  await apiFetch(`/api/admin/competencies/${id}`, { method: 'DELETE' });
+  toast('Competency deleted');
+  loadCompetencies();
+}
+
+document.getElementById('comp-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const id = document.getElementById('comp-id').value;
+  const data = formData('comp-form');
+  const url = id ? `/api/admin/competencies/${id}` : '/api/admin/competencies';
+  const method = id ? 'PUT' : 'POST';
+  const result = await apiFetch(url, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (result) {
+    toast(id ? 'Competency updated' : 'Competency created');
+    document.getElementById('comp-form').classList.add('hidden');
+    loadCompetencies();
+  }
+});
+
+// ── Evidence ──────────────────────────────────────────────────────────────────
+async function loadEvidence() {
+  // Fetch all evidence via competencies endpoint
+  const list = document.getElementById('evidence-list');
+  list.innerHTML = '<p class="text-gray-500 text-sm">Evidence is linked to competencies. Use the form below to add or edit entries.</p>';
+}
+
+function newEvidence() {
+  document.getElementById('ev-id').value = '';
+  document.getElementById('ev-form').reset();
+  document.getElementById('ev-form').classList.remove('hidden');
+}
+
+document.getElementById('ev-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const id = document.getElementById('ev-id').value;
+  const data = formData('ev-form');
+  const url = id ? `/api/admin/evidence/${id}` : '/api/admin/evidence';
+  const method = id ? 'PUT' : 'POST';
+  const result = await apiFetch(url, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (result) {
+    toast(id ? 'Evidence updated' : 'Evidence created');
+    document.getElementById('ev-form').classList.add('hidden');
+  }
+});
+</script>
+{% endblock %}

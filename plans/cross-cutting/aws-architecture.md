@@ -1,6 +1,6 @@
 # AWS Architecture — deploy-baba
 
-**Region:** us-east-1 | **Updated:** 2026-03-18
+**Region:** us-east-1 | **Updated:** 2026-03-26
 
 ---
 
@@ -21,16 +21,38 @@
                     │  Timeout: 30s                 │
                     └────────┬────────────┬─────────┘
                              │ mount EFS  │ reads
-                    ┌────────▼──────┐  ┌──▼───────────────┐
-                    │  EFS          │  │  SSM Params       │
-                    │  /mnt/db/     │  │  /deploy-baba/*   │
-                    │  app.db       │  │  (config values)  │
-                    └────────┬──────┘  └──────────────────┘
+                    ┌────────▼──────┐  ┌──▼───────────────────────────────┐
+                    │  EFS          │  │  SSM Params                       │
+                    │  /mnt/db/     │  │  /deploy-baba/*                   │
+                    │  app.db       │  │  (config + cognito-pool-id, etc.) │
+                    └────────┬──────┘  └──────────────────────────────────┘
                              │ scheduled backup
                     ┌────────▼──────┐
                     │  S3           │
                     │  backups/     │  EventBridge: daily
                     └───────────────┘
+
+  Admin login flow (app-layer auth — Lambda Function URL auth stays NONE):
+
+  Browser ─► GET /auth/login ─► 302 ─► Cognito Hosted UI
+                                              │ (login form)
+                                        POST credentials
+                                              │
+                                        302 to /auth/callback?code=xxx
+                                              │
+                    ┌─────────────────────────▼────────────────────┐
+                    │  Lambda: POST /oauth2/token to Cognito       │
+                    │  Validate ID token (RS256, JWKS cached)      │
+                    │  Set auth_token cookie (HttpOnly, SameSite)  │
+                    │  302 → /dashboard                            │
+                    └──────────────────────────────────────────────┘
+
+                    ┌──────────────────────────────────────────┐
+  Cognito ────────► │  aws_cognito_user_pool "baba"            │
+                    │  User: baba-admin (email verified)        │
+                    │  Domain: deploy-baba-prod.auth.*          │
+                    │  Client: baba_web (public, PKCE)          │
+                    └──────────────────────────────────────────┘
 ```
 
 ---
@@ -114,7 +136,7 @@ mode = "lambda"    # or "ecs-fargate-spot"
 
 ---
 
-## OpenTofu Resources (28 total)
+## OpenTofu Resources (32 total after W-AUTH)
 
 Managed in `infra/`:
 
@@ -130,7 +152,7 @@ Managed in `infra/`:
 | `aws_security_group` (lambda) | `efs.tf` | |
 | `aws_security_group_rule` ×2 | `efs.tf` | cross-SG rules (no cycle) |
 | `aws_s3_bucket` (backup) | `s3.tf` | |
-| `aws_s3_bucket` (tfstate) | `s3.tf` | Terraform backend |
+| `aws_s3_bucket` (tfstate) | `s3.tf` | OpenTofu backend |
 | `aws_cloudwatch_event_rule` | `eventbridge.tf` | daily backup schedule |
 | `aws_cloudwatch_log_group` | `lambda.tf` | |
 | `aws_iam_role` | `iam.tf` | Lambda execution role |
@@ -138,6 +160,10 @@ Managed in `infra/`:
 | `aws_iam_role_policy_attachment` ×2 | `iam.tf` | basic execution, VPC |
 | `aws_cloudfront_distribution` | `cdn.tf` | custom domain |
 | `aws_route53_record` ×2 | `cdn.tf` | apex + www |
+| `aws_cognito_user_pool` | `cognito.tf` | **W-AUTH** — baba user pool |
+| `aws_cognito_user_pool_domain` | `cognito.tf` | **W-AUTH** — hosted UI domain |
+| `aws_cognito_user_pool_client` | `cognito.tf` | **W-AUTH** — public PKCE client |
+| `aws_cognito_user` | `cognito.tf` | **W-AUTH** — baba-admin user |
 
 ---
 
@@ -145,7 +171,9 @@ Managed in `infra/`:
 - → ADR-002 (SQLite over PostgreSQL)
 - → ADR-003 (Lambda Function URL)
 - → ADR-006 (EFS + SQLite + S3 topology)
+- → ADR-008 (Cognito Authentication — W-AUTH)
 - → `plans/modules/terraform.md` — W-TF implementation
+- → `plans/modules/auth.md` — W-AUTH Cognito implementation
 - → `plans/modules/ui-service.md` — W-UI Lambda entry point
 - → `plans/cross-cutting/aws-setup-spec.md` — IAM policy + profile config
 - → `plans/drift/DRL-2026-03-18-terraform.md` — first-run fixes

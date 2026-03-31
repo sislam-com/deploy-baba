@@ -163,19 +163,19 @@ build-image:
 
 # Build + push image to ECR Public
 push-image PROFILE="default":
-    just aws-check {{PROFILE}} && cargo xtask deploy ecr-push --profile {{PROFILE}}
+    just aws-check {{PROFILE}} && cargo xtask deploy push --profile {{PROFILE}}
 
 # Full deploy: quality gate → build → push → Lambda update
 deploy PROFILE="default":
-    just quality && just push-image {{PROFILE}} && cargo xtask deploy update --profile {{PROFILE}}
+    just quality && just push-image {{PROFILE}} && cargo xtask deploy lambda --profile {{PROFILE}}
 
 # Deploy without quality gate (fast path)
 deploy-fast PROFILE="default":
-    just push-image {{PROFILE}} && cargo xtask deploy update --profile {{PROFILE}}
+    just push-image {{PROFILE}} && cargo xtask deploy lambda --profile {{PROFILE}}
 
 # Dry run: build + validate, no push
 deploy-dry PROFILE="default":
-    just aws-check {{PROFILE}} && cargo xtask deploy docker-build --dry-run
+    just aws-check {{PROFILE}} && cargo xtask deploy docker
 
 # ── Database (SQLite + S3) ───────────────────────────────────────────────────
 

@@ -80,6 +80,10 @@ flate2 = "1"
 # Database
 rusqlite = { version = "0.32", features = ["bundled"] }
 
+# Auth
+jsonwebtoken = "9"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
 # Internal crates
 config-core = { path = "crates/config-core" }
 config-toml = { path = "crates/config-toml" }

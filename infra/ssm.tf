@@ -33,3 +33,37 @@ resource "aws_ssm_parameter" "backup_prefix" {
     Name = "${local.lambda_function_name}-backup-prefix"
   }
 }
+
+# Cognito SSM parameters
+resource "aws_ssm_parameter" "cognito_pool_id" {
+  name        = "/${var.project_name}/${var.environment}/cognito-pool-id"
+  description = "Cognito User Pool ID"
+  type        = "String"
+  value       = aws_cognito_user_pool.baba.id
+
+  tags = {
+    Name = "${local.lambda_function_name}-cognito-pool-id"
+  }
+}
+
+resource "aws_ssm_parameter" "cognito_client_id" {
+  name        = "/${var.project_name}/${var.environment}/cognito-client-id"
+  description = "Cognito app client ID"
+  type        = "String"
+  value       = aws_cognito_user_pool_client.baba_web.id
+
+  tags = {
+    Name = "${local.lambda_function_name}-cognito-client-id"
+  }
+}
+
+resource "aws_ssm_parameter" "cognito_domain" {
+  name        = "/${var.project_name}/${var.environment}/cognito-domain"
+  description = "Cognito hosted UI domain (FQDN)"
+  type        = "String"
+  value       = "${aws_cognito_user_pool_domain.baba.domain}.auth.${var.region}.amazoncognito.com"
+
+  tags = {
+    Name = "${local.lambda_function_name}-cognito-domain"
+  }
+}

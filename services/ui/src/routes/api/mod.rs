@@ -1,3 +1,4 @@
+pub mod admin;
 pub mod competencies;
 pub mod crates;
 pub mod demo;
@@ -5,11 +6,10 @@ pub mod jobs;
 pub mod stack;
 
 use axum::Router;
-use std::sync::Arc;
 
-use crate::db::Db;
+use crate::state::AppState;
 
-pub fn router() -> Router<Arc<Db>> {
+pub fn router() -> Router<AppState> {
     Router::new()
         .nest("/crates", crates::router())
         .nest("/stack", stack::router())

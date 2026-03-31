@@ -57,3 +57,18 @@ output "site_url" {
   description = "Public URL of the portfolio site"
   value       = "https://${var.domain_name}"
 }
+
+output "cognito_user_pool_id" {
+  description = "Cognito User Pool ID"
+  value       = aws_cognito_user_pool.baba.id
+}
+
+output "cognito_client_id" {
+  description = "Cognito app client ID"
+  value       = aws_cognito_user_pool_client.baba_web.id
+}
+
+output "cognito_domain" {
+  description = "Cognito hosted UI domain (FQDN)"
+  value       = "${aws_cognito_user_pool_domain.baba.domain}.auth.${var.region}.amazoncognito.com"
+}

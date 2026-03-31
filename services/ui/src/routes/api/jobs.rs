@@ -8,6 +8,7 @@ use std::sync::Arc;
 use utoipa::ToSchema;
 
 use crate::db::Db;
+use crate::state::AppState;
 
 #[derive(Serialize, ToSchema)]
 pub struct Job {
@@ -161,7 +162,7 @@ pub async fn get_job(
     Ok(Json(JobWithDetails { job, details }))
 }
 
-pub fn router() -> Router<Arc<Db>> {
+pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(list_jobs))
         .route("/:slug", get(get_job))

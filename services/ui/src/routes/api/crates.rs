@@ -1,8 +1,7 @@
 use axum::{extract::Path, routing::get, Json, Router};
-use std::sync::Arc;
-
-use crate::db::Db;
 use serde::{Deserialize, Serialize};
+
+use crate::state::AppState;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct CrateInfo {
@@ -123,7 +122,7 @@ pub async fn get_crate(
         })
 }
 
-pub fn router() -> Router<Arc<Db>> {
+pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(list_crates))
         .route("/:name", get(get_crate))

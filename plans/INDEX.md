@@ -1,5 +1,5 @@
 # deploy-baba — Plan Index
-**GitHub:** `shantopagla/deploy-baba` | **Last updated:** 2026-03-25
+**GitHub:** `shantopagla/deploy-baba` | **Last updated:** 2026-03-26
 **Source repo:** `~/shanto` (Baba Toolchain, ~85K LOC) | **Status:** ~85% complete
 
 See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming rules.
@@ -26,10 +26,17 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | terraform | W-TF | `infra/` | SUPERSEDED | Replaced by W-OTF (OpenTofu). W-TF.4.1 and W-TF.4.2 already fixed in code. |
 | opentofu | W-OTF | `infra/` + `xtask/src/infra/` | WIP | Install `tofu` binary (W-OTF.4.1 OPEN); smoke test (W-OTF.4.7 BLOCKED); docs (W-OTF.4.9 TODO) |
 | dx-justfile | W-DX | `justfile`, `docs/`, `examples/` | WIP | Per-crate READMEs, integration tests |
+| auth | W-AUTH | `services/ui/src/auth.rs`, `routes/auth.rs`, `routes/api/admin.rs`, `infra/cognito.tf` | WIP | W-AUTH.4.1–4.15 DONE (code compiles, Cognito infra deployed); W-AUTH.4.19 TODO (OpenAPI security scheme + admin endpoint docs) |
 
 ---
 
 ## Remaining Work — Priority Order
+
+### P0 — New Feature (in progress on `cognito-login` branch)
+1. ~~**W-AUTH.4.1–4.15**~~ — Cognito auth + admin dashboard — **DONE** (code compiles clean, Cognito infra deployed to `us-east-1_I7c15vLHE`)
+2. ~~**W-AUTH.4.20**~~ — Fix Lambda 504: lazy JWKS fetch — **SUPERSEDED** by W-AUTH.4.21
+3. ~~**W-AUTH.4.21**~~ — Fix callback 504: implicit grant + JWKS from env — **DONE** (`allowed_oauth_flows=["implicit"]`; `data "http" cognito_jwks`; `COGNITO_JWKS` env var; HTML callback + `/auth/set-session`; self-sign-up disabled)
+4. **W-AUTH.4.19** — OpenAPI security scheme + admin endpoint docs (`cookieAuth`/`bearerAuth`, 12 admin paths, `ToSchema` on input types)
 
 ### P1 — Must Fix (blocking clean CI)
 1. ~~**W-XT.4.1**~~ — CLI naming: 3 justfile mismatches fixed (`fmt`→`format`, `--crate`→`crate` subcommand, `gate`→`all`) — **RESOLVED**
@@ -63,6 +70,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | ADR-005 | Zero-Cost Philosophy | W-CFG, W-API, W-INFR |
 | ADR-006 | EFS + SQLite + S3 Backup | W-INFR, W-TF, W-XT |
 | ADR-007 | OpenTofu Over Terraform | W-OTF, W-XT |
+| ADR-008 | Cognito Authentication for Admin Dashboard | W-AUTH, W-UI, W-OTF |
 
 ---
 

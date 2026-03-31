@@ -23,8 +23,14 @@ resource "aws_lambda_function" "baba" {
   # Environment variables passed to the Lambda function
   environment {
     variables = {
-      DB_PATH = "/mnt/db/baba.db"
-      RUST_LOG = "info"
+      DB_PATH          = "/mnt/db/baba.db"
+      RUST_LOG         = "info"
+      COGNITO_POOL_ID   = aws_cognito_user_pool.baba.id
+      COGNITO_CLIENT_ID = aws_cognito_user_pool_client.baba_web.id
+      COGNITO_DOMAIN    = "${aws_cognito_user_pool_domain.baba.domain}.auth.${var.region}.amazoncognito.com"
+      COGNITO_REGION    = var.region
+      APP_DOMAIN        = "https://${var.domain_name}"
+      COGNITO_JWKS      = data.http.cognito_jwks.response_body
     }
   }
 

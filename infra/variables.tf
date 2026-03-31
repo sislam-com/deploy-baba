@@ -76,3 +76,15 @@ variable "logs_retention_days" {
   type        = number
   default     = 14
 }
+
+variable "admin_email" {
+  description = "Email address for the Cognito admin user (baba-admin)"
+  type        = string
+  default     = "it@shantopagla.com"
+}
+
+variable "cognito_temp_password" {
+  description = "Temporary password for baba-admin (must be changed on first login)"
+  type        = string
+  sensitive   = true
+}

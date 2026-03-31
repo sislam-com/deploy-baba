@@ -133,6 +133,32 @@ just aws-check PROFILE  →  sts:GetCallerIdentity + ssm:GetParameter /deploy-ba
         "events:ListTargetsByRule", "events:TagResource"
       ],
       "Resource": "arn:aws:events:*:*:rule/deploy-baba-*"
+    },
+    {
+      "Sid": "CognitoForAuth",
+      "Effect": "Allow",
+      "Action": [
+        "cognito-idp:CreateUserPool",
+        "cognito-idp:DeleteUserPool",
+        "cognito-idp:DescribeUserPool",
+        "cognito-idp:UpdateUserPool",
+        "cognito-idp:CreateUserPoolClient",
+        "cognito-idp:DeleteUserPoolClient",
+        "cognito-idp:DescribeUserPoolClient",
+        "cognito-idp:UpdateUserPoolClient",
+        "cognito-idp:CreateUserPoolDomain",
+        "cognito-idp:DeleteUserPoolDomain",
+        "cognito-idp:DescribeUserPoolDomain",
+        "cognito-idp:AdminCreateUser",
+        "cognito-idp:AdminDeleteUser",
+        "cognito-idp:AdminGetUser",
+        "cognito-idp:AdminSetUserPassword",
+        "cognito-idp:ListUserPools",
+        "cognito-idp:ListUserPoolClients",
+        "cognito-idp:TagResource",
+        "cognito-idp:UntagResource"
+      ],
+      "Resource": "*"
     }
   ]
 }
@@ -183,10 +209,15 @@ before bootstrapping gives a clear error:
 | `/deploy-baba/sentinel` | `"deploy-baba-configured"` | `just infra-bootstrap` |
 | `/deploy-baba/region` | e.g. `"us-east-1"` | `just infra-bootstrap` |
 | `/deploy-baba/account` | e.g. `"123456789012"` | `just infra-bootstrap` |
+| `/deploy-baba/prod/cognito-pool-id` | Cognito user pool ID | `just infra-apply` (W-AUTH) |
+| `/deploy-baba/prod/cognito-client-id` | App client ID (public) | `just infra-apply` (W-AUTH) |
+| `/deploy-baba/prod/cognito-domain` | Hosted UI domain prefix | `just infra-apply` (W-AUTH) |
 
 ---
 
 ## Cross-References
 - → `plans/modules/xtask.md` — W-XT aws/validate.rs implementation
+- → `plans/modules/auth.md` — W-AUTH Cognito implementation
 - → `plans/cross-cutting/aws-architecture.md` — topology
+- → `plans/adr/ADR-008-cognito-authentication.md` — Cognito auth decision
 - → `plans/drift/DRL-2026-03-18-xtask.md` — bootstrap fixes

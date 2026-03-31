@@ -1,10 +1,13 @@
 use anyhow::Result;
 use std::sync::Arc;
 
+mod auth;
 mod db;
+mod middleware;
 mod openapi;
 mod router;
 mod routes;
+mod state;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -14,7 +17,15 @@ async fn main() -> Result<()> {
     let db = Arc::new(db::Db::open(&db_path)?);
     tracing::info!("→ Database ready at {}", db_path);
 
-    let app = router::build(db);
+    let auth_config = Arc::new(auth::AuthConfig::from_env());
+    tracing::info!("→ Auth ready (dev_mode={})", auth_config.dev_mode);
+
+    let app_state = state::AppState {
+        db,
+        auth: auth_config,
+    };
+
+    let app = router::build(app_state);
 
     if std::env::var("AWS_LAMBDA_FUNCTION_NAME").is_ok() {
         tracing::info!("→ Starting as AWS Lambda function");

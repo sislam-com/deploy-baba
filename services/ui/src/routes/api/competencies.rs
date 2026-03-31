@@ -8,6 +8,7 @@ use std::sync::Arc;
 use utoipa::ToSchema;
 
 use crate::db::Db;
+use crate::state::AppState;
 
 #[derive(Serialize, ToSchema)]
 pub struct Competency {
@@ -151,7 +152,7 @@ pub async fn get_competency(
     }))
 }
 
-pub fn router() -> Router<Arc<Db>> {
+pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(list_competencies))
         .route("/:slug", get(get_competency))
