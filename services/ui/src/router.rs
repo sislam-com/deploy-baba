@@ -74,6 +74,8 @@ pub fn build(state: AppState) -> Router {
         .route("/", get(routes::resume::handler))
         .route("/about/me", get(routes::about::about_me))
         .route("/about/repo", get(routes::about::about_repo))
+        .route("/contact", get(routes::contact::contact_page))
+        .route("/api/contact", get(routes::contact::contact_submit))
         .nest_service("/resume", ServeDir::new("target/resume"))
         .route("/health", get(routes::health::get_health))
         .nest("/api", api_routes)

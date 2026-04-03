@@ -75,6 +75,20 @@ lambda-build:
 lambda-deploy PROFILE="default":
     just aws-check {{PROFILE}} && just lambda-build && cargo xtask deploy lambda --profile {{PROFILE}}
 
+# Build the email Lambda zip for aarch64 (separate non-VPC Lambda, handles SES sends)
+# Output goes to infra/build/ so `tofu apply` (which runs with -chdir=infra) can find it
+email-build:
+    PATH="$HOME/.cargo/bin:$PATH" cargo lambda build --release --package email-lambda --target aarch64-unknown-linux-gnu
+    mkdir -p infra/build
+    zip -j infra/build/email-lambda.zip target/lambda/email-lambda/bootstrap
+
+# Build email Lambda zip + update the deployed function
+email-deploy PROFILE="default":
+    just aws-check {{PROFILE}} && just email-build && aws lambda update-function-code \
+        --function-name deploy-baba-email \
+        --zip-file fileb://infra/build/email-lambda.zip \
+        --profile {{PROFILE}}
+
 # Verify the live deployment (curl apex + www health checks)
 infra-verify DOMAIN="sislam.com":
     @echo "=== Verifying {{DOMAIN}} ==="

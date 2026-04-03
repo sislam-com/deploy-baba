@@ -79,6 +79,22 @@ resource "aws_iam_role_policy" "lambda_s3" {
   })
 }
 
+# Inline policy: invoke email Lambda
+resource "aws_iam_role_policy" "lambda_invoke_email" {
+  name = "${local.lambda_function_name}-invoke-email-policy"
+  role = aws_iam_role.lambda_execution.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid      = "InvokeEmailLambda"
+      Effect   = "Allow"
+      Action   = "lambda:InvokeFunction"
+      Resource = aws_lambda_function.email.arn
+    }]
+  })
+}
+
 # Inline policy: SSM parameter read access
 resource "aws_iam_role_policy" "lambda_ssm" {
   name = "${local.lambda_function_name}-ssm-policy"

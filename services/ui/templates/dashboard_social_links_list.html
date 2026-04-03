@@ -3,7 +3,7 @@
 {% block title %}Social Links — Dashboard{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
   <!-- Header -->
   <div class="flex items-center justify-between mb-6">
     <div>
@@ -27,28 +27,67 @@
     </div>
   </div>
 
-  <!-- Link list -->
-  <div class="space-y-2">
+  <!-- Link Status Overview -->
+  <div class="bg-gray-800 rounded-xl p-6 mb-6">
+    <h2 class="text-lg font-semibold text-white mb-4">Link Status Overview</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="bg-gray-700 rounded-lg p-4">
+        <h3 class="text-sm font-medium text-gray-300 mb-2">Total Links</h3>
+        <p class="text-2xl font-bold text-cyan-400">{{ link_items.len() }}</p>
+      </div>
+      <div class="bg-gray-700 rounded-lg p-4">
+        <h3 class="text-sm font-medium text-gray-300 mb-2">Visible</h3>
+        <p class="text-2xl font-bold text-green-400">{{ visible_count }}</p>
+      </div>
+      <div class="bg-gray-700 rounded-lg p-4">
+        <h3 class="text-sm font-medium text-gray-300 mb-2">Hidden</h3>
+        <p class="text-2xl font-bold text-gray-400">{{ hidden_count }}</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Social Links Master List -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div class="bg-gray-50 px-6 py-4 border-b border-gray-200">
+      <h2 class="text-sm font-semibold text-gray-900">Social Media Links ({{ link_items.len() }})</h2>
+    </div>
     {% for item in link_items %}
     <a href="/dashboard/social-links/{{ item.id }}"
-       class="flex items-center justify-between bg-gray-800 hover:bg-gray-700 rounded-xl px-5 py-4 transition group">
-      <div>
-        <span class="text-white font-medium group-hover:text-cyan-300 transition">{{ item.label }}</span>
-        <span class="text-gray-400 text-sm ml-3">{{ item.platform }}</span>
-        <span class="text-gray-500 text-xs ml-3">{{ item.url }}</span>
-      </div>
-      <div class="flex items-center gap-4">
-        {% if item.visible %}
-        <span class="text-green-400 text-xs font-medium">visible</span>
-        {% else %}
-        <span class="text-gray-500 text-xs font-medium">hidden</span>
-        {% endif %}
-        <span class="text-gray-500 text-xs">›</span>
+       class="block border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition group">
+      <div class="px-6 py-5">
+        <div class="flex items-center justify-between">
+          <div class="flex-1">
+            <div class="flex items-center gap-3 mb-2">
+              <h3 class="text-lg font-semibold text-gray-900 group-hover:text-cyan-600 transition">{{ item.label }}</h3>
+              {% if item.visible %}
+              <span class="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">Visible</span>
+              {% else %}
+              <span class="px-2 py-1 bg-gray-100 text-gray-800 text-xs font-medium rounded-full">Hidden</span>
+              {% endif %}
+            </div>
+            <p class="text-gray-600 font-medium mb-1">{{ item.platform }}</p>
+            <p class="text-gray-500 text-sm truncate max-w-md">{{ item.url }}</p>
+          </div>
+          <div class="flex items-center">
+            <svg class="w-5 h-5 text-gray-400 group-hover:text-cyan-500 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+            </svg>
+          </div>
+        </div>
       </div>
     </a>
     {% else %}
-    <div class="text-center py-16 text-gray-500">
-      No social links yet. <a href="/dashboard/social-links/new" class="text-cyan-400 hover:text-cyan-300">Add the first one.</a>
+    <div class="px-6 py-16 text-center">
+      <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+      </svg>
+      <p class="text-gray-500 mb-4">No social links have been added yet.</p>
+      <a href="/dashboard/social-links/new" class="inline-flex items-center px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm font-medium transition">
+        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+        </svg>
+        Add First Link
+      </a>
     </div>
     {% endfor %}
   </div>

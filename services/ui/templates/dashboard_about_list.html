@@ -3,7 +3,7 @@
 {% block title %}About Sections — Dashboard{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
   <!-- Header -->
   <div class="flex items-center justify-between mb-6">
     <div>
@@ -27,25 +27,82 @@
     </div>
   </div>
 
-  <!-- Section list -->
-  <div class="space-y-2">
+  <!-- Page Tabs -->
+  <div class="bg-gray-800 rounded-xl p-1 mb-6 inline-flex">
+    <button class="px-4 py-2 bg-cyan-600 text-white rounded-lg text-sm font-medium transition page-tab active" data-page="all">All Sections</button>
+    <button class="px-4 py-2 text-gray-400 hover:text-white rounded-lg text-sm font-medium transition page-tab" data-page="me">About Me</button>
+    <button class="px-4 py-2 text-gray-400 hover:text-white rounded-lg text-sm font-medium transition page-tab" data-page="repo">About Project</button>
+  </div>
+
+  <!-- Section Master List -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div class="bg-gray-50 px-6 py-4 border-b border-gray-200">
+      <h2 class="text-sm font-semibold text-gray-900">Content Sections ({{ sections.len() }})</h2>
+    </div>
     {% for section in sections %}
     <a href="/dashboard/about/{{ section.slug }}"
-       class="flex items-center justify-between bg-gray-800 hover:bg-gray-700 rounded-xl px-5 py-4 transition group">
-      <div>
-        <span class="text-white font-medium group-hover:text-cyan-300 transition">{{ section.heading }}</span>
-        <span class="text-gray-400 text-sm ml-3">{{ section.slug }}</span>
-      </div>
-      <div class="flex items-center gap-4">
-        <span class="text-gray-500 text-xs uppercase tracking-wide">{{ section.page }}</span>
-        <span class="text-gray-500 text-xs">›</span>
+       class="block border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition group section-item" data-page="{{ section.page }}">
+      <div class="px-6 py-5">
+        <div class="flex items-center justify-between">
+          <div class="flex-1">
+            <div class="flex items-center gap-3 mb-2">
+              <h3 class="text-lg font-semibold text-gray-900 group-hover:text-cyan-600 transition">{{ section.heading }}</h3>
+              {% if section.page == "me" %}
+              <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">About Me</span>
+              {% else %}
+              <span class="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded-full">About Project</span>
+              {% endif %}
+            </div>
+            <p class="text-gray-500 text-sm font-mono">{{ section.slug }}</p>
+          </div>
+          <div class="flex items-center">
+            <svg class="w-5 h-5 text-gray-400 group-hover:text-cyan-500 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+            </svg>
+          </div>
+        </div>
       </div>
     </a>
     {% else %}
-    <div class="text-center py-16 text-gray-500">
-      No sections yet. <a href="/dashboard/about/new" class="text-cyan-400 hover:text-cyan-300">Add the first one.</a>
+    <div class="px-6 py-16 text-center">
+      <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+      </svg>
+      <p class="text-gray-500 mb-4">No content sections have been added yet.</p>
+      <a href="/dashboard/about/new" class="inline-flex items-center px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm font-medium transition">
+        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+        </svg>
+        Add First Section
+      </a>
     </div>
     {% endfor %}
   </div>
+
+  <script>
+  // Page filtering
+  document.querySelectorAll('.page-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const page = tab.dataset.page;
+      
+      // Update tab styles
+      document.querySelectorAll('.page-tab').forEach(t => {
+        t.classList.remove('bg-cyan-600', 'text-white', 'active');
+        t.classList.add('text-gray-400');
+      });
+      tab.classList.add('bg-cyan-600', 'text-white', 'active');
+      tab.classList.remove('text-gray-400');
+      
+      // Filter sections
+      document.querySelectorAll('.section-item').forEach(item => {
+        if (page === 'all' || item.dataset.page === page) {
+          item.style.display = 'block';
+        } else {
+          item.style.display = 'none';
+        }
+      });
+    });
+  });
+  </script>
 </div>
 {% endblock %}

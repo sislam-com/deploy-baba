@@ -44,6 +44,9 @@ Example: `DRL-2026-03-18-terraform.md`
 | `PUB` | Publishing | crates.io release |
 | `AUTH` | auth | `services/ui/src/auth.rs`, `routes/auth.rs`, `routes/api/admin.rs`, `routes/dashboard.rs` |
 | `ABT` | about | `services/ui/src/routes/about.rs`, `services/ui/templates/about_*.html` |
+| `SL` | social-links | `services/ui/src/db.rs`, `services/ui/src/routes/dashboard.rs`, `services/ui/migrations/010-011` |
+| `RSM` | resume | `services/ui/src/routes/resume.rs`, `services/ui/migrations/001-007` |
+| `CTF` | contact-form | `services/email/` + `services/ui/src/routes/contact.rs` + `infra/ses.tf` + `infra/email-lambda.tf` |
 
 ---
 

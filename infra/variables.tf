@@ -89,3 +89,15 @@ variable "cognito_temp_password" {
   sensitive   = true
   default     = "unused-after-first-apply"
 }
+
+variable "contact_email" {
+  description = "Email address that receives contact form submissions"
+  type        = string
+  default     = "contact-sislam@shantopagla.com"
+}
+
+variable "email_lambda_code_path" {
+  description = "Path to the email Lambda zip file (built by just email-build)"
+  type        = string
+  default     = "./build/email-lambda.zip"
+}

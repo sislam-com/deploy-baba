@@ -12,6 +12,7 @@ members = [
     "crates/api-merger",
     "crates/infra-types",
     "services/ui",
+    "services/email",
     "xtask",
     "examples/01_multi_format_config",
     "examples/02_api_spec_generation",
@@ -47,6 +48,7 @@ tower-http = { version = "0.5", features = ["cors", "trace", "fs"] }
 
 # Lambda
 lambda_http = "0.13"
+lambda_runtime = "0.13"
 
 # Templates
 askama = "0.12"
@@ -70,6 +72,7 @@ aws-sdk-ecs = "1"
 aws-sdk-ecr = "1"
 aws-sdk-efs = "1"
 aws-sdk-dynamodb = "1"
+aws-sdk-sesv2 = { version = "1", features = ["behavior-version-latest"] }
 
 # CLI
 clap = { version = "4", features = ["derive"] }

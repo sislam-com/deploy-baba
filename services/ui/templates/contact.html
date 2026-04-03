@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}Contact — Sharful Islam{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+
+    <!-- Page header -->
+    <div class="mb-10">
+        <h1 class="text-4xl font-bold text-white mb-2">Contact</h1>
+        <p class="text-gray-400">Send me a message. I typically respond within a day or two.</p>
+    </div>
+
+    <!-- Status toast -->
+    <div id="toast" class="hidden mb-6 px-4 py-3 rounded-lg text-sm font-medium"></div>
+
+    <!-- Contact form -->
+    <form id="contact-form" class="space-y-5">
+        <!-- Honeypot (hidden from real users, filled by bots) -->
+        <div style="display:none" aria-hidden="true">
+            <input type="text" name="website" id="website" tabindex="-1" autocomplete="off">
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <div>
+                <label for="name" class="block text-sm font-medium text-gray-300 mb-1">Name</label>
+                <input type="text" id="name" name="name" required maxlength="100"
+                       class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500
+                              focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition"
+                       placeholder="Sharful Islam">
+            </div>
+            <div>
+                <label for="email" class="block text-sm font-medium text-gray-300 mb-1">Email</label>
+                <input type="email" id="email" name="email" required maxlength="254"
+                       class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500
+                              focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition"
+                       placeholder="you@example.com">
+            </div>
+        </div>
+
+        <div>
+            <label for="subject" class="block text-sm font-medium text-gray-300 mb-1">Subject</label>
+            <input type="text" id="subject" name="subject" required maxlength="200"
+                   class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500
+                          focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition"
+                   placeholder="e.g. Collaboration opportunity">
+        </div>
+
+        <div>
+            <label for="message" class="block text-sm font-medium text-gray-300 mb-1">Message</label>
+            <textarea id="message" name="message" required maxlength="5000" rows="6"
+                      class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500
+                             focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition resize-none"
+                      placeholder="Your message..."></textarea>
+            <p class="text-gray-600 text-xs mt-1 text-right"><span id="msg-count">0</span>/5000</p>
+        </div>
+
+        <button type="submit" id="submit-btn"
+                class="w-full bg-cyan-600 hover:bg-cyan-500 disabled:bg-gray-700 disabled:cursor-not-allowed
+                       text-white font-semibold py-3 px-6 rounded-lg transition focus:outline-none focus:ring-2
+                       focus:ring-cyan-500 focus:ring-offset-2 focus:ring-offset-gray-900">
+            Send Message
+        </button>
+    </form>
+
+</div>
+
+<script>
+(function () {
+    const form = document.getElementById('contact-form');
+    const toast = document.getElementById('toast');
+    const submitBtn = document.getElementById('submit-btn');
+    const msgArea = document.getElementById('message');
+    const msgCount = document.getElementById('msg-count');
+
+    msgArea.addEventListener('input', () => {
+        msgCount.textContent = msgArea.value.length;
+    });
+
+    function showToast(success, text) {
+        toast.textContent = text;
+        toast.className = success
+            ? 'mb-6 px-4 py-3 rounded-lg text-sm font-medium bg-green-900/60 border border-green-700 text-green-300'
+            : 'mb-6 px-4 py-3 rounded-lg text-sm font-medium bg-red-900/60 border border-red-700 text-red-300';
+        toast.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Sending…';
+
+        const payload = {
+            name: form.name.value.trim(),
+            email: form.email.value.trim(),
+            subject: form.subject.value.trim(),
+            message: document.getElementById('message').value.trim(),
+            website: document.getElementById('website').value,
+        };
+
+        try {
+            const res = await fetch('/api/contact?' + new URLSearchParams(payload).toString(), {
+                method: 'GET',
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast(true, 'Message sent! I\'ll be in touch soon.');
+                form.reset();
+                msgCount.textContent = '0';
+            } else {
+                showToast(false, data.message || 'Something went wrong. Please try again.');
+            }
+        } catch (_) {
+            showToast(false, 'Network error. Please check your connection and try again.');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Send Message';
+        }
+    });
+})();
+</script>
+{% endblock %}

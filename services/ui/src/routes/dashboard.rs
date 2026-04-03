@@ -192,6 +192,8 @@ pub struct DashboardAboutDetailTemplate {
 pub struct DashboardSocialLinksListTemplate {
     pub username: String,
     pub link_items: Vec<SocialLinkListItem>,
+    pub visible_count: usize,
+    pub hidden_count: usize,
     pub social_links: Vec<SocialLink>,
 }
 
@@ -610,7 +612,7 @@ pub async fn dashboard_social_links_list(
              FROM social_links ORDER BY sort_order ASC",
         )
         .unwrap();
-    let link_items = stmt
+    let link_items: Vec<SocialLinkListItem> = stmt
         .query_map([], |row| {
             let visible: i64 = row.get(4)?;
             Ok(SocialLinkListItem {
@@ -625,10 +627,14 @@ pub async fn dashboard_social_links_list(
         .filter_map(|r| r.ok())
         .collect();
     let social_links = load_social_links(&conn);
+    let visible_count = link_items.iter().filter(|l| l.visible).count();
+    let hidden_count = link_items.len() - visible_count;
 
     DashboardSocialLinksListTemplate {
         username: claims.username,
         link_items,
+        visible_count,
+        hidden_count,
         social_links,
     }
 }

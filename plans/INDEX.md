@@ -29,6 +29,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | auth | W-AUTH | `services/ui/src/auth.rs`, `routes/auth.rs`, `routes/api/admin.rs`, `routes/dashboard.rs`, `infra/cognito.tf` | DONE | W-AUTH.POST-FIX (CloudFront OAC body hash) |
 | about | W-ABT | `services/ui/src/routes/about.rs`, `services/ui/templates/about_*.html`, `services/ui/migrations/008-009` | DONE | — |
 | social-links | W-SL | `services/ui/src/db.rs`, `services/ui/src/routes/dashboard.rs`, `services/ui/src/routes/api/admin.rs`, `services/ui/migrations/010-011` | DONE | — |
+| contact-form | W-CTF | `services/email/`, `services/ui/src/routes/contact.rs`, `infra/ses.tf`, `infra/email-lambda.tf` | WIP | Pre-apply checks (W-CTF.4.9), e2e test (W-CTF.4.10) |
 
 ---
 
@@ -61,6 +62,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 ### P2.5 — Content Features
 12. ~~**W-ABT.4.1–4.10**~~ — DB-driven About section + admin CRUD — **DONE** (migrations 008–009, `/about/me`, `/about/repo`, dashboard routes, `POST/PUT/DELETE /api/admin/about`)
 13. ~~**W-SL**~~ — DB-managed social links in top nav — **DONE** (migrations 010–011, `social_links` table, nav loop in `base.html`, dashboard CRUD, `POST/PUT/DELETE /api/admin/social-links`)
+14. **W-CTF.4.1–4.10** — Contact form page + SES email Lambda + infra (W-CTF.4.9 pre-apply checks, W-CTF.4.10 e2e test remaining)
 
 ### P3 — Polish & Publish
 9. **W-PUB.1** — `just publish-dry` passes for all 10 library crates
@@ -92,6 +94,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | DRL-2026-03-18-xtask | 2026-03-18 | xtask/justfile gaps | 7 entries |
 | DRL-2026-03-25-opentofu | 2026-03-25 | OpenTofu migration audit | 6 entries |
 | DRL-2026-03-27-function-url-auth | 2026-03-27 | Lambda Function URL auth incident + revert | 2 entries + 2 open items (W-AUTH.POST-FIX, DRL-FUA-2) |
+| DRL-2026-04-03-contact-form | 2026-04-03 | Contact Form + SES Email Lambda implementation | 4 entries, 2 open items (W-CTF.4.9, W-CTF.4.10) |
 
 ---
 
@@ -128,6 +131,7 @@ shantopagla/deploy-baba/
 │   ├── api-merger/
 │   └── infra-types/
 ├── services/ui/            # Portfolio site + deployed Lambda binary
+├── services/email/         # Email Lambda (SES sender, no VPC)
 ├── xtask/                  # Internal tooling (called by justfile)
 ├── infra/                  # OpenTofu (Lambda + EFS + S3 + EventBridge)
 ├── examples/               # 4 standalone examples

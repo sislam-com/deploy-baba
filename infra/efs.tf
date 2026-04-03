@@ -106,11 +106,3 @@ resource "aws_security_group_rule" "efs_ingress_from_lambda" {
   source_security_group_id = aws_security_group.lambda_efs.id
 }
 
-resource "aws_security_group_rule" "lambda_egress_to_efs" {
-  type                     = "egress"
-  from_port                = 2049
-  to_port                  = 2049
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.lambda_efs.id
-  source_security_group_id = aws_security_group.efs.id
-}
