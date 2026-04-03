@@ -32,6 +32,7 @@ resource "aws_lambda_function" "baba" {
       APP_DOMAIN        = "https://${var.domain_name}"
       EMAIL_LAMBDA_NAME = aws_lambda_function.email.function_name
       COGNITO_JWKS      = data.http.cognito_jwks.response_body
+      POW_SECRET        = var.pow_secret
     }
   }
 

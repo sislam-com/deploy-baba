@@ -1,12 +1,13 @@
 use askama::Template;
 use aws_sdk_lambda::primitives::Blob;
 use axum::{
-    extract::{Query, State},
+    extract::{Json, State},
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
-    Json,
 };
+use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex, OnceLock},
@@ -14,6 +15,22 @@ use std::{
 };
 
 use crate::db::{load_social_links, Db, SocialLink};
+
+type HmacSha256 = Hmac<Sha256>;
+
+// ─── POW_SECRET ───────────────────────────────────────────────────────────────
+
+static POW_SECRET: OnceLock<[u8; 32]> = OnceLock::new();
+
+fn pow_secret() -> &'static [u8; 32] {
+    POW_SECRET.get_or_init(|| {
+        let secret =
+            std::env::var("POW_SECRET").unwrap_or_else(|_| "dev-secret-change-me".to_string());
+        let mut key = [0u8; 32];
+        key.copy_from_slice(&Sha256::digest(secret.as_bytes()));
+        key
+    })
+}
 
 // ─── Rate limiter ─────────────────────────────────────────────────────────────
 
@@ -48,12 +65,109 @@ impl RateLimiter {
     }
 }
 
+// ─── Nonce tracker (replay protection) ───────────────────────────────────────
+
+struct NonceTracker {
+    used: Mutex<HashMap<String, Instant>>,
+}
+
+static USED_NONCES: OnceLock<NonceTracker> = OnceLock::new();
+
+fn nonce_tracker() -> &'static NonceTracker {
+    USED_NONCES.get_or_init(|| NonceTracker {
+        used: Mutex::new(HashMap::new()),
+    })
+}
+
+impl NonceTracker {
+    /// Returns true and marks the nonce as used; false if already used.
+    fn check_and_mark(&self, nonce: &str) -> bool {
+        let mut map = self.used.lock().unwrap();
+        let now = Instant::now();
+        // Evict entries older than challenge TTL (5 min)
+        map.retain(|_, t| now.duration_since(*t) < Duration::from_secs(300));
+        if map.contains_key(nonce) {
+            return false;
+        }
+        map.insert(nonce.to_string(), now);
+        true
+    }
+}
+
+// ─── PoW helpers ──────────────────────────────────────────────────────────────
+
+const POW_DIFFICULTY: u32 = 18;
+const CHALLENGE_TTL_SECS: i64 = 300;
+
+fn compute_hmac(secret: &[u8], nonce: &str, timestamp: i64, difficulty: u32) -> String {
+    let mut mac = HmacSha256::new_from_slice(secret).expect("HMAC accepts any key length");
+    mac.update(nonce.as_bytes());
+    mac.update(b":");
+    mac.update(timestamp.to_string().as_bytes());
+    mac.update(b":");
+    mac.update(difficulty.to_string().as_bytes());
+    hex::encode(mac.finalize().into_bytes())
+}
+
+fn has_leading_zero_bits(hash: &[u8], bits: u32) -> bool {
+    let full_bytes = (bits / 8) as usize;
+    let remaining_bits = bits % 8;
+    for i in 0..full_bytes {
+        if i >= hash.len() || hash[i] != 0 {
+            return false;
+        }
+    }
+    if remaining_bits > 0 {
+        let mask = 0xFF_u8 << (8 - remaining_bits);
+        if full_bytes >= hash.len() || (hash[full_bytes] & mask) != 0 {
+            return false;
+        }
+    }
+    true
+}
+
+fn verify_pow(nonce: &str, timestamp: i64, solution: u64, signature: &str) -> Result<(), String> {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+
+    if (now - timestamp).abs() > CHALLENGE_TTL_SECS {
+        return Err("Challenge expired".to_string());
+    }
+
+    let expected = compute_hmac(pow_secret(), nonce, timestamp, POW_DIFFICULTY);
+    if expected != signature {
+        return Err("Invalid challenge signature".to_string());
+    }
+
+    if !nonce_tracker().check_and_mark(nonce) {
+        return Err("Challenge already used".to_string());
+    }
+
+    let input = format!("{}:{}", nonce, solution);
+    let hash = Sha256::digest(input.as_bytes());
+    if !has_leading_zero_bits(&hash, POW_DIFFICULTY) {
+        return Err("Invalid proof of work".to_string());
+    }
+
+    Ok(())
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 #[derive(Template)]
 #[template(path = "contact.html")]
 struct ContactTemplate {
     social_links: Vec<SocialLink>,
+}
+
+#[derive(Serialize)]
+struct ChallengeResponse {
+    nonce: String,
+    timestamp: i64,
+    difficulty: u32,
+    signature: String,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -64,6 +178,20 @@ pub struct ContactSubmitRequest {
     message: String,
     #[serde(default)]
     website: String,
+    pow_nonce: String,
+    pow_timestamp: i64,
+    pow_solution: u64,
+    pow_signature: String,
+}
+
+// Strip PoW fields before forwarding to email Lambda
+#[derive(Serialize)]
+struct EmailPayload<'a> {
+    name: &'a str,
+    email: &'a str,
+    subject: &'a str,
+    message: &'a str,
+    website: &'a str,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -80,10 +208,60 @@ pub async fn contact_page(State(db): State<Arc<Db>>) -> impl IntoResponse {
     ContactTemplate { social_links }
 }
 
+pub async fn challenge_issue() -> impl IntoResponse {
+    use rand::RngCore;
+    let mut nonce_bytes = [0u8; 16];
+    rand::thread_rng().fill_bytes(&mut nonce_bytes);
+    let nonce = hex::encode(nonce_bytes);
+
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+
+    let signature = compute_hmac(pow_secret(), &nonce, timestamp, POW_DIFFICULTY);
+
+    Json(ChallengeResponse {
+        nonce,
+        timestamp,
+        difficulty: POW_DIFFICULTY,
+        signature,
+    })
+}
+
 pub async fn contact_submit(
     headers: HeaderMap,
-    Query(req): Query<ContactSubmitRequest>,
+    Json(req): Json<ContactSubmitRequest>,
 ) -> impl IntoResponse {
+    // Honeypot — silently succeed for bots
+    if !req.website.is_empty() {
+        return (
+            StatusCode::OK,
+            Json(ContactResponse {
+                success: true,
+                message: "Message sent!".to_string(),
+            }),
+        )
+            .into_response();
+    }
+
+    // Proof-of-work verification
+    if let Err(msg) = verify_pow(
+        &req.pow_nonce,
+        req.pow_timestamp,
+        req.pow_solution,
+        &req.pow_signature,
+    ) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(ContactResponse {
+                success: false,
+                message: msg,
+            }),
+        )
+            .into_response();
+    }
+
     // Rate limit by client IP
     let source_ip = headers
         .get("x-forwarded-for")
@@ -103,14 +281,22 @@ pub async fn contact_submit(
             .into_response();
     }
 
-    // Invoke email Lambda directly via SDK (no public HTTP endpoint needed)
+    // Invoke email Lambda (PoW fields stripped from payload)
     let fn_name =
         std::env::var("EMAIL_LAMBDA_NAME").unwrap_or_else(|_| "deploy-baba-email".to_string());
 
     let config = aws_config::load_from_env().await;
     let client = aws_sdk_lambda::Client::new(&config);
 
-    let payload = match serde_json::to_vec(&req) {
+    let email_payload = EmailPayload {
+        name: &req.name,
+        email: &req.email,
+        subject: &req.subject,
+        message: &req.message,
+        website: &req.website,
+    };
+
+    let payload = match serde_json::to_vec(&email_payload) {
         Ok(b) => Blob::new(b),
         Err(_) => {
             return (

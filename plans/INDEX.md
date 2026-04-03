@@ -1,5 +1,5 @@
 # deploy-baba — Plan Index
-**GitHub:** `shantopagla/deploy-baba` | **Last updated:** 2026-04-02
+**GitHub:** `shantopagla/deploy-baba` | **Last updated:** 2026-04-03
 **Source repo:** `~/shanto` (Baba Toolchain, ~85K LOC) | **Status:** ~92% complete
 
 See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming rules.
@@ -29,7 +29,8 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | auth | W-AUTH | `services/ui/src/auth.rs`, `routes/auth.rs`, `routes/api/admin.rs`, `routes/dashboard.rs`, `infra/cognito.tf` | DONE | W-AUTH.POST-FIX (CloudFront OAC body hash) |
 | about | W-ABT | `services/ui/src/routes/about.rs`, `services/ui/templates/about_*.html`, `services/ui/migrations/008-009` | DONE | — |
 | social-links | W-SL | `services/ui/src/db.rs`, `services/ui/src/routes/dashboard.rs`, `services/ui/src/routes/api/admin.rs`, `services/ui/migrations/010-011` | DONE | — |
-| contact-form | W-CTF | `services/email/`, `services/ui/src/routes/contact.rs`, `infra/ses.tf`, `infra/email-lambda.tf` | WIP | Pre-apply checks (W-CTF.4.9), e2e test (W-CTF.4.10) |
+| contact-form | W-CTF | `services/email/`, `services/ui/src/routes/contact.rs`, `infra/ses.tf`, `infra/email-lambda.tf`, `infra/apigateway.tf` | WIP | POW_SECRET → Secrets Manager (W-CTF.4.11), e2e test (W-CTF.4.12) |
+| secrets-manager | W-SEC | `xtask/src/secrets/`, `infra/secrets.tf`, `services/ui/src/routes/contact.rs` | TODO | xtask secret-put/get/list, SM for POW_SECRET, remove secret from env var |
 
 ---
 
@@ -43,7 +44,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 5. ~~**W-AUTH.4.22–4.28**~~ — Dashboard master/detail refactoring — **DONE** (6 routes, 5 templates, type-ahead nav, dashboard.html monolith deleted)
 
 ### P0.5 — Live Site Post-Incident
-1. **W-AUTH.POST-FIX** — POST/PUT requests fail through CloudFront OAC (body hash mismatch with `AllViewerExceptHostHeader`). Dashboard edit forms are broken. Investigate Option C (CloudFront custom origin without OAC body signing) before next auth work. See `DRL-2026-03-27-function-url-auth`.
+1. ~~**W-AUTH.POST-FIX**~~ — **RESOLVED** for `POST /api/contact` via API Gateway HTTP API (ADR-009). Dashboard edit forms (PUT/PATCH via OAC path) remain broken — out of scope for now. See `DRL-2026-03-27-function-url-auth`.
 
 ### P1 — Must Fix (blocking clean CI)
 1. ~~**W-XT.4.1**~~ — CLI naming: 3 justfile mismatches fixed (`fmt`→`format`, `--crate`→`crate` subcommand, `gate`→`all`) — **RESOLVED**
@@ -62,7 +63,8 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 ### P2.5 — Content Features
 12. ~~**W-ABT.4.1–4.10**~~ — DB-driven About section + admin CRUD — **DONE** (migrations 008–009, `/about/me`, `/about/repo`, dashboard routes, `POST/PUT/DELETE /api/admin/about`)
 13. ~~**W-SL**~~ — DB-managed social links in top nav — **DONE** (migrations 010–011, `social_links` table, nav loop in `base.html`, dashboard CRUD, `POST/PUT/DELETE /api/admin/social-links`)
-14. **W-CTF.4.1–4.10** — Contact form page + SES email Lambda + infra (W-CTF.4.9 pre-apply checks, W-CTF.4.10 e2e test remaining)
+14. ~~**W-CTF.4.1–4.10**~~ — Contact form + SES + PoW + API Gateway — **DONE** (deployed 2026-04-03)
+15. **W-CTF.4.11 + W-SEC** — Migrate `POW_SECRET` from Lambda env var → AWS Secrets Manager + xtask secret commands (P1)
 
 ### P3 — Polish & Publish
 9. **W-PUB.1** — `just publish-dry` passes for all 10 library crates
@@ -77,12 +79,13 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 |----|-------|-----------------|
 | ADR-001 | justfile Is the Only Interface | W-DX, W-XT |
 | ADR-002 | SQLite Over PostgreSQL | W-INFR, W-TF, W-XT |
-| ADR-003 | Lambda Function URL (No API Gateway) | W-TF, W-UI |
+| ADR-003 | Lambda Function URL (No API Gateway) — exception: POST /api/contact uses API Gateway (ADR-009) | W-TF, W-UI, W-CTF |
 | ADR-004 | Dual-Mode Entry Point | W-UI |
 | ADR-005 | Zero-Cost Philosophy | W-CFG, W-API, W-INFR |
 | ADR-006 | EFS + SQLite + S3 Backup | W-INFR, W-TF, W-XT |
 | ADR-007 | OpenTofu Over Terraform | W-OTF, W-XT |
 | ADR-008 | Cognito Authentication for Admin Dashboard | W-AUTH, W-UI, W-OTF |
+| ADR-009 | API Gateway HTTP API for POST /api/contact (OAC body hash workaround) | W-CTF, W-UI |
 
 ---
 
@@ -94,7 +97,8 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | DRL-2026-03-18-xtask | 2026-03-18 | xtask/justfile gaps | 7 entries |
 | DRL-2026-03-25-opentofu | 2026-03-25 | OpenTofu migration audit | 6 entries |
 | DRL-2026-03-27-function-url-auth | 2026-03-27 | Lambda Function URL auth incident + revert | 2 entries + 2 open items (W-AUTH.POST-FIX, DRL-FUA-2) |
-| DRL-2026-04-03-contact-form | 2026-04-03 | Contact Form + SES Email Lambda implementation | 4 entries, 2 open items (W-CTF.4.9, W-CTF.4.10) |
+| DRL-2026-04-03-contact-form | 2026-04-03 | Contact Form + SES Email Lambda implementation | 4 entries, resolved |
+| DRL-2026-04-03-pow-apigateway | 2026-04-03 | POST+PoW via API Gateway — replaces GET+query params | OAC body hash workaround, ADR-009 |
 
 ---
 

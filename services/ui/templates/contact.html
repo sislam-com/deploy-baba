@@ -85,12 +85,42 @@
         toast.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
+    function hasLeadingZeroBits(hash, bits) {
+        const fullBytes = Math.floor(bits / 8);
+        const remainingBits = bits % 8;
+        for (let i = 0; i < fullBytes; i++) {
+            if (hash[i] !== 0) return false;
+        }
+        if (remainingBits > 0) {
+            const mask = (0xFF << (8 - remainingBits)) & 0xFF;
+            if ((hash[fullBytes] & mask) !== 0) return false;
+        }
+        return true;
+    }
+
+    async function solvePoW(nonce, difficulty) {
+        const encoder = new TextEncoder();
+        let solution = 0;
+        while (true) {
+            const data = encoder.encode(`${nonce}:${solution}`);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hash = new Uint8Array(hashBuffer);
+            if (hasLeadingZeroBits(hash, difficulty)) {
+                return solution;
+            }
+            solution++;
+            // Yield to UI every 1000 iterations to keep browser responsive
+            if (solution % 1000 === 0) {
+                await new Promise(r => setTimeout(r, 0));
+            }
+        }
+    }
+
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         submitBtn.disabled = true;
-        submitBtn.textContent = 'Sending…';
 
-        const payload = {
+        const formData = {
             name: form.name.value.trim(),
             email: form.email.value.trim(),
             subject: form.subject.value.trim(),
@@ -99,12 +129,34 @@
         };
 
         try {
-            const res = await fetch('/api/contact?' + new URLSearchParams(payload).toString(), {
-                method: 'GET',
+            // Step 1: Fetch challenge
+            submitBtn.textContent = 'Verifying…';
+            const challengeRes = await fetch('/api/contact/challenge');
+            if (!challengeRes.ok) throw new Error('Failed to fetch challenge');
+            const challenge = await challengeRes.json();
+
+            // Step 2: Solve proof-of-work
+            submitBtn.textContent = 'Solving challenge…';
+            const solution = await solvePoW(challenge.nonce, challenge.difficulty);
+
+            // Step 3: Submit with PoW fields
+            submitBtn.textContent = 'Sending…';
+            const payload = {
+                ...formData,
+                pow_nonce: challenge.nonce,
+                pow_timestamp: challenge.timestamp,
+                pow_solution: solution,
+                pow_signature: challenge.signature,
+            };
+
+            const res = await fetch('/api/contact', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
             });
             const data = await res.json();
             if (data.success) {
-                showToast(true, 'Message sent! I\'ll be in touch soon.');
+                showToast(true, "Message sent! I'll be in touch soon.");
                 form.reset();
                 msgCount.textContent = '0';
             } else {

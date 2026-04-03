@@ -101,3 +101,10 @@ variable "email_lambda_code_path" {
   type        = string
   default     = "./build/email-lambda.zip"
 }
+
+variable "pow_secret" {
+  description = "Secret key for HMAC-signing proof-of-work challenges (contact form)"
+  type        = string
+  sensitive   = true
+  default     = "change-me-before-deploy"
+}

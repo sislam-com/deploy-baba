@@ -9,12 +9,13 @@
   "adrs": {
     "ADR-001": "justfile-only interface — xtask is internal, never invoke directly",
     "ADR-002": "SQLite on EFS + S3 backup — no PostgreSQL, no RDS",
-    "ADR-003": "Lambda Function URL — no API Gateway",
+    "ADR-003": "Lambda Function URL — no API Gateway (exception: ADR-009 for POST /api/contact)",
     "ADR-004": "Dual-mode entry point — runtime env var detection (local vs Lambda)",
     "ADR-005": "(see plans/adr/)",
     "ADR-006": "(see plans/adr/)",
     "ADR-007": "OpenTofu over Terraform — MPL-2.0; `tofu` CLI; drop-in HCL compatible (Accepted)",
-    "ADR-008": "Cognito Authentication — implicit grant, JWKS from env var, HttpOnly cookie, dev-mode bypass"
+    "ADR-008": "Cognito Authentication — implicit grant, JWKS from env var, HttpOnly cookie, dev-mode bypass",
+    "ADR-009": "API Gateway HTTP API for POST /api/contact — OAC body hash workaround (DRL-FUA-3)"
   },
   "crates": {
     "api-core": {
@@ -257,11 +258,11 @@
     ]
   },
   "git": {
-    "branch": "feat/about-sections",
-    "last_commit": "Add social links DB-managed nav + dashboard CRUD",
+    "branch": "feat/contact",
+    "last_commit": "Contact form POST + PoW via API Gateway",
     "remote": "git@github.com:shantopagla/deploy-baba.git",
-    "sha": "82f6e63ac7add53caa338b6715786b0d78236116",
-    "short_sha": "82f6e63"
+    "sha": "b271e05c4600623710bf12aef921b6e0fe96581c",
+    "short_sha": "b271e05"
   },
   "infra": {
     "aws_region": "us-east-1",
@@ -296,6 +297,10 @@
       "cognito.tf",
       "eventbridge.tf",
       "ssm.tf",
+      "apigateway.tf",
+      "ses.tf",
+      "email-lambda.tf",
+      "vpc-endpoints.tf",
       "build/"
     ],
     "tool": "OpenTofu (migrated from Terraform)"

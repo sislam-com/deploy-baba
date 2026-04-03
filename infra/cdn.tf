@@ -107,6 +107,19 @@ resource "aws_cloudfront_distribution" "main" {
     origin_access_control_id = aws_cloudfront_origin_access_control.assets.id
   }
 
+  # API Gateway origin for POST /api/contact (no OAC — body hash works correctly)
+  origin {
+    domain_name = local.apigw_contact_domain
+    origin_id   = "apigw-contact"
+
+    custom_origin_config {
+      http_port              = 80
+      https_port             = 443
+      origin_protocol_policy = "https-only"
+      origin_ssl_protocols   = ["TLSv1.2"]
+    }
+  }
+
   # Cache behavior for /resume/* — served from S3 assets bucket
   ordered_cache_behavior {
     path_pattern           = "/resume/*"
@@ -118,6 +131,19 @@ resource "aws_cloudfront_distribution" "main" {
 
     # CachingOptimized — honors Cache-Control headers set during upload
     cache_policy_id = data.aws_cloudfront_cache_policy.caching_optimized.id
+  }
+
+  # Cache behavior for POST /api/contact — routed to API Gateway (no OAC, POST body works)
+  ordered_cache_behavior {
+    path_pattern           = "/api/contact"
+    target_origin_id       = "apigw-contact"
+    viewer_protocol_policy = "redirect-to-https"
+
+    allowed_methods = ["GET", "HEAD", "OPTIONS", "PUT", "PATCH", "POST", "DELETE"]
+    cached_methods  = ["GET", "HEAD"]
+
+    cache_policy_id          = data.aws_cloudfront_cache_policy.caching_disabled.id
+    origin_request_policy_id = data.aws_cloudfront_origin_request_policy.all_viewer_except_host.id
   }
 
   default_cache_behavior {
