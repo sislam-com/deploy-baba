@@ -32,6 +32,14 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "007_seed_personal_projects",
         include_str!("../migrations/007_seed_personal_projects.sql"),
     ),
+    (
+        "008_create_about_sections",
+        include_str!("../migrations/008_create_about_sections.sql"),
+    ),
+    (
+        "009_seed_about_sections",
+        include_str!("../migrations/009_seed_about_sections.sql"),
+    ),
 ];
 
 pub struct Db {

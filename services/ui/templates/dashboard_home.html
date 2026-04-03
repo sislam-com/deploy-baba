@@ -17,7 +17,7 @@
   </div>
 
   <!-- Summary tiles -->
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
     <a href="/dashboard/jobs"
        class="bg-gray-800 hover:bg-gray-700 rounded-xl p-6 transition group">
       <p class="text-4xl font-bold text-cyan-400 group-hover:text-cyan-300">{{ jobs_count }}</p>
@@ -37,6 +37,15 @@
        class="bg-gray-800 hover:bg-gray-700 rounded-xl p-6 transition group">
       <p class="text-4xl font-bold text-cyan-400 group-hover:text-cyan-300">{{ evidence_count }}</p>
       <p class="text-gray-300 text-sm mt-2 font-medium">Evidence</p>
+    </a>
+  </div>
+
+  <!-- Second row -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <a href="/dashboard/about"
+       class="bg-gray-800 hover:bg-gray-700 rounded-xl p-6 transition group">
+      <p class="text-4xl font-bold text-cyan-400 group-hover:text-cyan-300">{{ about_sections_count }}</p>
+      <p class="text-gray-300 text-sm mt-2 font-medium">About Sections</p>
     </a>
   </div>
 </div>

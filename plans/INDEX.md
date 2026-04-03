@@ -27,6 +27,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | opentofu | W-OTF | `infra/` + `xtask/src/infra/` | WIP | Install `tofu` binary (W-OTF.4.1 OPEN); smoke test (W-OTF.4.7 BLOCKED); docs (W-OTF.4.9 TODO) |
 | dx-justfile | W-DX | `justfile`, `docs/`, `examples/` | WIP | Per-crate READMEs, integration tests |
 | auth | W-AUTH | `services/ui/src/auth.rs`, `routes/auth.rs`, `routes/api/admin.rs`, `routes/dashboard.rs`, `infra/cognito.tf` | DONE | W-AUTH.POST-FIX (CloudFront OAC body hash) |
+| about | W-ABT | `services/ui/src/routes/about.rs`, `services/ui/templates/about_*.html`, `services/ui/migrations/008-009` | DONE | Admin CRUD (W-ABT.4.10, future) |
 
 ---
 
@@ -55,6 +56,9 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 7. **W-DX.5** — Integration tests for `just dev` pipeline
 8. **W-XT.4.3** — Implement `just infra-bootstrap` (xtask bootstrap.rs) — creates S3 + DynamoDB + SSM
 9. **W-QA** — Integration tests & test infrastructure (`plans/cross-cutting/integration-tests.md`) — 5 Phase-0 fixes done, add ~39 tests across phases 1–6
+
+### P2.5 — Content Features
+12. **W-ABT.4.1–4.9** — DB-driven About section (`/about/me`, `/about/repo`) — 2 migrations, 2 templates, 1 route module, nav link
 
 ### P3 — Polish & Publish
 9. **W-PUB.1** — `just publish-dry` passes for all 10 library crates

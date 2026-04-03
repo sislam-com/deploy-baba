@@ -39,6 +39,18 @@ pub fn build(state: AppState) -> Router {
             "/dashboard/competencies/:slug",
             get(routes::dashboard::dashboard_competency_detail),
         )
+        .route(
+            "/dashboard/about",
+            get(routes::dashboard::dashboard_about_list),
+        )
+        .route(
+            "/dashboard/about/new",
+            get(routes::dashboard::dashboard_about_new),
+        )
+        .route(
+            "/dashboard/about/:slug",
+            get(routes::dashboard::dashboard_about_detail),
+        )
         .route_layer(axum::middleware::from_fn_with_state(
             state.clone(),
             crate::middleware::require_auth,
@@ -48,6 +60,8 @@ pub fn build(state: AppState) -> Router {
 
     Router::new()
         .route("/", get(routes::resume::handler))
+        .route("/about/me", get(routes::about::about_me))
+        .route("/about/repo", get(routes::about::about_repo))
         .nest_service("/resume", ServeDir::new("target/resume"))
         .route("/health", get(routes::health::get_health))
         .nest("/api", api_routes)
