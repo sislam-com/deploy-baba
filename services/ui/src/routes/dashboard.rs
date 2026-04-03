@@ -82,6 +82,22 @@ pub struct CompetencySelectItem {
     pub name: String,
 }
 
+pub struct AboutSectionListItem {
+    pub slug: String,
+    pub page: String,
+    pub heading: String,
+}
+
+pub struct AboutSectionForDetail {
+    pub id: i64,
+    pub page: String,
+    pub slug: String,
+    pub heading: String,
+    pub body: String,
+    pub icon: String,
+    pub sort_order: i64,
+}
+
 // ── Templates ─────────────────────────────────────────────────────────────────
 
 #[derive(Template)]
@@ -92,6 +108,7 @@ pub struct DashboardHomeTemplate {
     pub job_details_count: i64,
     pub competencies_count: i64,
     pub evidence_count: i64,
+    pub about_sections_count: i64,
 }
 
 #[derive(Template)]
@@ -129,6 +146,21 @@ pub struct DashboardCompetencyDetailTemplate {
     pub all_jobs: Vec<JobNavItem>,
 }
 
+#[derive(Template)]
+#[template(path = "dashboard_about_list.html")]
+pub struct DashboardAboutListTemplate {
+    pub username: String,
+    pub sections: Vec<AboutSectionListItem>,
+}
+
+#[derive(Template)]
+#[template(path = "dashboard_about_detail.html")]
+pub struct DashboardAboutDetailTemplate {
+    pub username: String,
+    pub section: AboutSectionForDetail,
+    pub is_new: bool,
+}
+
 // ── Error helper ──────────────────────────────────────────────────────────────
 
 fn db_err(e: impl std::fmt::Display) -> (StatusCode, String) {
@@ -154,6 +186,9 @@ pub async fn dashboard_home(
     let evidence_count: i64 = conn
         .query_row("SELECT COUNT(*) FROM competency_evidence", [], |r| r.get(0))
         .unwrap_or(0);
+    let about_sections_count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM about_sections", [], |r| r.get(0))
+        .unwrap_or(0);
 
     DashboardHomeTemplate {
         username: claims.username,
@@ -161,6 +196,7 @@ pub async fn dashboard_home(
         job_details_count,
         competencies_count,
         evidence_count,
+        about_sections_count,
     }
 }
 
@@ -409,6 +445,90 @@ pub async fn dashboard_competency_detail(
         competency,
         evidence,
         all_jobs,
+    })
+}
+
+pub async fn dashboard_about_list(
+    Extension(claims): Extension<Claims>,
+    State(db): State<Arc<Db>>,
+) -> impl IntoResponse {
+    let conn = db.conn.lock().unwrap();
+    let mut stmt = conn
+        .prepare("SELECT slug, page, heading FROM about_sections ORDER BY page ASC, sort_order ASC")
+        .unwrap();
+    let sections = stmt
+        .query_map([], |row| {
+            Ok(AboutSectionListItem {
+                slug: row.get(0)?,
+                page: row.get(1)?,
+                heading: row.get(2)?,
+            })
+        })
+        .unwrap()
+        .filter_map(|r| r.ok())
+        .collect();
+
+    DashboardAboutListTemplate {
+        username: claims.username,
+        sections,
+    }
+}
+
+pub async fn dashboard_about_new(
+    Extension(claims): Extension<Claims>,
+    State(_db): State<Arc<Db>>,
+) -> impl IntoResponse {
+    DashboardAboutDetailTemplate {
+        username: claims.username,
+        section: AboutSectionForDetail {
+            id: 0,
+            page: String::new(),
+            slug: String::new(),
+            heading: String::new(),
+            body: String::new(),
+            icon: String::new(),
+            sort_order: 0,
+        },
+        is_new: true,
+    }
+}
+
+pub async fn dashboard_about_detail(
+    Extension(claims): Extension<Claims>,
+    State(db): State<Arc<Db>>,
+    Path(slug): Path<String>,
+) -> Result<impl IntoResponse, (StatusCode, String)> {
+    let conn = db.conn.lock().unwrap();
+
+    let section = conn
+        .query_row(
+            "SELECT id, page, slug, heading, body, icon, sort_order
+             FROM about_sections WHERE slug = ?1",
+            rusqlite::params![slug],
+            |row| {
+                let icon: Option<String> = row.get(5)?;
+                Ok(AboutSectionForDetail {
+                    id: row.get(0)?,
+                    page: row.get(1)?,
+                    slug: row.get(2)?,
+                    heading: row.get(3)?,
+                    body: row.get(4)?,
+                    icon: icon.unwrap_or_default(),
+                    sort_order: row.get(6)?,
+                })
+            },
+        )
+        .map_err(|_| {
+            (
+                StatusCode::NOT_FOUND,
+                format!("About section '{}' not found", slug),
+            )
+        })?;
+
+    Ok(DashboardAboutDetailTemplate {
+        username: claims.username,
+        section,
+        is_new: false,
     })
 }
 

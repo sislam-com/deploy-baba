@@ -4,7 +4,7 @@ use axum::{
     routing::{post, put},
     Json, Router,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use utoipa::ToSchema;
 
@@ -61,6 +61,27 @@ pub struct EvidenceInput {
     pub job_id: i64,
     pub detail_id: Option<i64>,
     pub highlight_text: Option<String>,
+    pub sort_order: i64,
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct AboutSectionInput {
+    pub page: String,
+    pub slug: String,
+    pub heading: String,
+    pub body: String,
+    pub icon: Option<String>,
+    pub sort_order: i64,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct AboutSectionResponse {
+    pub id: i64,
+    pub page: String,
+    pub slug: String,
+    pub heading: String,
+    pub body: String,
+    pub icon: Option<String>,
     pub sort_order: i64,
 }
 
@@ -594,6 +615,143 @@ fn row_to_evidence(row: &rusqlite::Row<'_>) -> rusqlite::Result<Evidence> {
     })
 }
 
+fn row_to_about_section(row: &rusqlite::Row<'_>) -> rusqlite::Result<AboutSectionResponse> {
+    Ok(AboutSectionResponse {
+        id: row.get(0)?,
+        page: row.get(1)?,
+        slug: row.get(2)?,
+        heading: row.get(3)?,
+        body: row.get(4)?,
+        icon: row.get(5)?,
+        sort_order: row.get(6)?,
+    })
+}
+
+// ── AboutSection handlers ─────────────────────────────────────────────────────
+
+/// Create a new about section.
+#[utoipa::path(
+    post,
+    path = "/api/admin/about",
+    tag = "admin",
+    request_body = AboutSectionInput,
+    responses(
+        (status = 201, description = "About section created", body = AboutSectionResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error"),
+    ),
+    security(("cookieAuth" = []), ("bearerAuth" = [])),
+)]
+pub async fn create_about_section(
+    State(db): State<Arc<Db>>,
+    Json(input): Json<AboutSectionInput>,
+) -> ApiResult<(StatusCode, Json<AboutSectionResponse>)> {
+    let conn = db.conn.lock().unwrap();
+    conn.execute(
+        "INSERT INTO about_sections (page, slug, heading, body, icon, sort_order)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        rusqlite::params![
+            input.page,
+            input.slug,
+            input.heading,
+            input.body,
+            input.icon,
+            input.sort_order,
+        ],
+    )
+    .map_err(db_err)?;
+
+    let id = conn.last_insert_rowid();
+    let section = conn
+        .query_row(
+            "SELECT id, page, slug, heading, body, icon, sort_order
+             FROM about_sections WHERE id = ?1",
+            rusqlite::params![id],
+            row_to_about_section,
+        )
+        .map_err(db_err)?;
+
+    Ok((StatusCode::CREATED, Json(section)))
+}
+
+/// Update an existing about section.
+#[utoipa::path(
+    put,
+    path = "/api/admin/about/{id}",
+    tag = "admin",
+    params(("id" = i64, Path, description = "About section ID")),
+    request_body = AboutSectionInput,
+    responses(
+        (status = 200, description = "About section updated", body = AboutSectionResponse),
+        (status = 404, description = "About section not found"),
+        (status = 401, description = "Unauthorized"),
+    ),
+    security(("cookieAuth" = []), ("bearerAuth" = [])),
+)]
+pub async fn update_about_section(
+    State(db): State<Arc<Db>>,
+    Path(id): Path<i64>,
+    Json(input): Json<AboutSectionInput>,
+) -> ApiResult<Json<AboutSectionResponse>> {
+    let conn = db.conn.lock().unwrap();
+    let rows = conn
+        .execute(
+            "UPDATE about_sections SET page=?1, slug=?2, heading=?3, body=?4, icon=?5, sort_order=?6
+             WHERE id=?7",
+            rusqlite::params![
+                input.page, input.slug, input.heading, input.body,
+                input.icon, input.sort_order, id,
+            ],
+        )
+        .map_err(db_err)?;
+
+    if rows == 0 {
+        return Err(not_found(format!("AboutSection {} not found", id)));
+    }
+
+    let section = conn
+        .query_row(
+            "SELECT id, page, slug, heading, body, icon, sort_order
+             FROM about_sections WHERE id = ?1",
+            rusqlite::params![id],
+            row_to_about_section,
+        )
+        .map_err(db_err)?;
+
+    Ok(Json(section))
+}
+
+/// Delete an about section.
+#[utoipa::path(
+    delete,
+    path = "/api/admin/about/{id}",
+    tag = "admin",
+    params(("id" = i64, Path, description = "About section ID")),
+    responses(
+        (status = 204, description = "About section deleted"),
+        (status = 404, description = "About section not found"),
+        (status = 401, description = "Unauthorized"),
+    ),
+    security(("cookieAuth" = []), ("bearerAuth" = [])),
+)]
+pub async fn delete_about_section(
+    State(db): State<Arc<Db>>,
+    Path(id): Path<i64>,
+) -> ApiResult<StatusCode> {
+    let conn = db.conn.lock().unwrap();
+    let rows = conn
+        .execute(
+            "DELETE FROM about_sections WHERE id = ?1",
+            rusqlite::params![id],
+        )
+        .map_err(db_err)?;
+
+    if rows == 0 {
+        return Err(not_found(format!("AboutSection {} not found", id)));
+    }
+    Ok(StatusCode::NO_CONTENT)
+}
+
 // ── Router ────────────────────────────────────────────────────────────────────
 
 pub fn router() -> Router<AppState> {
@@ -614,5 +772,10 @@ pub fn router() -> Router<AppState> {
         .route(
             "/evidence/:id",
             put(update_evidence).delete(delete_evidence),
+        )
+        .route("/about", post(create_about_section))
+        .route(
+            "/about/:id",
+            put(update_about_section).delete(delete_about_section),
         )
 }

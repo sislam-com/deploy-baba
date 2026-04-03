@@ -43,6 +43,7 @@ Example: `DRL-2026-03-18-terraform.md`
 | `DX` | justfile + docs + examples | `justfile`, `docs/`, `examples/` |
 | `PUB` | Publishing | crates.io release |
 | `AUTH` | auth | `services/ui/src/auth.rs`, `routes/auth.rs`, `routes/api/admin.rs`, `routes/dashboard.rs` |
+| `ABT` | about | `services/ui/src/routes/about.rs`, `services/ui/templates/about_*.html` |
 
 ---
 
