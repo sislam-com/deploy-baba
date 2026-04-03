@@ -2,7 +2,7 @@
   "_meta": {
     "description": "Global agent cache for deploy-baba. Claude reads this on startup to avoid re-exploring unchanged code.",
     "generated_by": "just cache-refresh",
-    "last_updated": "2026-03-30",
+    "last_updated": "2026-04-02",
     "schema_version": "1.0.0",
     "usage": "Check git.sha against `git rev-parse HEAD`. If match: use cached data. If mismatch: re-scan changed components only, then update this file."
   },
@@ -245,16 +245,23 @@
     "backup": "S3 via EventBridge schedule",
     "engine": "SQLite (rusqlite 0.32 bundled)",
     "file": "deploy-baba.db",
-    "git_sha_at_scan": "0a8613fd30818b424dbfe44fd4132d6c4b828d0b",
+    "git_sha_at_scan": "82f6e63ac7add53caa338b6715786b0d78236116",
     "location": "EFS mount (Lambda) / local file (dev)",
-    "migrations_path": "services/ui/migrations/"
+    "migrations_path": "services/ui/migrations/",
+    "migration_count": 11,
+    "latest_migrations": [
+      "008_create_about_sections (W-ABT)",
+      "009_seed_about_sections (W-ABT)",
+      "010_create_social_links (W-SL)",
+      "011_seed_social_links (W-SL)"
+    ]
   },
   "git": {
-    "branch": "feat/resume",
-    "last_commit": "Revert lambda policy changes and update plans.",
+    "branch": "feat/about-sections",
+    "last_commit": "Add social links DB-managed nav + dashboard CRUD",
     "remote": "git@github.com:shantopagla/deploy-baba.git",
-    "sha": "a37c4d9b366a89f63db529e1e97f9b1c6c1556d9",
-    "short_sha": "a37c4d9"
+    "sha": "82f6e63ac7add53caa338b6715786b0d78236116",
+    "short_sha": "82f6e63"
   },
   "infra": {
     "aws_region": "us-east-1",
@@ -318,12 +325,10 @@
     "conventions": "plans/CONVENTIONS.md",
     "cross_cutting_dir": "plans/cross-cutting/",
     "current_priority": {
-      "P0": [
-        "W-AUTH.4.19 — OpenAPI security scheme + admin endpoint docs"
-      ],
       "P1": [
         "W-XT.4.2 — Remove or wire up EnvironmentInterpolator",
-        "W-OTF.4.1–4.7 — OpenTofu migration"
+        "W-OTF.4.1–4.7 — OpenTofu migration",
+        "W-AUTH.POST-FIX — CloudFront OAC body hash mismatch blocks dashboard edit forms"
       ],
       "P2": [
         "W-DX.3 per-crate READMEs",
@@ -339,7 +344,7 @@
     },
     "drift_dir": "plans/drift/",
     "index": "plans/INDEX.md",
-    "module_count": 17,
+    "module_count": 19,
     "modules_dir": "plans/modules/"
   },
   "project": {
@@ -372,7 +377,7 @@
       "database": "rusqlite on EFS (ADR-002)",
       "description": "Portfolio site and live API demo — the Lambda binary",
       "framework": "axum 0.7",
-      "git_sha_at_scan": "0a8613fd30818b424dbfe44fd4132d6c4b828d0b",
+      "git_sha_at_scan": "82f6e63ac7add53caa338b6715786b0d78236116",
       "key_files": [
         "src/main.rs",
         "src/router.rs",
@@ -383,9 +388,7 @@
         "src/error.rs",
         "src/openapi.rs"
       ],
-      "open_issues": [
-        "W-AUTH.4.19: OpenAPI security scheme + admin endpoint docs"
-      ],
+      "open_issues": [],
       "path": "services/ui",
       "plan_domain": "W-UI",
       "routes_dir": "src/routes",

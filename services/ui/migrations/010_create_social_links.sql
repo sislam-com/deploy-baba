@@ -1,0 +1,9 @@
+CREATE TABLE social_links (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    platform TEXT NOT NULL UNIQUE,
+    url TEXT NOT NULL,
+    icon TEXT,
+    label TEXT NOT NULL,
+    visible INTEGER NOT NULL DEFAULT 1,
+    sort_order INTEGER NOT NULL DEFAULT 0
+);

@@ -3,7 +3,7 @@ use askama_axum::IntoResponse;
 use axum::extract::State;
 use std::sync::Arc;
 
-use crate::db::Db;
+use crate::db::{load_social_links, Db, SocialLink};
 
 pub struct JobSummary {
     pub slug: String,
@@ -27,6 +27,7 @@ pub struct CompetencySummary {
 struct ResumeTemplate {
     jobs: Vec<JobSummary>,
     competencies: Vec<CompetencySummary>,
+    social_links: Vec<SocialLink>,
 }
 
 pub async fn handler(State(db): State<Arc<Db>>) -> impl IntoResponse {
@@ -77,5 +78,11 @@ pub async fn handler(State(db): State<Arc<Db>>) -> impl IntoResponse {
         .filter_map(|r| r.ok())
         .collect();
 
-    ResumeTemplate { jobs, competencies }
+    let social_links = load_social_links(&conn);
+
+    ResumeTemplate {
+        jobs,
+        competencies,
+        social_links,
+    }
 }

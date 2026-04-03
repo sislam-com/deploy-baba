@@ -51,6 +51,18 @@ pub fn build(state: AppState) -> Router {
             "/dashboard/about/:slug",
             get(routes::dashboard::dashboard_about_detail),
         )
+        .route(
+            "/dashboard/social-links",
+            get(routes::dashboard::dashboard_social_links_list),
+        )
+        .route(
+            "/dashboard/social-links/new",
+            get(routes::dashboard::dashboard_social_link_new),
+        )
+        .route(
+            "/dashboard/social-links/:id",
+            get(routes::dashboard::dashboard_social_link_detail),
+        )
         .route_layer(axum::middleware::from_fn_with_state(
             state.clone(),
             crate::middleware::require_auth,

@@ -58,6 +58,14 @@ DELETE /api/admin/competencies/:id           → 204 | 404
 POST   /api/admin/evidence                   → 201 + created Evidence
 PUT    /api/admin/evidence/:id               → 200 + updated Evidence | 404
 DELETE /api/admin/evidence/:id               → 204 | 404
+
+POST   /api/admin/about                      → 201 + created AboutSection
+PUT    /api/admin/about/:id                  → 200 + updated AboutSection | 404
+DELETE /api/admin/about/:id                  → 204 | 404
+
+POST   /api/admin/social-links               → 201 + created SocialLink
+PUT    /api/admin/social-links/:id           → 200 + updated SocialLink | 404
+DELETE /api/admin/social-links/:id           → 204 | 404
 ```
 
 ### AppState (`services/ui/src/state.rs`)
@@ -180,6 +188,12 @@ Multi-route, multi-template architecture replacing the single-page monolith:
 | `GET /dashboard/jobs/:slug` | `dashboard_job_detail.html` | Job + details + evidence; type-ahead nav |
 | `GET /dashboard/competencies` | `dashboard_competencies_list.html` | Competency master list |
 | `GET /dashboard/competencies/:slug` | `dashboard_competency_detail.html` | Competency + linked evidence |
+| `GET /dashboard/about` | `dashboard_about_list.html` | About sections master list |
+| `GET /dashboard/about/new` | `dashboard_about_detail.html` | New about section form |
+| `GET /dashboard/about/:slug` | `dashboard_about_detail.html` | Edit about section |
+| `GET /dashboard/social-links` | `dashboard_social_links_list.html` | Social links master list |
+| `GET /dashboard/social-links/new` | `dashboard_social_link_detail.html` | New social link form |
+| `GET /dashboard/social-links/:id` | `dashboard_social_link_detail.html` | Edit social link |
 
 Each template extends `base.html`; styled with Tailwind. JavaScript uses `fetch()` to call existing
 `/api/admin/*` CRUD endpoints — no new API routes needed. Type-ahead navigation on job detail page
@@ -248,6 +262,8 @@ W-AUTH.4.22 (dashboard.rs refactor — 6 handlers + template structs)
 | W-AUTH.4.26 | Create `templates/dashboard_competencies_list.html` + `dashboard_competency_detail.html` | DONE | List + detail views for competencies with linked evidence |
 | W-AUTH.4.27 | Update `router.rs` — mount 6 dashboard routes with auth middleware | DONE | Replace single `/dashboard` route; literal `/new` before `/:slug` |
 | W-AUTH.4.28 | Delete `templates/dashboard.html` monolith | DONE | Replaced by 5 new templates |
+| W-AUTH.4.29 | Add about sections dashboard pages + admin CRUD | DONE | `/dashboard/about`, `/dashboard/about/new`, `/dashboard/about/:slug`; `POST/PUT/DELETE /api/admin/about` |
+| W-AUTH.4.30 | Add social links dashboard pages + admin CRUD | DONE | `/dashboard/social-links`, `/dashboard/social-links/new`, `/dashboard/social-links/:id`; `POST/PUT/DELETE /api/admin/social-links` |
 
 ---
 

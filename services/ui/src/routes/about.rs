@@ -3,15 +3,14 @@ use askama_axum::IntoResponse;
 use axum::extract::State;
 use std::sync::Arc;
 
-use crate::db::Db;
+use crate::db::{load_social_links, Db, SocialLink};
 
 pub struct AboutSection {
     pub heading: String,
     pub body: String,
 }
 
-fn query_sections(db: &Arc<Db>, page: &str) -> Vec<AboutSection> {
-    let conn = db.conn.lock().unwrap();
+fn query_sections(conn: &rusqlite::Connection, page: &str) -> Vec<AboutSection> {
     let mut stmt = conn
         .prepare(
             "SELECT heading, body FROM about_sections
@@ -34,20 +33,32 @@ fn query_sections(db: &Arc<Db>, page: &str) -> Vec<AboutSection> {
 #[template(path = "about_me.html")]
 struct AboutMeTemplate {
     sections: Vec<AboutSection>,
+    social_links: Vec<SocialLink>,
 }
 
 #[derive(Template)]
 #[template(path = "about_repo.html")]
 struct AboutRepoTemplate {
     sections: Vec<AboutSection>,
+    social_links: Vec<SocialLink>,
 }
 
 pub async fn about_me(State(db): State<Arc<Db>>) -> impl IntoResponse {
-    let sections = query_sections(&db, "me");
-    AboutMeTemplate { sections }
+    let conn = db.conn.lock().unwrap();
+    let sections = query_sections(&conn, "me");
+    let social_links = load_social_links(&conn);
+    AboutMeTemplate {
+        sections,
+        social_links,
+    }
 }
 
 pub async fn about_repo(State(db): State<Arc<Db>>) -> impl IntoResponse {
-    let sections = query_sections(&db, "repo");
-    AboutRepoTemplate { sections }
+    let conn = db.conn.lock().unwrap();
+    let sections = query_sections(&conn, "repo");
+    let social_links = load_social_links(&conn);
+    AboutRepoTemplate {
+        sections,
+        social_links,
+    }
 }

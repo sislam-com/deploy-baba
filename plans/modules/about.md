@@ -1,6 +1,7 @@
 # W-ABT: About Section
 **Path:** `services/ui/src/routes/about.rs`, `services/ui/templates/about_me.html`, `services/ui/templates/about_repo.html` | **Status:** DONE
 **Coverage floor:** N/A | **Depends on:** W-UI, W-RSM (pattern reference) | **Depended on by:** —
+**Migrations:** 008 (schema), 009 (seed) | **Admin API:** `POST/PUT/DELETE /api/admin/about` | **Dashboard:** `/dashboard/about`, `/dashboard/about/new`, `/dashboard/about/:slug`
 
 ## W-ABT.1 Purpose
 
@@ -65,7 +66,7 @@ render their respective Askama template.
 | W-ABT.4.7 | Create `about_me.html` template | DONE | Extends `base.html`, tab toggle |
 | W-ABT.4.8 | Create `about_repo.html` template | DONE | Extends `base.html`, tab toggle |
 | W-ABT.4.9 | Add "About" nav link in `base.html` | DONE | Before "API Docs" link |
-| W-ABT.4.10 | Admin CRUD routes (future) | TODO | POST/PUT/DELETE via `/api/admin/about` |
+| W-ABT.4.10 | Admin CRUD routes + dashboard pages | DONE | `POST/PUT/DELETE /api/admin/about`; dashboard list/new/detail handlers + templates |
 
 ### Implementation Order
 

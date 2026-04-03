@@ -45,7 +45,11 @@ services/ui/
 │   ├── 004_seed_job_details.sql         # All accomplishment bullets + sub-engagements
 │   ├── 005_seed_competencies.sql        # 6 competency categories
 │   ├── 006_seed_competency_evidence.sql # Cross-references
-│   └── 007_seed_personal_projects.sql   # Personal projects job details seed
+│   ├── 007_seed_personal_projects.sql   # Personal projects job details seed
+│   ├── 008_create_about_sections.sql    # About sections schema (W-ABT)
+│   ├── 009_seed_about_sections.sql      # About sections seed (W-ABT)
+│   ├── 010_create_social_links.sql      # Social links schema (W-SL)
+│   └── 011_seed_social_links.sql        # LinkedIn + GitHub seed (W-SL)
 ├── src/
 │   ├── db.rs                            # Db struct, open(), migration runner
 │   └── routes/

@@ -24,11 +24,10 @@
                 <div class="flex items-center space-x-6">
                     <a href="/about/me" class="text-gray-300 hover:text-white transition">About</a>
                     <a href="/docs" class="text-gray-300 hover:text-white transition">API Docs</a>
-                    <a href="https://github.com/shantopagla/deploy-baba"
-                       target="_blank" rel="noopener noreferrer"
-                       class="text-gray-300 hover:text-white transition">
-                        GitHub
-                    </a>
+                    {% for link in social_links %}
+                    <a href="{{ link.url }}" target="_blank" rel="noopener noreferrer"
+                       class="text-gray-300 hover:text-white transition">{{ link.label }}</a>
+                    {% endfor %}
                     <a href="/auth/login"
                        class="text-gray-300 hover:text-white transition">
                         Login
