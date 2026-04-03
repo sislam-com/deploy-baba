@@ -752,6 +752,135 @@ pub async fn delete_about_section(
     Ok(StatusCode::NO_CONTENT)
 }
 
+// ── SocialLink types ──────────────────────────────────────────────────────────
+
+#[derive(Deserialize, ToSchema)]
+pub struct SocialLinkInput {
+    pub platform: String,
+    pub url: String,
+    pub label: String,
+    pub icon: Option<String>,
+    pub visible: bool,
+    pub sort_order: i64,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct SocialLinkResponse {
+    pub id: i64,
+    pub platform: String,
+    pub url: String,
+    pub label: String,
+    pub icon: Option<String>,
+    pub visible: bool,
+    pub sort_order: i64,
+}
+
+fn row_to_social_link(row: &rusqlite::Row<'_>) -> rusqlite::Result<SocialLinkResponse> {
+    let visible: i64 = row.get(5)?;
+    Ok(SocialLinkResponse {
+        id: row.get(0)?,
+        platform: row.get(1)?,
+        url: row.get(2)?,
+        label: row.get(3)?,
+        icon: row.get(4)?,
+        visible: visible != 0,
+        sort_order: row.get(6)?,
+    })
+}
+
+// ── SocialLink handlers ───────────────────────────────────────────────────────
+
+/// Create a new social link.
+pub async fn create_social_link(
+    State(db): State<Arc<Db>>,
+    Json(input): Json<SocialLinkInput>,
+) -> ApiResult<(StatusCode, Json<SocialLinkResponse>)> {
+    let conn = db.conn.lock().unwrap();
+    conn.execute(
+        "INSERT INTO social_links (platform, url, label, icon, visible, sort_order)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        rusqlite::params![
+            input.platform,
+            input.url,
+            input.label,
+            input.icon,
+            input.visible as i64,
+            input.sort_order,
+        ],
+    )
+    .map_err(db_err)?;
+
+    let id = conn.last_insert_rowid();
+    let link = conn
+        .query_row(
+            "SELECT id, platform, url, label, icon, visible, sort_order
+             FROM social_links WHERE id = ?1",
+            rusqlite::params![id],
+            row_to_social_link,
+        )
+        .map_err(db_err)?;
+
+    Ok((StatusCode::CREATED, Json(link)))
+}
+
+/// Update an existing social link.
+pub async fn update_social_link(
+    State(db): State<Arc<Db>>,
+    Path(id): Path<i64>,
+    Json(input): Json<SocialLinkInput>,
+) -> ApiResult<Json<SocialLinkResponse>> {
+    let conn = db.conn.lock().unwrap();
+    let rows = conn
+        .execute(
+            "UPDATE social_links SET platform=?1, url=?2, label=?3, icon=?4,
+             visible=?5, sort_order=?6 WHERE id=?7",
+            rusqlite::params![
+                input.platform,
+                input.url,
+                input.label,
+                input.icon,
+                input.visible as i64,
+                input.sort_order,
+                id,
+            ],
+        )
+        .map_err(db_err)?;
+
+    if rows == 0 {
+        return Err(not_found(format!("SocialLink {} not found", id)));
+    }
+
+    let link = conn
+        .query_row(
+            "SELECT id, platform, url, label, icon, visible, sort_order
+             FROM social_links WHERE id = ?1",
+            rusqlite::params![id],
+            row_to_social_link,
+        )
+        .map_err(db_err)?;
+
+    Ok(Json(link))
+}
+
+/// Delete a social link.
+pub async fn delete_social_link(
+    State(db): State<Arc<Db>>,
+    Path(id): Path<i64>,
+) -> ApiResult<StatusCode> {
+    let conn = db.conn.lock().unwrap();
+    let rows = conn
+        .execute(
+            "DELETE FROM social_links WHERE id = ?1",
+            rusqlite::params![id],
+        )
+        .map_err(db_err)?;
+
+    if rows == 0 {
+        return Err(not_found(format!("SocialLink {} not found", id)));
+    }
+    Ok(StatusCode::NO_CONTENT)
+}
+
 // ── Router ────────────────────────────────────────────────────────────────────
 
 pub fn router() -> Router<AppState> {
@@ -777,5 +906,10 @@ pub fn router() -> Router<AppState> {
         .route(
             "/about/:id",
             put(update_about_section).delete(delete_about_section),
+        )
+        .route("/social-links", post(create_social_link))
+        .route(
+            "/social-links/:id",
+            put(update_social_link).delete(delete_social_link),
         )
 }

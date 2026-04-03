@@ -40,7 +40,38 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "009_seed_about_sections",
         include_str!("../migrations/009_seed_about_sections.sql"),
     ),
+    (
+        "010_create_social_links",
+        include_str!("../migrations/010_create_social_links.sql"),
+    ),
+    (
+        "011_seed_social_links",
+        include_str!("../migrations/011_seed_social_links.sql"),
+    ),
 ];
+
+pub struct SocialLink {
+    pub url: String,
+    pub label: String,
+}
+
+/// Load visible social links using an already-locked connection.
+pub fn load_social_links(conn: &rusqlite::Connection) -> Vec<SocialLink> {
+    let mut stmt = match conn
+        .prepare("SELECT url, label FROM social_links WHERE visible = 1 ORDER BY sort_order ASC")
+    {
+        Ok(s) => s,
+        Err(_) => return Vec::new(),
+    };
+    stmt.query_map([], |row| {
+        Ok(SocialLink {
+            url: row.get(0)?,
+            label: row.get(1)?,
+        })
+    })
+    .map(|rows| rows.filter_map(|r| r.ok()).collect())
+    .unwrap_or_default()
+}
 
 pub struct Db {
     pub conn: Mutex<Connection>,

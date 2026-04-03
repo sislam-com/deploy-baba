@@ -1,6 +1,6 @@
 # deploy-baba — Plan Index
-**GitHub:** `shantopagla/deploy-baba` | **Last updated:** 2026-03-30
-**Source repo:** `~/shanto` (Baba Toolchain, ~85K LOC) | **Status:** ~90% complete
+**GitHub:** `shantopagla/deploy-baba` | **Last updated:** 2026-04-02
+**Source repo:** `~/shanto` (Baba Toolchain, ~85K LOC) | **Status:** ~92% complete
 
 See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming rules.
 
@@ -27,7 +27,8 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | opentofu | W-OTF | `infra/` + `xtask/src/infra/` | WIP | Install `tofu` binary (W-OTF.4.1 OPEN); smoke test (W-OTF.4.7 BLOCKED); docs (W-OTF.4.9 TODO) |
 | dx-justfile | W-DX | `justfile`, `docs/`, `examples/` | WIP | Per-crate READMEs, integration tests |
 | auth | W-AUTH | `services/ui/src/auth.rs`, `routes/auth.rs`, `routes/api/admin.rs`, `routes/dashboard.rs`, `infra/cognito.tf` | DONE | W-AUTH.POST-FIX (CloudFront OAC body hash) |
-| about | W-ABT | `services/ui/src/routes/about.rs`, `services/ui/templates/about_*.html`, `services/ui/migrations/008-009` | DONE | Admin CRUD (W-ABT.4.10, future) |
+| about | W-ABT | `services/ui/src/routes/about.rs`, `services/ui/templates/about_*.html`, `services/ui/migrations/008-009` | DONE | — |
+| social-links | W-SL | `services/ui/src/db.rs`, `services/ui/src/routes/dashboard.rs`, `services/ui/src/routes/api/admin.rs`, `services/ui/migrations/010-011` | DONE | — |
 
 ---
 
@@ -58,7 +59,8 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 9. **W-QA** — Integration tests & test infrastructure (`plans/cross-cutting/integration-tests.md`) — 5 Phase-0 fixes done, add ~39 tests across phases 1–6
 
 ### P2.5 — Content Features
-12. **W-ABT.4.1–4.9** — DB-driven About section (`/about/me`, `/about/repo`) — 2 migrations, 2 templates, 1 route module, nav link
+12. ~~**W-ABT.4.1–4.10**~~ — DB-driven About section + admin CRUD — **DONE** (migrations 008–009, `/about/me`, `/about/repo`, dashboard routes, `POST/PUT/DELETE /api/admin/about`)
+13. ~~**W-SL**~~ — DB-managed social links in top nav — **DONE** (migrations 010–011, `social_links` table, nav loop in `base.html`, dashboard CRUD, `POST/PUT/DELETE /api/admin/social-links`)
 
 ### P3 — Polish & Publish
 9. **W-PUB.1** — `just publish-dry` passes for all 10 library crates

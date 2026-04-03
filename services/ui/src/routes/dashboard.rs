@@ -8,7 +8,7 @@ use axum::{
 use std::sync::Arc;
 
 use crate::auth::Claims;
-use crate::db::Db;
+use crate::db::{load_social_links, Db, SocialLink};
 
 // ── Template data structs ─────────────────────────────────────────────────────
 
@@ -98,6 +98,24 @@ pub struct AboutSectionForDetail {
     pub sort_order: i64,
 }
 
+pub struct SocialLinkListItem {
+    pub id: i64,
+    pub platform: String,
+    pub label: String,
+    pub url: String,
+    pub visible: bool,
+}
+
+pub struct SocialLinkForDetail {
+    pub id: i64,
+    pub platform: String,
+    pub url: String,
+    pub label: String,
+    pub icon: String,
+    pub visible: bool,
+    pub sort_order: i64,
+}
+
 // ── Templates ─────────────────────────────────────────────────────────────────
 
 #[derive(Template)]
@@ -109,6 +127,8 @@ pub struct DashboardHomeTemplate {
     pub competencies_count: i64,
     pub evidence_count: i64,
     pub about_sections_count: i64,
+    pub social_links_count: i64,
+    pub social_links: Vec<SocialLink>,
 }
 
 #[derive(Template)]
@@ -116,6 +136,7 @@ pub struct DashboardHomeTemplate {
 pub struct DashboardJobsListTemplate {
     pub username: String,
     pub jobs: Vec<JobListItem>,
+    pub social_links: Vec<SocialLink>,
 }
 
 #[derive(Template)]
@@ -128,6 +149,7 @@ pub struct DashboardJobDetailTemplate {
     pub all_jobs: Vec<JobNavItem>,
     pub all_competencies: Vec<CompetencySelectItem>,
     pub is_new: bool,
+    pub social_links: Vec<SocialLink>,
 }
 
 #[derive(Template)]
@@ -135,6 +157,7 @@ pub struct DashboardJobDetailTemplate {
 pub struct DashboardCompetenciesListTemplate {
     pub username: String,
     pub competencies: Vec<CompetencyListItem>,
+    pub social_links: Vec<SocialLink>,
 }
 
 #[derive(Template)]
@@ -144,6 +167,7 @@ pub struct DashboardCompetencyDetailTemplate {
     pub competency: CompetencyForDetail,
     pub evidence: Vec<EvidenceForCompetency>,
     pub all_jobs: Vec<JobNavItem>,
+    pub social_links: Vec<SocialLink>,
 }
 
 #[derive(Template)]
@@ -151,6 +175,7 @@ pub struct DashboardCompetencyDetailTemplate {
 pub struct DashboardAboutListTemplate {
     pub username: String,
     pub sections: Vec<AboutSectionListItem>,
+    pub social_links: Vec<SocialLink>,
 }
 
 #[derive(Template)]
@@ -159,6 +184,24 @@ pub struct DashboardAboutDetailTemplate {
     pub username: String,
     pub section: AboutSectionForDetail,
     pub is_new: bool,
+    pub social_links: Vec<SocialLink>,
+}
+
+#[derive(Template)]
+#[template(path = "dashboard_social_links_list.html")]
+pub struct DashboardSocialLinksListTemplate {
+    pub username: String,
+    pub link_items: Vec<SocialLinkListItem>,
+    pub social_links: Vec<SocialLink>,
+}
+
+#[derive(Template)]
+#[template(path = "dashboard_social_link_detail.html")]
+pub struct DashboardSocialLinkDetailTemplate {
+    pub username: String,
+    pub link: SocialLinkForDetail,
+    pub is_new: bool,
+    pub social_links: Vec<SocialLink>,
 }
 
 // ── Error helper ──────────────────────────────────────────────────────────────
@@ -189,6 +232,10 @@ pub async fn dashboard_home(
     let about_sections_count: i64 = conn
         .query_row("SELECT COUNT(*) FROM about_sections", [], |r| r.get(0))
         .unwrap_or(0);
+    let social_links_count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM social_links", [], |r| r.get(0))
+        .unwrap_or(0);
+    let social_links = load_social_links(&conn);
 
     DashboardHomeTemplate {
         username: claims.username,
@@ -197,6 +244,8 @@ pub async fn dashboard_home(
         competencies_count,
         evidence_count,
         about_sections_count,
+        social_links_count,
+        social_links,
     }
 }
 
@@ -225,10 +274,12 @@ pub async fn dashboard_jobs_list(
         .unwrap()
         .filter_map(|r| r.ok())
         .collect();
+    let social_links = load_social_links(&conn);
 
     DashboardJobsListTemplate {
         username: claims.username,
         jobs,
+        social_links,
     }
 }
 
@@ -239,6 +290,7 @@ pub async fn dashboard_job_new(
     let conn = db.conn.lock().unwrap();
     let all_jobs = load_job_nav_items(&conn);
     let all_competencies = load_competency_select_items(&conn);
+    let social_links = load_social_links(&conn);
 
     DashboardJobDetailTemplate {
         username: claims.username,
@@ -259,6 +311,7 @@ pub async fn dashboard_job_new(
         all_jobs,
         all_competencies,
         is_new: true,
+        social_links,
     }
 }
 
@@ -340,6 +393,7 @@ pub async fn dashboard_job_detail(
 
     let all_jobs = load_job_nav_items(&conn);
     let all_competencies = load_competency_select_items(&conn);
+    let social_links = load_social_links(&conn);
 
     Ok(DashboardJobDetailTemplate {
         username: claims.username,
@@ -349,6 +403,7 @@ pub async fn dashboard_job_detail(
         all_jobs,
         all_competencies,
         is_new: false,
+        social_links,
     })
 }
 
@@ -370,10 +425,12 @@ pub async fn dashboard_competencies_list(
         .unwrap()
         .filter_map(|r| r.ok())
         .collect();
+    let social_links = load_social_links(&conn);
 
     DashboardCompetenciesListTemplate {
         username: claims.username,
         competencies,
+        social_links,
     }
 }
 
@@ -439,12 +496,14 @@ pub async fn dashboard_competency_detail(
         .collect();
 
     let all_jobs = load_job_nav_items(&conn);
+    let social_links = load_social_links(&conn);
 
     Ok(DashboardCompetencyDetailTemplate {
         username: claims.username,
         competency,
         evidence,
         all_jobs,
+        social_links,
     })
 }
 
@@ -467,17 +526,21 @@ pub async fn dashboard_about_list(
         .unwrap()
         .filter_map(|r| r.ok())
         .collect();
+    let social_links = load_social_links(&conn);
 
     DashboardAboutListTemplate {
         username: claims.username,
         sections,
+        social_links,
     }
 }
 
 pub async fn dashboard_about_new(
     Extension(claims): Extension<Claims>,
-    State(_db): State<Arc<Db>>,
+    State(db): State<Arc<Db>>,
 ) -> impl IntoResponse {
+    let conn = db.conn.lock().unwrap();
+    let social_links = load_social_links(&conn);
     DashboardAboutDetailTemplate {
         username: claims.username,
         section: AboutSectionForDetail {
@@ -490,6 +553,7 @@ pub async fn dashboard_about_new(
             sort_order: 0,
         },
         is_new: true,
+        social_links,
     }
 }
 
@@ -525,10 +589,112 @@ pub async fn dashboard_about_detail(
             )
         })?;
 
+    let social_links = load_social_links(&conn);
+
     Ok(DashboardAboutDetailTemplate {
         username: claims.username,
         section,
         is_new: false,
+        social_links,
+    })
+}
+
+pub async fn dashboard_social_links_list(
+    Extension(claims): Extension<Claims>,
+    State(db): State<Arc<Db>>,
+) -> impl IntoResponse {
+    let conn = db.conn.lock().unwrap();
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, platform, label, url, visible
+             FROM social_links ORDER BY sort_order ASC",
+        )
+        .unwrap();
+    let link_items = stmt
+        .query_map([], |row| {
+            let visible: i64 = row.get(4)?;
+            Ok(SocialLinkListItem {
+                id: row.get(0)?,
+                platform: row.get(1)?,
+                label: row.get(2)?,
+                url: row.get(3)?,
+                visible: visible != 0,
+            })
+        })
+        .unwrap()
+        .filter_map(|r| r.ok())
+        .collect();
+    let social_links = load_social_links(&conn);
+
+    DashboardSocialLinksListTemplate {
+        username: claims.username,
+        link_items,
+        social_links,
+    }
+}
+
+pub async fn dashboard_social_link_new(
+    Extension(claims): Extension<Claims>,
+    State(db): State<Arc<Db>>,
+) -> impl IntoResponse {
+    let conn = db.conn.lock().unwrap();
+    let social_links = load_social_links(&conn);
+    DashboardSocialLinkDetailTemplate {
+        username: claims.username,
+        link: SocialLinkForDetail {
+            id: 0,
+            platform: String::new(),
+            url: String::new(),
+            label: String::new(),
+            icon: String::new(),
+            visible: true,
+            sort_order: 0,
+        },
+        is_new: true,
+        social_links,
+    }
+}
+
+pub async fn dashboard_social_link_detail(
+    Extension(claims): Extension<Claims>,
+    State(db): State<Arc<Db>>,
+    Path(id): Path<i64>,
+) -> Result<impl IntoResponse, (StatusCode, String)> {
+    let conn = db.conn.lock().unwrap();
+
+    let link = conn
+        .query_row(
+            "SELECT id, platform, url, label, icon, visible, sort_order
+             FROM social_links WHERE id = ?1",
+            rusqlite::params![id],
+            |row| {
+                let icon: Option<String> = row.get(4)?;
+                let visible: i64 = row.get(5)?;
+                Ok(SocialLinkForDetail {
+                    id: row.get(0)?,
+                    platform: row.get(1)?,
+                    url: row.get(2)?,
+                    label: row.get(3)?,
+                    icon: icon.unwrap_or_default(),
+                    visible: visible != 0,
+                    sort_order: row.get(6)?,
+                })
+            },
+        )
+        .map_err(|_| {
+            (
+                StatusCode::NOT_FOUND,
+                format!("Social link {} not found", id),
+            )
+        })?;
+
+    let social_links = load_social_links(&conn);
+
+    Ok(DashboardSocialLinkDetailTemplate {
+        username: claims.username,
+        link,
+        is_new: false,
+        social_links,
     })
 }
 
