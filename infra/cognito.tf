@@ -76,7 +76,7 @@ resource "aws_cognito_user" "baba_admin" {
     email_verified = "true"
   }
 
-  temporary_password = var.cognito_temp_password
+  temporary_password = aws_secretsmanager_secret_version.cognito_temp_password_initial.secret_string
 
   lifecycle {
     ignore_changes = [temporary_password]
