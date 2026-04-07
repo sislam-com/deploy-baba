@@ -65,7 +65,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 13. ~~**W-SL**~~ — DB-managed social links in top nav — **DONE** (migrations 010–011, `social_links` table, nav loop in `base.html`, dashboard CRUD, `POST/PUT/DELETE /api/admin/social-links`)
 14. ~~**W-CTF.4.1–4.10**~~ — Contact form + SES + PoW + API Gateway — **DONE** (deployed 2026-04-03)
 15. ~~**W-CTF.4.11 + W-SEC**~~ — Migrate `POW_SECRET` from Lambda env var → AWS Secrets Manager + xtask secret commands — **DONE** (code complete; `just infra-apply` + `just secret-put pow-secret ...` + `just lambda-deploy` still needed)
-16. **W-CTF.4.13** — Acknowledgement email to submitter (ADR-010 § Acknowledgement Email): second `ses.send_email()` call in `services/email/src/main.rs`, `SES_ACK_FROM_EMAIL` env var wired in `infra/email-lambda.tf`, verify `it@sislam.com` SES identity + SES production access
+16. ~~**W-CTF.4.13**~~ — Acknowledgement email to submitter — **DONE** (`try_send_ack()` in `services/email/src/main.rs`; `SES_ACK_FROM_EMAIL=it@sislam.com` in `infra/email-lambda.tf`; `it@sislam.com` added to IAM SES resource list. Awaits `just infra-apply` + `just email-deploy`.)
 
 ### P3 — Polish & Publish
 9. **W-PUB.1** — `just publish-dry` passes for all 10 library crates
