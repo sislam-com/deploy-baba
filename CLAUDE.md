@@ -49,6 +49,26 @@ Update `git.sha`, `last_updated`, and the relevant component's `git_sha_at_scan`
 
 ---
 
+## ⚖️ Engineering Principles — These Are Imperatives
+
+**Follow these unconditionally when making any design, implementation, or architectural decision in this project.**
+
+- **Plan deliberately, but assume plans will evolve.** Commit to a direction early enough to act, but treat every plan as a living document. Update `plans/INDEX.md` and module files as understanding improves — never let the plan drift silently from reality.
+
+- **Validate dependencies early, and continuously refine through execution.** Don't defer integration risk. Wire up external boundaries (AWS, Cognito, SQLite, SES) in the earliest possible iteration and let real behavior drive plan updates.
+
+- **Prefer boring infrastructure, explicit systems, and strong type guarantees over hidden complexity.** SQLite over RDS. OpenTofu HCL over dynamic abstractions. Rust types over runtime checks. If a solution is hard to explain, it's probably wrong.
+
+- **Optimize for clarity, debuggability, and long-term maintainability.** Write code that is obvious to read six months later. Name things precisely. Avoid clever shortcuts that collapse under pressure. A longer-but-readable function beats a compact-but-opaque one every time.
+
+- **Treat AI as a collaborator, not an oracle — design systems that verify, constrain, and observe its outputs.** Agent cache, plan modules, and ADRs exist to provide ground truth. Don't generate code in a vacuum; validate against the plan, run `just quality`, and confirm intent with the human.
+
+- **Build feedback loops into every layer.** Compile-time: Rust types and `cargo clippy`. Test-time: `just dev` and coverage floors. Deploy-time: `just infra-plan` before apply. Runtime: CloudWatch logs via `just ui-logs`. User-level: observable state, not silent failures.
+
+- **Every abstraction should earn its place — and justify its cost over time.** No xtask module without a justfile entry. No plan module without work items. No infra resource without an ADR or drift log. Challenge every layer of indirection: if it doesn't reduce real complexity, remove it.
+
+---
+
 ## About Me
 
 - **Name:** shantopagla
