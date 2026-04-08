@@ -141,3 +141,5 @@ with `category = 'sub-engagement'`.
 - → ADR-004 (dual-mode entry point — DB path from `DB_PATH` env var)
 - → W-UI (base route surface, router, state architecture)
 - → `plans/cross-cutting/aws-architecture.md` (EFS mount for SQLite on Lambda)
+- → ADR-010 (upsert re-seed convention — applies to jobs, job_details, competencies, competency_evidence)
+- → W-SYNC (dashboard → migrations sync workflow)

@@ -2,7 +2,7 @@
   "_meta": {
     "description": "Global agent cache for deploy-baba. Claude reads this on startup to avoid re-exploring unchanged code.",
     "generated_by": "just cache-refresh",
-    "last_updated": "2026-04-02",
+    "last_updated": "2026-04-08",
     "schema_version": "1.0.0",
     "usage": "Check git.sha against `git rev-parse HEAD`. If match: use cached data. If mismatch: re-scan changed components only, then update this file."
   },
@@ -15,7 +15,8 @@
     "ADR-006": "(see plans/adr/)",
     "ADR-007": "OpenTofu over Terraform — MPL-2.0; `tofu` CLI; drop-in HCL compatible (Accepted)",
     "ADR-008": "Cognito Authentication — implicit grant, JWKS from env var, HttpOnly cookie, dev-mode bypass",
-    "ADR-009": "API Gateway HTTP API for POST /api/contact — OAC body hash workaround (DRL-FUA-3)"
+    "ADR-009": "API Gateway HTTP API for POST /api/contact — OAC body hash workaround (DRL-FUA-3)",
+    "ADR-010": "SQLite Upsert as the Canonical Re-Seed Convention — INSERT … ON CONFLICT(natural_key) DO UPDATE SET …; bans INSERT OR IGNORE, INSERT OR REPLACE, split UPDATE+INSERT"
   },
   "crates": {
     "api-core": {
@@ -249,20 +250,21 @@
     "git_sha_at_scan": "82f6e63ac7add53caa338b6715786b0d78236116",
     "location": "EFS mount (Lambda) / local file (dev)",
     "migrations_path": "services/ui/migrations/",
-    "migration_count": 11,
+    "migration_count": 12,
     "latest_migrations": [
-      "008_create_about_sections (W-ABT)",
       "009_seed_about_sections (W-ABT)",
       "010_create_social_links (W-SL)",
-      "011_seed_social_links (W-SL)"
-    ]
+      "011_seed_social_links (W-SL)",
+      "012_update_about_sections (W-ABT — superseded split convention; ADR-010 upsert applies to new migrations)"
+    ],
+    "upsert_convention": "ADR-010 — INSERT … ON CONFLICT(natural_key) DO UPDATE SET …; banned: INSERT OR IGNORE, INSERT OR REPLACE, split UPDATE+INSERT"
   },
   "git": {
-    "branch": "feat/contact",
-    "last_commit": "Contact form POST + PoW via API Gateway",
+    "branch": "feat/sync-db-with-migrations",
+    "last_commit": "plans: adopt SQLite upsert convention (ADR-010); add W-SYNC module for dashboard → migrations sync",
     "remote": "git@github.com:shantopagla/deploy-baba.git",
-    "sha": "b271e05c4600623710bf12aef921b6e0fe96581c",
-    "short_sha": "b271e05"
+    "sha": "f20e92873be1d3a1d4812c2b78881cb4da248404",
+    "short_sha": "f20e928"
   },
   "infra": {
     "aws_region": "us-east-1",
@@ -325,12 +327,13 @@
     "template_engine": "askama (compile-time Jinja2-like) + askama_axum integration"
   },
   "plans": {
-    "adr_count": 8,
+    "adr_count": 10,
     "adr_dir": "plans/adr/",
     "conventions": "plans/CONVENTIONS.md",
     "cross_cutting_dir": "plans/cross-cutting/",
     "current_priority": {
       "P1": [
+        "W-SYNC.4.2, .4.3, .4.5 — Audit UNIQUE constraints; implement live-DB pull path (Option B); backfill first sync migration",
         "W-XT.4.2 — Remove or wire up EnvironmentInterpolator",
         "W-OTF.4.1–4.7 — OpenTofu migration",
         "W-AUTH.POST-FIX — CloudFront OAC body hash mismatch blocks dashboard edit forms"
@@ -349,11 +352,11 @@
     },
     "drift_dir": "plans/drift/",
     "index": "plans/INDEX.md",
-    "module_count": 19,
+    "module_count": 20,
     "modules_dir": "plans/modules/"
   },
   "project": {
-    "adr_count": 8,
+    "adr_count": 10,
     "description": "Zero-cost Rust portfolio and deployment automation platform hosted on AWS Lambda",
     "license": "MIT OR Apache-2.0",
     "name": "deploy-baba",
