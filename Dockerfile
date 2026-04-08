@@ -1,7 +1,7 @@
 # Stage 1 — Builder
 # `docker build --platform linux/arm64` runs this stage as arm64 (natively on
 # Apple Silicon, or via QEMU elsewhere), so no cross-compiler is needed.
-FROM rust:1.83-bookworm AS builder
+FROM rust:bookworm AS builder
 
 WORKDIR /workspace
 COPY . .

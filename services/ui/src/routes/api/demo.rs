@@ -1,40 +1,11 @@
 use axum::{extract::Json, routing::post, Router};
-use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::Value;
 
 use crate::state::AppState;
 
-#[derive(Serialize, Deserialize)]
-pub struct ParseConfigRequest {
-    pub format: String,
-    pub content: String,
-}
-
-#[derive(Serialize)]
-pub struct ParseConfigResponse {
-    pub success: bool,
-    pub parsed: Option<Value>,
-    pub error: Option<String>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct Field {
-    pub name: String,
-    #[serde(rename = "type")]
-    pub field_type: String,
-    pub required: bool,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct GenerateSpecRequest {
-    pub title: String,
-    pub fields: Vec<Field>,
-}
-
-#[derive(Serialize)]
-pub struct GenerateSpecResponse {
-    pub spec: Value,
-}
+pub use api_openapi::models::{
+    GenerateSpecRequest, GenerateSpecResponse, ParseConfigRequest, ParseConfigResponse,
+};
 
 #[utoipa::path(
     post,
@@ -113,12 +84,12 @@ pub async fn generate_spec(Json(req): Json<GenerateSpecRequest>) -> Json<Generat
 
     for field in req.fields {
         let field_schema = match field.field_type.to_lowercase().as_str() {
-            "string" => json!({"type": "string"}),
-            "integer" => json!({"type": "integer", "format": "int64"}),
-            "number" => json!({"type": "number", "format": "float"}),
-            "boolean" => json!({"type": "boolean"}),
-            "array" => json!({"type": "array", "items": {"type": "string"}}),
-            _ => json!({"type": "string"}),
+            "string" => serde_json::json!({"type": "string"}),
+            "integer" => serde_json::json!({"type": "integer", "format": "int64"}),
+            "number" => serde_json::json!({"type": "number", "format": "float"}),
+            "boolean" => serde_json::json!({"type": "boolean"}),
+            "array" => serde_json::json!({"type": "array", "items": {"type": "string"}}),
+            _ => serde_json::json!({"type": "string"}),
         };
 
         properties.insert(field.name.clone(), field_schema);
@@ -128,7 +99,7 @@ pub async fn generate_spec(Json(req): Json<GenerateSpecRequest>) -> Json<Generat
         }
     }
 
-    let spec = json!({
+    let spec = serde_json::json!({
         "openapi": "3.0.0",
         "info": {
             "title": req.title,

@@ -1,13 +1,8 @@
 use axum::Json;
-use serde::Serialize;
+
+pub use api_openapi::models::HealthResponse;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-
-#[derive(Serialize)]
-pub struct HealthResponse {
-    pub status: String,
-    pub version: String,
-}
 
 #[utoipa::path(
     get,

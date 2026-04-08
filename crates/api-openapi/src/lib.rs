@@ -1,8 +1,18 @@
-//! OpenAPI Specification Generator
+//! OpenAPI Specification Generator — Single Source of Truth
 //!
-//! This crate provides an OpenAPI 3.0 specification generator that implements the universal
-//! API specification traits from `api-core`. It integrates with the utoipa ecosystem
-//! while providing a standardized interface for API specification generation.
+//! This crate is the **SSOT** for all API data models and the OpenAPI specification
+//! for the deploy-baba portfolio service. It provides:
+//!
+//! * [`models`] — every public/admin request/response struct with `ToSchema` + `ApiModel`.
+//! * [`registry`] — compile-time checked `ALL_MODELS` list (drives coverage tests).
+//! * [`apidoc`] — `PublicApiDoc`, `AdminApiDoc`, and `full_spec()` for router init.
+//! * [`filter`] — `public_view()` strips admin paths + unreferenced schemas.
+//! * The original `OpenApiGenerator` / `OpenApiSchema` / `merge_openapi_specs` are
+//!   preserved for use by `api-merger` and examples.
+//!
+//! `services/ui` imports types from this crate instead of defining them locally.
+//! The `utoipa-axum` router in `services/ui` calls `api_openapi::apidoc::full_spec()`
+//! to seed the router, then `.split_for_parts()` to obtain the merged spec with paths.
 //!
 //! # Example
 //!
@@ -45,6 +55,11 @@
 //! let spec = OpenApiGenerator::<ApiDoc>::generate_spec(ApiDoc::api_schema()).unwrap();
 //! let json = serde_json::to_string_pretty(&spec).unwrap();
 //! ```
+
+pub mod apidoc;
+pub mod filter;
+pub mod models;
+pub mod registry;
 
 use api_core::{ApiSpecGenerator, SpecError, SpecValidationError};
 use serde::{Deserialize, Serialize};

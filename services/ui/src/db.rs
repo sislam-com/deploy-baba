@@ -62,10 +62,9 @@ const MIGRATIONS: &[(&str, &str)] = &[
     ),
 ];
 
-pub struct SocialLink {
-    pub url: String,
-    pub label: String,
-}
+/// Re-exported from `api_openapi::models::social` — the canonical SSOT.
+/// Only `url` and `label` are used for nav rendering (visible links only).
+pub use api_openapi::models::SocialLink;
 
 /// Load visible social links using an already-locked connection.
 pub fn load_social_links(conn: &rusqlite::Connection) -> Vec<SocialLink> {
