@@ -1,5 +1,5 @@
 # W-SEC: AWS Secrets Manager Integration
-**Service:** `xtask/` + `services/ui/` + `infra/` | **Status:** TODO
+**Service:** `xtask/` + `services/ui/` + `infra/` | **Status:** DONE (2026-04-03)
 **Depends on:** W-OTF (tofu infra) | **Depended on by:** W-CTF (POW_SECRET)
 
 ## W-SEC.1 Purpose
@@ -81,14 +81,21 @@ fetch eagerly at Lambda cold start in `main.rs`.
 
 | ID | Task | Status |
 |----|------|--------|
-| W-SEC.4.1 | Create `infra/secrets.tf` — SM secret + IAM policy + POW_SECRET_ARN env var | TODO |
-| W-SEC.4.2 | Remove `pow_secret` var from `infra/variables.tf`, `infra/lambda.tf`, `terraform.tfvars` | TODO |
-| W-SEC.4.3 | Add `aws-sdk-secretsmanager` to workspace Cargo.toml + services/ui | TODO |
-| W-SEC.4.4 | Create `xtask/src/secrets/mod.rs` — put/get/list commands | TODO |
-| W-SEC.4.5 | Add `secret-put`, `secret-get`, `secret-list` justfile recipes | TODO |
-| W-SEC.4.6 | Update `contact.rs` to fetch POW_SECRET from SM at cold start | TODO |
-| W-SEC.4.7 | `just infra-apply` + `just secret-put pow-secret <value>` + `just lambda-deploy` | TODO |
-| W-SEC.4.8 | Verify: submit contact form → challenge → solve → POST → email received | TODO |
+| W-SEC.4.1 | Create `infra/secrets.tf` — SM secret + IAM policy + POW_SECRET_ARN env var | DONE |
+| W-SEC.4.2 | Remove `pow_secret` var from `infra/variables.tf`, `infra/lambda.tf`, `terraform.tfvars` | DONE |
+| W-SEC.4.3 | Add `aws-sdk-secretsmanager` to workspace Cargo.toml + services/ui + xtask | DONE |
+| W-SEC.4.4 | Create `xtask/src/secret.rs` — put/get/list commands | DONE |
+| W-SEC.4.5 | Add `secret-put`, `secret-get`, `secret-list` justfile recipes | DONE |
+| W-SEC.4.6 | Update `contact.rs` to fetch POW_SECRET from SM at cold start via `init_pow_secret()` | DONE |
+| W-SEC.4.7 | `just infra-apply` + `just secret-put pow-secret <value>` + `just lambda-deploy` | OPEN — deploy step |
+| W-SEC.4.8 | Verify: submit contact form → challenge → solve → POST → email received | OPEN — W-CTF.4.12 |
+
+### Additional changes beyond original design
+- `infra/secrets.tf` also includes `cognito-temp-password` SM secret (full secret audit)
+- `infra/vpc-endpoints.tf` adds SM VPC Interface Endpoint (~$7.30/mo, 1 AZ)
+- `infra/cognito.tf`: `temporary_password` now reads from SM secret version (not tfvar)
+- `infra/lambda.tf`: `depends_on` includes `aws_iam_role_policy.lambda_secretsmanager`
+- `xtask/src/secret.rs` at top-level (not `secrets/`), validates against `KNOWN_SECRETS`
 
 ## W-SEC.4 Cross-References
 → W-CTF.4.11 (blocked on W-SEC)

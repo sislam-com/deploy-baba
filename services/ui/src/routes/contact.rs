@@ -19,17 +19,49 @@ use crate::db::{load_social_links, Db, SocialLink};
 type HmacSha256 = Hmac<Sha256>;
 
 // ─── POW_SECRET ───────────────────────────────────────────────────────────────
+//
+// Loaded once per cold start via `init_pow_secret()`. Falls back to a local
+// dev default when `POW_SECRET_ARN` is not set (i.e. running locally).
 
 static POW_SECRET: OnceLock<[u8; 32]> = OnceLock::new();
 
+/// Fetch the PoW HMAC key from Secrets Manager (or fall back to dev default).
+/// Call once at Lambda cold start before the router is built.
+pub async fn init_pow_secret() {
+    if POW_SECRET.get().is_some() {
+        return; // already initialised (shouldn't happen at cold start, but be safe)
+    }
+
+    let secret = match std::env::var("POW_SECRET_ARN") {
+        Ok(arn) => {
+            let config = aws_config::load_from_env().await;
+            let client = aws_sdk_secretsmanager::Client::new(&config);
+            match client.get_secret_value().secret_id(&arn).send().await {
+                Ok(resp) => resp
+                    .secret_string()
+                    .unwrap_or("dev-secret-change-me")
+                    .to_string(),
+                Err(e) => {
+                    tracing::error!("Failed to fetch POW_SECRET from Secrets Manager: {}", e);
+                    "dev-secret-change-me".to_string()
+                }
+            }
+        }
+        Err(_) => {
+            tracing::warn!("POW_SECRET_ARN not set — using dev default");
+            "dev-secret-change-me".to_string()
+        }
+    };
+
+    let mut key = [0u8; 32];
+    key.copy_from_slice(&Sha256::digest(secret.as_bytes()));
+    POW_SECRET.set(key).ok();
+}
+
 fn pow_secret() -> &'static [u8; 32] {
-    POW_SECRET.get_or_init(|| {
-        let secret =
-            std::env::var("POW_SECRET").unwrap_or_else(|_| "dev-secret-change-me".to_string());
-        let mut key = [0u8; 32];
-        key.copy_from_slice(&Sha256::digest(secret.as_bytes()));
-        key
-    })
+    POW_SECRET
+        .get()
+        .expect("init_pow_secret() must be called before serving requests")
 }
 
 // ─── Rate limiter ─────────────────────────────────────────────────────────────

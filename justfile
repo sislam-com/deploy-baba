@@ -233,6 +233,20 @@ publish-dry:
 publish:
     just quality && cargo xtask publish release
 
+# ── Secrets Manager ──────────────────────────────────────────────────────────
+
+# Write a secret to AWS Secrets Manager (e.g. just secret-put pow-secret $(openssl rand -hex 32))
+secret-put NAME VALUE PROFILE="default":
+    just aws-check {{PROFILE}} && cargo xtask secret put {{NAME}} {{VALUE}} --profile {{PROFILE}}
+
+# Read a secret value from AWS Secrets Manager
+secret-get NAME PROFILE="default":
+    just aws-check {{PROFILE}} && cargo xtask secret get {{NAME}} --profile {{PROFILE}}
+
+# List all managed secrets under the deploy-baba/prod/ prefix
+secret-list PROFILE="default":
+    just aws-check {{PROFILE}} && cargo xtask secret list --profile {{PROFILE}}
+
 # ── Agent Cache ──────────────────────────────────────────────────────────────
 
 # Show cache age and whether it's stale vs current HEAD

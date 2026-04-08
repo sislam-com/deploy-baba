@@ -73,6 +73,7 @@ aws-sdk-ecr = "1"
 aws-sdk-efs = "1"
 aws-sdk-dynamodb = "1"
 aws-sdk-sesv2 = { version = "1", features = ["behavior-version-latest"] }
+aws-sdk-secretsmanager = "1"
 
 # CLI
 clap = { version = "4", features = ["derive"] }

@@ -20,6 +20,9 @@ async fn main() -> Result<()> {
     let auth_config = Arc::new(auth::AuthConfig::from_env());
     tracing::info!("→ Auth ready (dev_mode={})", auth_config.dev_mode);
 
+    routes::contact::init_pow_secret().await;
+    tracing::info!("→ PoW secret ready");
+
     let app_state = state::AppState {
         db,
         auth: auth_config,

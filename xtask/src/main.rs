@@ -15,6 +15,7 @@ mod deploy;
 mod infra;
 mod quality;
 mod resume;
+mod secret;
 mod test;
 
 #[derive(Parser)]
@@ -77,6 +78,11 @@ enum Commands {
         #[command(subcommand)]
         action: resume::ResumeAction,
     },
+    /// Secrets Manager operations (put/get/list)
+    Secret {
+        #[command(subcommand)]
+        action: secret::SecretAction,
+    },
     /// Publish/release operations
     Publish {
         /// Target environment (dev, staging, prod)
@@ -109,6 +115,7 @@ async fn run() -> anyhow::Result<()> {
         Commands::Cache { action } => cache::execute(action).await,
         Commands::Database { action } => database::execute(action).await,
         Commands::Resume { action } => resume::execute(action).await,
+        Commands::Secret { action } => secret::execute(action).await,
         Commands::Publish {
             environment,
             dry_run,

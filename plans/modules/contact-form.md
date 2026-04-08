@@ -36,10 +36,10 @@ See `infra/apigateway.tf`, `infra/cdn.tf` `/api/contact` ordered_cache_behavior.
 - Server verifies: HMAC signature, 5-min expiry, nonce not replayed, hash difficulty
 - Used-nonce tracker: `OnceLock<Mutex<HashMap<String, Instant>>>` with auto-eviction
 
-**`POW_SECRET` (PENDING MIGRATION TO SECRETS MANAGER):**
-Currently stored in Lambda env var. Will be migrated to AWS Secrets Manager
-(see W-CTF.4.11). The Rust code reads `std::env::var("POW_SECRET")` and falls
-back to `"dev-secret-change-me"` locally. SHA-256 hashed to 32-byte HMAC key.
+**`POW_SECRET` (MIGRATED — W-CTF.4.11 DONE):**
+Stored in AWS Secrets Manager at `deploy-baba/prod/pow-secret`. Lambda reads
+it via `POW_SECRET_ARN` env var at cold start (`init_pow_secret()` in main.rs).
+Falls back to `"dev-secret-change-me"` locally when `POW_SECRET_ARN` not set.
 
 **Email flow:**
 - Main UI Lambda (`POST /api/contact`) invokes email Lambda via `aws_sdk_lambda::Client::invoke()`
@@ -70,7 +70,7 @@ back to `"dev-secret-change-me"` locally. SHA-256 hashed to 32-byte HMAC key.
 | W-CTF.4.8 | Add justfile recipes: `email-build`, `email-deploy` | DONE | |
 | W-CTF.4.9 | Create `infra/apigateway.tf` — HTTP API + Lambda proxy + POST route + stage | DONE | Bypasses OAC body hash issue (DRL-FUA-3) |
 | W-CTF.4.10 | POST + PoW implementation — challenge/verify handlers + JS solver | DONE | Deployed 2026-04-03 |
-| W-CTF.4.11 | Migrate `POW_SECRET` from Lambda env var → AWS Secrets Manager | **OPEN** | See W-SEC; Lambda reads from SM at startup; remove env var from lambda.tf |
+| W-CTF.4.11 | Migrate `POW_SECRET` from Lambda env var → AWS Secrets Manager | **DONE** | W-SEC complete; `init_pow_secret()` in main.rs; SM secret + VPC endpoint + IAM policy in infra |
 | W-CTF.4.12 | End-to-end test: form → PoW solve → POST → SES → contact-sislam@shantopagla.com | **OPEN** | Test after Secrets Manager migration complete |
 
 ## W-CTF.5 Test Strategy

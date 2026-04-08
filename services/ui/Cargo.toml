@@ -47,6 +47,7 @@ tracing-subscriber = { workspace = true }
 # AWS
 aws-config = { workspace = true }
 aws-sdk-lambda = { workspace = true }
+aws-sdk-secretsmanager = { workspace = true }
 
 # Auth
 jsonwebtoken = { workspace = true }

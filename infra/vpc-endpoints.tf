@@ -44,3 +44,21 @@ resource "aws_vpc_endpoint" "lambda" {
     Name = "${local.lambda_function_name}-lambda-endpoint"
   }
 }
+
+# ─── VPC Interface Endpoint: Secrets Manager ───────────────────────────────────
+#
+# Allows the VPC-bound UI Lambda to call Secrets Manager at cold start without
+# a NAT Gateway. Cost: ~$7.30/month for 1 AZ.
+
+resource "aws_vpc_endpoint" "secretsmanager" {
+  vpc_id              = data.aws_vpc.default.id
+  service_name        = "com.amazonaws.${var.region}.secretsmanager"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = [data.aws_subnet.endpoint.id]
+  security_group_ids  = [aws_security_group.vpc_endpoints.id]
+  private_dns_enabled = true
+
+  tags = {
+    Name = "${local.lambda_function_name}-secretsmanager-endpoint"
+  }
+}

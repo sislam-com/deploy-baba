@@ -83,13 +83,6 @@ variable "admin_email" {
   default     = "it@shantopagla.com"
 }
 
-variable "cognito_temp_password" {
-  description = "Temporary password for baba-admin (must be changed on first login). Ignored after initial user creation (lifecycle.ignore_changes)."
-  type        = string
-  sensitive   = true
-  default     = "unused-after-first-apply"
-}
-
 variable "contact_email" {
   description = "Email address that receives contact form submissions"
   type        = string
@@ -102,9 +95,3 @@ variable "email_lambda_code_path" {
   default     = "./build/email-lambda.zip"
 }
 
-variable "pow_secret" {
-  description = "Secret key for HMAC-signing proof-of-work challenges (contact form)"
-  type        = string
-  sensitive   = true
-  default     = "change-me-before-deploy"
-}
