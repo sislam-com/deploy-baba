@@ -23,32 +23,40 @@ The following tables are writable via `/dashboard` admin UI or `POST/PUT/DELETE
 /api/admin/*` endpoints. Each row is audited for UNIQUE constraints that the ADR-010
 upsert form requires.
 
+**Audit completed 2026-04-08** (W-SYNC.4.2 DONE):
+
 | Table | Natural key | UNIQUE today? | Action |
 |-------|-------------|---------------|--------|
-| `jobs` | `slug` | verify in `001_create_jobs.sql` | preflight |
-| `job_details` | composite `(job_id, sort_order)` | likely no — autoincrement `id` only | add composite UNIQUE in first sync migration |
-| `competencies` | `slug` | verify in `002_create_competencies.sql` | preflight |
-| `competency_evidence` | composite `(competency_id, job_id, sort_order)` | likely no | add composite UNIQUE in first sync migration |
-| `about_sections` | `slug` | UNIQUE in `008_create_about_sections.sql` | good |
-| `social_links` | `platform` | UNIQUE in `010_create_social_links.sql` | good |
+| `jobs` | `slug` | YES — column `UNIQUE` in `001_create_jobs.sql` | none |
+| `job_details` | composite `(job_id, sort_order)` | NO — only autoincrement `id` + non-unique `idx_job_details_job_id` | **added** `ux_job_details_job_sort` in `014_add_sync_unique_indexes.sql` |
+| `competencies` | `slug` | YES — column `UNIQUE` in `002_create_competencies.sql` | none |
+| `competency_evidence` | composite `(competency_id, job_id, sort_order)` | NO | **added** `ux_competency_evidence_comp_job_sort` in `014_add_sync_unique_indexes.sql` |
+| `about_sections` | `slug` | YES — column `UNIQUE` in `008_create_about_sections.sql` | none |
+| `social_links` | `platform` | YES — column `UNIQUE` in `010_create_social_links.sql` | none |
 
-> **Note:** The first sync migration for any table that lacks a UNIQUE constraint must
-> add the composite index **before** the first upsert block runs. See ADR-010 for the
-> full constraint requirement.
+> **Re-ordering caveat:** `job_details.sort_order` and `competency_evidence.sort_order`
+> are mutable from the dashboard and are part of the composite natural key. If the
+> operator re-orders rows, emit explicit `DELETE FROM … WHERE (natural_key) = …;`
+> statements **above** the upsert block. See `.claude/skills/sync-dashboard-data/SKILL.md`
+> Phase 3 for the full template.
 
 ---
 
 ## W-SYNC.3 Workflow
 
-Four phases, manual today, partially automated when W-SYNC.4.3 and W-SYNC.4.4 land:
+Four phases — Phase 1 automated via `GET /api/admin/db-dump` (W-SYNC.4.3 DONE), full workflow in `/sync-dashboard-data` skill (W-SYNC.4.4 DONE):
 
-### Phase 1 — Pull
+### Phase 1 — Pull (automated — W-SYNC.4.3 DONE)
 
-Obtain a local copy of the live EFS SQLite database. Manual today:
-- SSH/exec into the Lambda environment and copy `/mnt/db/baba.db` locally, **or**
-- Use the future `GET /api/admin/db-dump` route (W-SYNC.4.3 Option B), **or**
-- Fix the EventBridge→Lambda backup handler + S3 bucket name mismatch and pull the
-  S3 backup (W-SYNC.4.3 Option C).
+Obtain a consistent SQLite snapshot of the live EFS database via:
+
+```bash
+curl -b "auth_token=<token>" -o /tmp/baba-live.db \
+     https://<cloudfront-host>/api/admin/db-dump
+```
+
+See `.claude/skills/sync-dashboard-data/SKILL.md` Phase 1 for full curl commands
+(production Cognito-gated + local dev open).
 
 ### Phase 2 — Diff
 
@@ -81,10 +89,10 @@ just lambda-deploy <profile>
 | ID | Task | Status | Notes |
 |----|------|--------|-------|
 | W-SYNC.4.1 | Adopt ADR-010 (upsert re-seed convention) | DONE | Convention only; no code; ADR-010 committed 2026-04-08 |
-| W-SYNC.4.2 | Audit UNIQUE constraints on natural keys across all dashboard-editable tables; fill in W-SYNC.2 table with findings | TODO | Read `00N_create_*.sql` files; update action column with confirmed status |
-| W-SYNC.4.3 | Choose and implement the live-DB pull path: **Option B** (`GET /api/admin/db-dump` streaming `VACUUM INTO` copy, Cognito-gated) or **Option C** (fix EventBridge→Lambda backup handler + bucket-name mismatch in `xtask/src/database/{backup,restore}.rs` vs `infra/s3.tf`) | TODO | Recommendation: Option B — smallest footprint, reuses existing Cognito auth layer; record rejection of Option C if B is chosen |
-| W-SYNC.4.4 | Create `.claude/skills/sync-dashboard-data/SKILL.md` + register in `docs/skills.md`. Delegates scaffolding to `/add-migration`; embeds ADR-010 upsert template; lists W-SYNC.2 natural-key table for preflight; cites W-SYNC.4.3 as the automated pull source | TODO | Execution step — deferred; skill authoring follows W-SYNC.4.3 |
-| W-SYNC.4.5 | Backfill: write the first upsert-style migration capturing current live-DB divergence from the committed seeds (all edits accumulated via `/dashboard` to date) | TODO | Blocked on W-SYNC.4.3 (need a DB copy) |
+| W-SYNC.4.2 | Audit UNIQUE constraints on natural keys across all dashboard-editable tables; fill in W-SYNC.2 table with findings | **DONE** | Audit complete 2026-04-08; preflight UNIQUE indexes added in `014_add_sync_unique_indexes.sql` |
+| W-SYNC.4.3 | Choose and implement the live-DB pull path | **DONE** | **Option B** implemented: `GET /api/admin/db-dump` via `VACUUM INTO /tmp/baba-dump-<nanos>.db`; Cognito-gated via router-level `require_auth`; handler in `services/ui/src/routes/api/admin.rs::db_dump_handler`. **Option C rejected** — fixes `xtask` backup handler + bucket-name mismatch; more code churn, no auth reuse, S3 download adds latency vs direct HTTP. |
+| W-SYNC.4.4 | Create `.claude/skills/sync-dashboard-data/SKILL.md` + register in `docs/skills.md` | **DONE** | Skill created 2026-04-08; registered in `docs/skills.md`; embeds ADR-010 upsert template, W-SYNC.2 natural-key table, all four workflow phases |
+| W-SYNC.4.5 | Backfill: write the first upsert-style migration capturing current live-DB divergence from the committed seeds (all edits accumulated via `/dashboard` to date) | TODO | Operator step — requires deployed Lambda with `db-dump` route; run `/sync-dashboard-data` skill after deploy |
 | W-SYNC.4.6 | Optional: `xtask seed dump <table> --db-path <file>` command that emits upsert SQL for a single table from a local DB copy, reusing `xtask/src/resume/generate.rs` read-only loader pattern | TODO | Nice-to-have; defer until W-SYNC.4.5 proves the hand-authored path is too slow |
 | W-SYNC.4.7 | Optional: extend `just dev` / CI to diff the live EFS DB against applied seed migrations and fail loudly if drift exists | TODO | Observability layer; makes "edit was never synced" state visible |
 
@@ -98,8 +106,33 @@ just lambda-deploy <profile>
   content (edit one value manually in sqlite3) → same migration applies as `UPDATE`.
 - **Read-back smoke test:** `cargo xtask resume generate --db-path fresh.db` — confirms
   the seeded rows are queryable via the read-only loader.
-- **Pull path (W-SYNC.4.3):** add a cross-cutting integration test once the route or
-  S3 backup handler lands; test that the downloaded file is a valid SQLite database.
+
+### db-dump endpoint smoke test (local dev, no auth)
+
+```bash
+just ui &
+sleep 2
+curl -fsS -o /tmp/baba-dump.db http://localhost:3000/api/admin/db-dump
+file /tmp/baba-dump.db   # → "SQLite 3.x database"
+sqlite3 /tmp/baba-dump.db "SELECT name FROM sqlite_master WHERE type='table';"
+# Expected: jobs, job_details, competencies, competency_evidence, about_sections,
+#           social_links, _migrations
+sqlite3 /tmp/baba-dump.db "SELECT count(*) FROM jobs;"  # → an integer ≥ 0
+kill %1
+```
+
+### UNIQUE index smoke test (migration 014)
+
+```bash
+rm -f deploy-baba.db
+just dev &   # fresh DB → migration 014 applies
+sleep 2 && kill %1
+sqlite3 deploy-baba.db \
+  "SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'ux_%';"
+# Expected:
+#   ux_job_details_job_sort
+#   ux_competency_evidence_comp_job_sort
+```
 
 ---
 

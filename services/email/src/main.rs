@@ -107,6 +107,20 @@ async fn handler(event: LambdaEvent<ContactRequest>) -> Result<ContactResponse, 
     match result {
         Ok(_) => {
             info!(from = %req.email, "contact form email sent");
+            // Best-effort ack — failure does not affect ContactResponse
+            if let Err(e) = try_send_ack(&ses, &req).await {
+                // Classify known SES sandbox/verification rejection separately so it's
+                // grep-able and doesn't pollute the error stream with a known-expected case.
+                if format!("{e:?}").contains("MessageRejected") {
+                    tracing::warn!(
+                        code = "message_rejected",
+                        to = %req.email,
+                        "ack email rejected — SES sandbox or unverified recipient; re-enable SES_ACK_FROM_EMAIL after production access"
+                    );
+                } else {
+                    tracing::error!(error = ?e, to = %req.email, "ack email send failed");
+                }
+            }
             Ok(ContactResponse {
                 success: true,
                 message: "Message sent successfully".to_string(),
@@ -120,6 +134,48 @@ async fn handler(event: LambdaEvent<ContactRequest>) -> Result<ContactResponse, 
             })
         }
     }
+}
+
+// ─── Acknowledgement email (best-effort) ──────────────────────────────────────
+//
+// Sends a courtesy copy back to the submitter so they know we received their
+// message. Controlled by SES_ACK_FROM_EMAIL; skipped silently if unset (dev mode).
+// Caller logs the returned error at `error` level but still returns success: true.
+
+async fn try_send_ack(ses: &aws_sdk_sesv2::Client, req: &ContactRequest) -> Result<(), Error> {
+    let ack_from = match std::env::var("SES_ACK_FROM_EMAIL") {
+        Ok(v) if !v.is_empty() => v,
+        _ => return Ok(()),
+    };
+
+    let subject = "Thanks for reaching out \u{2014} sislam.com";
+    let body = format!(
+        "Hi {},\n\nThanks for reaching out! I received your message and will get back to you soon.\n\nHere's a copy of what you sent:\n\nSubject: {}\n\n---\n\n{}\n",
+        req.name, req.subject, req.message
+    );
+
+    ses.send_email()
+        .from_email_address(&ack_from)
+        .destination(Destination::builder().to_addresses(&req.email).build())
+        .content(
+            EmailContent::builder()
+                .simple(
+                    Message::builder()
+                        .subject(Content::builder().data(subject).build()?)
+                        .body(
+                            Body::builder()
+                                .text(Content::builder().data(&body).build()?)
+                                .build(),
+                        )
+                        .build(),
+                )
+                .build(),
+        )
+        .send()
+        .await?;
+
+    info!(to = %req.email, "acknowledgement email sent");
+    Ok(())
 }
 
 // ─── Entry point ──────────────────────────────────────────────────────────────

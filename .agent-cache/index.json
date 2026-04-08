@@ -250,21 +250,20 @@
     "git_sha_at_scan": "82f6e63ac7add53caa338b6715786b0d78236116",
     "location": "EFS mount (Lambda) / local file (dev)",
     "migrations_path": "services/ui/migrations/",
-    "migration_count": 12,
+    "migration_count": 14,
     "latest_migrations": [
-      "009_seed_about_sections (W-ABT)",
-      "010_create_social_links (W-SL)",
-      "011_seed_social_links (W-SL)",
-      "012_update_about_sections (W-ABT — superseded split convention; ADR-010 upsert applies to new migrations)"
+      "012_update_about_sections (W-ABT — superseded split convention; ADR-010 upsert applies to new migrations)",
+      "013_align_linkedin_profile (W-LINK — ADR-010 upsert to update LinkedIn URL)",
+      "014_add_sync_unique_indexes (W-SYNC — composite UNIQUE indexes for job_details and competency_evidence; enables ADR-010 upserts on those tables)"
     ],
     "upsert_convention": "ADR-010 — INSERT … ON CONFLICT(natural_key) DO UPDATE SET …; banned: INSERT OR IGNORE, INSERT OR REPLACE, split UPDATE+INSERT"
   },
   "git": {
     "branch": "feat/sync-db-with-migrations",
-    "last_commit": "plans: adopt SQLite upsert convention (ADR-010); add W-SYNC module for dashboard → migrations sync",
+    "last_commit": "feat: implement W-SYNC — migration 014, db-dump endpoint, sync-dashboard-data skill",
     "remote": "git@github.com:shantopagla/deploy-baba.git",
-    "sha": "f20e92873be1d3a1d4812c2b78881cb4da248404",
-    "short_sha": "f20e928"
+    "sha": "728df4a11960a18fcdf0d416bb78a69a1ab55a73",
+    "short_sha": "728df4a"
   },
   "infra": {
     "aws_region": "us-east-1",
@@ -397,6 +396,7 @@
         "src/openapi.rs"
       ],
       "open_issues": [],
+      "routes_added": "GET /api/admin/db-dump (W-SYNC.4.3) — VACUUM INTO snapshot, Cognito-gated, returns application/octet-stream",
       "path": "services/ui",
       "plan_domain": "W-UI",
       "routes_dir": "src/routes",

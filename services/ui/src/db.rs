@@ -52,6 +52,14 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "012_update_about_sections.sql",
         include_str!("../migrations/012_update_about_sections.sql"),
     ),
+    (
+        "013_align_linkedin_profile",
+        include_str!("../migrations/013_align_linkedin_profile.sql"),
+    ),
+    (
+        "014_add_sync_unique_indexes",
+        include_str!("../migrations/014_add_sync_unique_indexes.sql"),
+    ),
 ];
 
 pub struct SocialLink {
