@@ -59,7 +59,9 @@ pub async fn init_pow_secret() {
 }
 
 fn pow_secret() -> &'static [u8; 32] {
-    POW_SECRET.get().expect("init_pow_secret() must be called before serving requests")
+    POW_SECRET
+        .get()
+        .expect("init_pow_secret() must be called before serving requests")
 }
 
 // ─── Rate limiter ─────────────────────────────────────────────────────────────

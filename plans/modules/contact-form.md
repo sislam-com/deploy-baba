@@ -53,7 +53,7 @@ Falls back to `"dev-secret-change-me"` locally when `POW_SECRET_ARN` not set.
   See ADR-010 § Acknowledgement Email for full contract.
 - SES domain identity: `mail.sislam.com` with DKIM, SPF (~all softfail), DMARC (p=none)
 - SES email identity: `it@sislam.com` (verified separately — required for ack send)
-- Requires SES production access (out of sandbox) to send to arbitrary submitter addresses
+- SES production access granted 2026-04-08 for `us-east-1` — ack emails to arbitrary submitter addresses now live. See `docs/aws-setup.md` §SES for the reproducible manual setup steps.
 - Reserved concurrency=5, timeout=10s, memory=128MB for cost/abuse protection
 - Honeypot field `website`: silently returns success if filled (bot detection)
 - In-memory per-IP rate limit: max 3 submissions/hour (keyed on `x-forwarded-for`)
@@ -78,7 +78,7 @@ Falls back to `"dev-secret-change-me"` locally when `POW_SECRET_ARN` not set.
 | W-CTF.4.10 | POST + PoW implementation — challenge/verify handlers + JS solver | DONE | Deployed 2026-04-03 |
 | W-CTF.4.11 | Migrate `POW_SECRET` from Lambda env var → AWS Secrets Manager | **DONE** | W-SEC complete; `init_pow_secret()` in main.rs; SM secret + VPC endpoint + IAM policy in infra |
 | W-CTF.4.12 | End-to-end test: form → PoW solve → POST → SES → contact-sislam@shantopagla.com | **OPEN** | Test after Secrets Manager migration complete |
-| W-CTF.4.13 | Send acknowledgement email to submitter after admin notification succeeds | **DONE** | `try_send_ack()` in `services/email/src/main.rs`; `SES_ACK_FROM_EMAIL=it@sislam.com` in `infra/email-lambda.tf`; `it@sislam.com` added to IAM SES resource list. Requires `just infra-apply` + `just email-deploy`. Verify `it@sislam.com` SES identity + SES production access before deploy. |
+| W-CTF.4.13 | Send acknowledgement email to submitter after admin notification succeeds | **DONE** | Deployed 2026-04-08. `try_send_ack()` in `services/email/src/main.rs`; `SES_ACK_FROM_EMAIL=it@sislam.com` restored in `infra/email-lambda.tf`. SES production access granted 2026-04-08 — external (Gmail) delivery verified. See `DRL-2026-04-07-ses-sandbox-ack` (RESOLVED). |
 
 ## W-CTF.5 Test Strategy
 - Local: `just ui` renders /contact, form JS works (email disabled in dev mode)

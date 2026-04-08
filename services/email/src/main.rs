@@ -109,7 +109,17 @@ async fn handler(event: LambdaEvent<ContactRequest>) -> Result<ContactResponse, 
             info!(from = %req.email, "contact form email sent");
             // Best-effort ack — failure does not affect ContactResponse
             if let Err(e) = try_send_ack(&ses, &req).await {
-                tracing::error!(error = ?e, to = %req.email, "ack email send failed");
+                // Classify known SES sandbox/verification rejection separately so it's
+                // grep-able and doesn't pollute the error stream with a known-expected case.
+                if format!("{e:?}").contains("MessageRejected") {
+                    tracing::warn!(
+                        code = "message_rejected",
+                        to = %req.email,
+                        "ack email rejected — SES sandbox or unverified recipient; re-enable SES_ACK_FROM_EMAIL after production access"
+                    );
+                } else {
+                    tracing::error!(error = ?e, to = %req.email, "ack email send failed");
+                }
             }
             Ok(ContactResponse {
                 success: true,
@@ -132,10 +142,7 @@ async fn handler(event: LambdaEvent<ContactRequest>) -> Result<ContactResponse, 
 // message. Controlled by SES_ACK_FROM_EMAIL; skipped silently if unset (dev mode).
 // Caller logs the returned error at `error` level but still returns success: true.
 
-async fn try_send_ack(
-    ses: &aws_sdk_sesv2::Client,
-    req: &ContactRequest,
-) -> Result<(), Error> {
+async fn try_send_ack(ses: &aws_sdk_sesv2::Client, req: &ContactRequest) -> Result<(), Error> {
     let ack_from = match std::env::var("SES_ACK_FROM_EMAIL") {
         Ok(v) if !v.is_empty() => v,
         _ => return Ok(()),

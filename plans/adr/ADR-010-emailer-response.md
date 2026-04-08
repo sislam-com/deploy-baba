@@ -88,7 +88,9 @@ because of a courtesy email would be a regression in observable behaviour.
   of contact-form latency (still well within Lambda timeout budget)
 - Requires SES production access (out of sandbox) so the email Lambda can send to
   arbitrary unverified submitter addresses. If the account is in sandbox, the ack
-  will silently fail and be logged
+  will silently fail and be logged. **(Resolved 2026-04-08: production access
+  granted for `us-east-1`; see `DRL-2026-04-07-ses-sandbox-ack` and
+  `docs/aws-setup.md` §SES Manual Setup for the reproducible steps.)**
 - A bot supplying a third-party email address causes us to send unsolicited mail
   to that address. Mitigated but not eliminated by honeypot + rate limit + PoW
 - Two verified SES identities now sit on the contact path (`mail.sislam.com`

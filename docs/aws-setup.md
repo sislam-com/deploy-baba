@@ -148,7 +148,95 @@ CI/CD operations and full OpenTofu provisioning (first-time `just infra-apply`).
 }
 ```
 
-## 3. Bootstrap (First Time Only)
+## 3. SES Manual Setup (One-Time, Per Account + Region)
+
+SES configuration has two layers:
+
+**Managed by OpenTofu** (`infra/ses.tf`):
+- Domain identity for `mail.sislam.com` with DKIM, SPF, and DMARC records
+
+**NOT managed by OpenTofu — manual AWS Console steps:**
+- Verifying the `it@sislam.com` email identity (console wizard + click-through link)
+- Requesting SES production access (account + region scoped, Support ticket form)
+
+Both are one-time setup per target account. Neither has a Terraform/OpenTofu resource
+that can automate the human-in-the-loop verification.
+
+### 3a. Verify the sender email identity
+
+1. AWS Console → SES → **Verified identities** → **Create identity** → Email address
+2. Enter the address used as `SES_ACK_FROM_EMAIL` (currently `it@sislam.com`)
+3. Open the verification email AWS sends; click the confirmation link
+4. Confirm status shows **Verified** in the console
+
+Verification command (no `--profile` flag needed if using the default profile):
+```bash
+aws sesv2 get-email-identity --email-identity it@sislam.com --region us-east-1
+# append --profile <name> only if using a non-default profile
+```
+
+### 3b. Request SES production access
+
+By default, new SES accounts are in **sandbox mode**: `send_email` to any
+unverified recipient address is rejected with `MessageRejected`. Production access
+removes this restriction.
+
+1. AWS Console → SES → **Account dashboard** → **Request production access**
+2. Fill out the form:
+   - **Mail type:** Transactional
+   - **Website URL:** `https://sislam.com`
+   - **Use case description:**
+     > Transactional acknowledgement emails for a personal portfolio contact form.
+     > Each email is opt-in — the submitter initiated the request by filling out the
+     > form. Low volume (≤100/day). Messages contain a thank-you note and a verbatim
+     > copy of what the user submitted.
+   - Acknowledge the bounce/complaint handling commitment
+3. Submit and wait for approval (typically within 24 hours)
+
+Verification command once approved:
+```bash
+aws sesv2 get-account --region us-east-1
+# append --profile <name> only for a non-default profile
+```
+Look for:
+- `ProductionAccessEnabled: true`
+- `EnforcementStatus: HEALTHY`
+- `Details.ReviewDetails.Status: GRANTED`
+
+Note the `CaseId` from `Details.ReviewDetails.CaseId` for your records.
+
+### 3c. Deploy after production access is granted
+
+```bash
+just infra-apply <profile>   # restores SES_ACK_FROM_EMAIL in the Lambda env
+just email-deploy <profile>  # pushes the email Lambda binary
+```
+
+### 3d. End-to-end verification
+
+1. Submit the contact form at `https://sislam.com/contact` using an external
+   (non-verified) Gmail address
+2. Confirm the admin notification arrives at `contact-sislam@shantopagla.com`
+3. Confirm the acknowledgement email arrives in the Gmail inbox
+4. Tail the email Lambda logs and look for `info!(to = ..., "acknowledgement email sent")`
+   with no `warn!(code = "message_rejected", ...)` lines:
+   ```bash
+   just email-logs <profile>
+   ```
+
+### 3e. Troubleshooting
+
+If the ack email stops working (e.g. after expanding to a new region, or if email
+identity verification lapses), the symptom is a `warn!(code = "message_rejected", ...)`
+line in the email Lambda logs and no ack in the submitter's inbox. Admin notifications
+are unaffected — they go to a verified identity.
+
+See `plans/drift/DRL-2026-04-07-ses-sandbox-ack.md` for the historical record of
+this exact failure mode, the interim mitigation, and the resolution evidence.
+
+---
+
+## 4. Bootstrap (First Time Only)
 
 ```bash
 just infra-bootstrap deploy-baba
@@ -157,7 +245,7 @@ just infra-bootstrap deploy-baba
 This creates the S3 state bucket for OpenTofu and writes the SSM sentinel
 parameter that `just aws-check` uses for validation.
 
-## 4. Validate Setup
+## 5. Validate Setup
 
 ```bash
 just aws-check deploy-baba
@@ -169,7 +257,7 @@ Expected output:
 ✓ Account: 123456789012, Region: us-east-1
 ```
 
-## 5. Deploy
+## 6. Deploy
 
 ```bash
 just infra-apply deploy-baba    # Provision Lambda, EFS, S3
