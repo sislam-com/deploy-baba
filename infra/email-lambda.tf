@@ -21,11 +21,12 @@ resource "aws_lambda_function" "email" {
 
   environment {
     variables = {
-      RUST_LOG         = "info"
-      SES_FROM_EMAIL   = "noreply@${local.ses_domain}"
-      CONTACT_TO_EMAIL = var.contact_email
-      AWS_SES_REGION   = var.region
-      ALLOWED_ORIGIN   = "https://${var.domain_name}"
+      RUST_LOG             = "info"
+      SES_FROM_EMAIL       = "noreply@${local.ses_domain}"
+      SES_ACK_FROM_EMAIL   = "it@sislam.com"
+      CONTACT_TO_EMAIL     = var.contact_email
+      AWS_SES_REGION       = var.region
+      ALLOWED_ORIGIN       = "https://${var.domain_name}"
     }
   }
 
@@ -68,8 +69,12 @@ resource "aws_iam_role_policy" "email_lambda_ses" {
       # TO identity ARN. The domain identity `shantopagla.com` does NOT cover
       # individual address checks — need a wildcard for *@shantopagla.com.
       Resource = [
+        # FROM identity for admin notifications (domain identity)
         "arn:aws:ses:${var.region}:${data.aws_caller_identity.current.account_id}:identity/${local.ses_domain}",
+        # TO identity for admin notifications (verified email in same account)
         "arn:aws:ses:${var.region}:${data.aws_caller_identity.current.account_id}:identity/*@shantopagla.com",
+        # FROM identity for acknowledgement emails (separately-verified email identity)
+        "arn:aws:ses:${var.region}:${data.aws_caller_identity.current.account_id}:identity/it@sislam.com",
       ]
     }]
   })
