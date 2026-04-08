@@ -124,17 +124,22 @@ Never call `cargo xtask` directly. All commands go through `just`.
 Key commands:
 - `just dev` — inner development loop
 - `just quality` — full quality gate (fmt + clippy + test)
-- `just deploy PROFILE` — quality gate → lambda-build → infra apply
+- `just lambda-deploy PROFILE` — build + upload Lambda zip (no infra changes)
 - `just ui` — run local UI server
-- `just lambda-build` — build Lambda binary (uses cross for aarch64)
-- `just infra-plan` / `just infra-apply` — OpenTofu plan/apply
+- `just lambda-build` — build Lambda binary (uses cargo-lambda for aarch64)
+- `just infra-plan PROFILE` / `just infra-apply PROFILE` — OpenTofu plan/apply
+- `just secret-put NAME VALUE PROFILE` — write secret to AWS Secrets Manager (W-SEC, TODO)
+- `just secret-get NAME PROFILE` — read secret from AWS Secrets Manager (W-SEC, TODO)
 
 ### Architecture Decisions
 
 - **ADR-001:** justfile-only interface — xtask is internal plumbing, never invoked directly
 - **ADR-002:** SQLite on EFS + S3 backup — no PostgreSQL, no RDS
-- **ADR-003:** Lambda Function URL — no API Gateway
+- **ADR-003:** Lambda Function URL — no API Gateway (exception: ADR-009)
 - **ADR-004:** Dual-mode entry point — runtime env var detection (local vs Lambda)
+- **ADR-007:** OpenTofu over Terraform — `tofu` CLI binary, MPL-2.0
+- **ADR-008:** Cognito hosted UI auth — implicit grant, JWKS from env, HttpOnly cookie, dev-mode bypass
+- **ADR-009:** API Gateway HTTP API for `POST /api/contact` only — OAC body hash workaround
 
 ### Stack Config (`stack.toml`)
 
@@ -144,17 +149,28 @@ Local-only config file — not committed to git. Contains:
 
 Copy `stack.example.toml` to `stack.toml` to get started. No external dependencies or remote service URLs.
 
+### Secrets Policy
+
+**All secrets must live in AWS Secrets Manager** (W-SEC). Never store secrets in:
+- Source code or hardcoded fallbacks (except `dev-*` local-only defaults)
+- Lambda environment variables (visible in AWS console)
+- Committed files of any kind
+
+Use `just secret-put NAME VALUE PROFILE` to write secrets, `just secret-get NAME PROFILE` to read.
+Lambda reads secrets via `POW_SECRET_ARN` env var at cold start. See `plans/modules/secrets-manager.md`.
+
 ### Plan System
 
 Entry point: `plans/INDEX.md` — lists all modules, ADRs, cross-cutting concerns, and drift logs.
+**The plan system is the single source of truth for project state.** Keep it updated.
 
 Structure under `plans/`:
-- `modules/` — 14 per-component plans
-- `adr/` — architecture decision records (ADR-001 through ADR-006)
+- `modules/` — per-component plans (21 modules incl. secrets-manager)
+- `adr/` — architecture decision records (ADR-001 through ADR-009)
 - `cross-cutting/` — 5 shared concern files
-- `drift/` — drift logs (format: `DRL-YYYY-MM-DD`)
+- `drift/` — drift logs (format: `DRL-YYYY-MM-DD-topic`)
 
-Current status: ~85% complete. Remaining work listed in P1–P3 sections of `plans/INDEX.md`.
+Current status: ~93% complete. Remaining work listed in P1–P3 sections of `plans/INDEX.md`.
 
 ### Cross-Session Memory
 

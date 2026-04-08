@@ -30,6 +30,30 @@ data "aws_cloudfront_origin_request_policy" "all_viewer_except_host" {
   name = "Managed-AllViewerExceptHostHeader"
 }
 
+# ─── Custom origin request policy for Lambda ───────────────────────────────────
+# Forward NO viewer headers: OAC SigV4 for Lambda Function URL (AWS_IAM) requires
+# signed payload hash for POST/PUT but CloudFront always uses UNSIGNED-PAYLOAD,
+# causing InvalidSignatureException. Forwarding zero viewer headers minimizes the
+# signed header set, keeping GET working. POST/PUT must be avoided through this
+# CloudFront→Function URL path (see W-AUTH.POST-FIX, DRL-2026-03-27-function-url-auth).
+# Cookies forwarded separately via cookies_config (session auth works).
+# x-forwarded-for always added by CloudFront regardless of this policy.
+resource "aws_cloudfront_origin_request_policy" "lambda_oac" {
+  name = "deploy-baba-lambda-oac-policy"
+
+  headers_config {
+    header_behavior = "none"
+  }
+
+  cookies_config {
+    cookie_behavior = "all"
+  }
+
+  query_strings_config {
+    query_string_behavior = "all"
+  }
+}
+
 # ─── Locals ────────────────────────────────────────────────────────────────────
 
 locals {
@@ -83,6 +107,19 @@ resource "aws_cloudfront_distribution" "main" {
     origin_access_control_id = aws_cloudfront_origin_access_control.assets.id
   }
 
+  # API Gateway origin for POST /api/contact (no OAC — body hash works correctly)
+  origin {
+    domain_name = local.apigw_contact_domain
+    origin_id   = "apigw-contact"
+
+    custom_origin_config {
+      http_port              = 80
+      https_port             = 443
+      origin_protocol_policy = "https-only"
+      origin_ssl_protocols   = ["TLSv1.2"]
+    }
+  }
+
   # Cache behavior for /resume/* — served from S3 assets bucket
   ordered_cache_behavior {
     path_pattern           = "/resume/*"
@@ -96,6 +133,19 @@ resource "aws_cloudfront_distribution" "main" {
     cache_policy_id = data.aws_cloudfront_cache_policy.caching_optimized.id
   }
 
+  # Cache behavior for POST /api/contact — routed to API Gateway (no OAC, POST body works)
+  ordered_cache_behavior {
+    path_pattern           = "/api/contact"
+    target_origin_id       = "apigw-contact"
+    viewer_protocol_policy = "redirect-to-https"
+
+    allowed_methods = ["GET", "HEAD", "OPTIONS", "PUT", "PATCH", "POST", "DELETE"]
+    cached_methods  = ["GET", "HEAD"]
+
+    cache_policy_id          = data.aws_cloudfront_cache_policy.caching_disabled.id
+    origin_request_policy_id = data.aws_cloudfront_origin_request_policy.all_viewer_except_host.id
+  }
+
   default_cache_behavior {
     target_origin_id       = "lambda-function-url"
     viewer_protocol_policy = "redirect-to-https"
@@ -106,9 +156,10 @@ resource "aws_cloudfront_distribution" "main" {
     # CachingDisabled — every request forwarded to origin (dynamic app)
     cache_policy_id = data.aws_cloudfront_cache_policy.caching_disabled.id
 
-    # AllViewerExceptHostHeader — forwards all headers/cookies/query strings
-    # but replaces Host with the Lambda origin domain so Lambda accepts the request
-    origin_request_policy_id = data.aws_cloudfront_origin_request_policy.all_viewer_except_host.id
+    # Custom policy: all viewer headers except Host and Content-Length.
+    # Excluding Content-Length fixes InvalidSignatureException on POST/PUT —
+    # CloudFront OAC signs Content-Length but then uses chunked encoding to Lambda.
+    origin_request_policy_id = aws_cloudfront_origin_request_policy.lambda_oac.id
   }
 
   restrictions {

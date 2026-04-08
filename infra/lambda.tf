@@ -30,7 +30,9 @@ resource "aws_lambda_function" "baba" {
       COGNITO_DOMAIN    = "${aws_cognito_user_pool_domain.baba.domain}.auth.${var.region}.amazoncognito.com"
       COGNITO_REGION    = var.region
       APP_DOMAIN        = "https://${var.domain_name}"
+      EMAIL_LAMBDA_NAME = aws_lambda_function.email.function_name
       COGNITO_JWKS      = data.http.cognito_jwks.response_body
+      POW_SECRET        = var.pow_secret
     }
   }
 
@@ -54,6 +56,7 @@ resource "aws_lambda_function" "baba" {
     aws_iam_role_policy.lambda_efs,
     aws_iam_role_policy.lambda_s3,
     aws_iam_role_policy.lambda_ssm,
+    aws_iam_role_policy.lambda_invoke_email,
   ]
 
   tags = {
@@ -69,7 +72,7 @@ resource "aws_lambda_function_url" "baba" {
   depends_on = [aws_lambda_function.baba]
 }
 
-# Lambda permission — CloudFront OAC only (replaces public principal = "*")
+# Lambda permission — CloudFront OAC only
 resource "aws_lambda_permission" "cloudfront" {
   statement_id  = "AllowCloudFrontInvoke"
   action        = "lambda:InvokeFunctionUrl"

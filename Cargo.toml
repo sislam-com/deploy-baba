@@ -12,6 +12,7 @@ members = [
     "crates/api-merger",
     "crates/infra-types",
     "services/ui",
+    "services/email",
     "xtask",
     "examples/01_multi_format_config",
     "examples/02_api_spec_generation",
@@ -47,6 +48,7 @@ tower-http = { version = "0.5", features = ["cors", "trace", "fs"] }
 
 # Lambda
 lambda_http = "0.13"
+lambda_runtime = "0.13"
 
 # Templates
 askama = "0.12"
@@ -70,6 +72,7 @@ aws-sdk-ecs = "1"
 aws-sdk-ecr = "1"
 aws-sdk-efs = "1"
 aws-sdk-dynamodb = "1"
+aws-sdk-sesv2 = { version = "1", features = ["behavior-version-latest"] }
 
 # CLI
 clap = { version = "4", features = ["derive"] }
@@ -83,6 +86,12 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 # Auth
 jsonwebtoken = "9"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
+# Crypto (PoW)
+sha2 = "0.10"
+hmac = "0.12"
+hex = "0.4"
+rand = "0.8"
 
 # Internal crates
 config-core = { path = "crates/config-core" }

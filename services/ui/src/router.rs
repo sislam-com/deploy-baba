@@ -1,4 +1,8 @@
-use axum::{response::Html, routing::get, Router};
+use axum::{
+    response::Html,
+    routing::{get, post},
+    Router,
+};
 use tower_http::cors::CorsLayer;
 use tower_http::services::ServeDir;
 use tower_http::trace::TraceLayer;
@@ -74,6 +78,12 @@ pub fn build(state: AppState) -> Router {
         .route("/", get(routes::resume::handler))
         .route("/about/me", get(routes::about::about_me))
         .route("/about/repo", get(routes::about::about_repo))
+        .route("/contact", get(routes::contact::contact_page))
+        .route(
+            "/api/contact/challenge",
+            get(routes::contact::challenge_issue),
+        )
+        .route("/api/contact", post(routes::contact::contact_submit))
         .nest_service("/resume", ServeDir::new("target/resume"))
         .route("/health", get(routes::health::get_health))
         .nest("/api", api_routes)

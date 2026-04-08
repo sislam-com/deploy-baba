@@ -48,6 +48,10 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "011_seed_social_links",
         include_str!("../migrations/011_seed_social_links.sql"),
     ),
+    (
+        "012_update_about_sections.sql",
+        include_str!("../migrations/012_update_about_sections.sql"),
+    ),
 ];
 
 pub struct SocialLink {
