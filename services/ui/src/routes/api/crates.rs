@@ -1,15 +1,8 @@
 use axum::{extract::Path, routing::get, Json, Router};
-use serde::{Deserialize, Serialize};
 
 use crate::state::AppState;
 
-#[derive(Serialize, Deserialize, Clone)]
-pub struct CrateInfo {
-    pub name: String,
-    pub version: String,
-    pub description: String,
-    pub traits: Vec<String>,
-}
+pub use api_openapi::models::CrateInfo;
 
 fn get_all_crates() -> Vec<CrateInfo> {
     vec![

@@ -9,15 +9,18 @@ use axum::{
     routing::{get, post, put},
     Json, Router,
 };
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
-use utoipa::ToSchema;
 
 use crate::db::Db;
 use crate::routes::api::competencies::Competency;
 use crate::routes::api::jobs::{Job, JobDetail};
 use crate::state::AppState;
+
+pub use api_openapi::models::{
+    AboutSectionInput, AboutSectionResponse, CompetencyInput, Evidence, EvidenceInput,
+    JobDetailInput, JobInput, SocialLinkInput, SocialLinkResponse,
+};
 
 type ApiResult<T> = Result<T, (StatusCode, String)>;
 
@@ -27,68 +30,6 @@ fn db_err(e: impl std::fmt::Display) -> (StatusCode, String) {
 
 fn not_found(msg: impl Into<String>) -> (StatusCode, String) {
     (StatusCode::NOT_FOUND, msg.into())
-}
-
-// ── Input types ──────────────────────────────────────────────────────────────
-
-#[derive(Deserialize, ToSchema)]
-pub struct JobInput {
-    pub slug: String,
-    pub company: String,
-    pub title: String,
-    pub location: Option<String>,
-    pub start_date: String,
-    pub end_date: Option<String>,
-    pub summary: String,
-    /// Comma-separated list, matches DB storage format.
-    pub tech_stack: Option<String>,
-    pub sort_order: i64,
-}
-
-#[derive(Deserialize, ToSchema)]
-pub struct JobDetailInput {
-    pub detail_text: String,
-    pub category: Option<String>,
-    pub sort_order: i64,
-}
-
-#[derive(Deserialize, ToSchema)]
-pub struct CompetencyInput {
-    pub slug: String,
-    pub name: String,
-    pub description: String,
-    pub icon: Option<String>,
-    pub sort_order: i64,
-}
-
-#[derive(Deserialize, ToSchema)]
-pub struct EvidenceInput {
-    pub competency_id: i64,
-    pub job_id: i64,
-    pub detail_id: Option<i64>,
-    pub highlight_text: Option<String>,
-    pub sort_order: i64,
-}
-
-#[derive(Deserialize, ToSchema)]
-pub struct AboutSectionInput {
-    pub page: String,
-    pub slug: String,
-    pub heading: String,
-    pub body: String,
-    pub icon: Option<String>,
-    pub sort_order: i64,
-}
-
-#[derive(Serialize, ToSchema)]
-pub struct AboutSectionResponse {
-    pub id: i64,
-    pub page: String,
-    pub slug: String,
-    pub heading: String,
-    pub body: String,
-    pub icon: Option<String>,
-    pub sort_order: i64,
 }
 
 // ── Job handlers ─────────────────────────────────────────────────────────────
@@ -440,16 +381,6 @@ pub async fn delete_competency(
 
 // ── Evidence handlers ─────────────────────────────────────────────────────────
 
-#[derive(serde::Serialize, ToSchema)]
-pub struct Evidence {
-    pub id: i64,
-    pub competency_id: i64,
-    pub job_id: i64,
-    pub detail_id: Option<i64>,
-    pub highlight_text: Option<String>,
-    pub sort_order: i64,
-}
-
 /// Create a new competency evidence link.
 #[utoipa::path(
     post,
@@ -758,28 +689,7 @@ pub async fn delete_about_section(
     Ok(StatusCode::NO_CONTENT)
 }
 
-// ── SocialLink types ──────────────────────────────────────────────────────────
-
-#[derive(Deserialize, ToSchema)]
-pub struct SocialLinkInput {
-    pub platform: String,
-    pub url: String,
-    pub label: String,
-    pub icon: Option<String>,
-    pub visible: bool,
-    pub sort_order: i64,
-}
-
-#[derive(Serialize, ToSchema)]
-pub struct SocialLinkResponse {
-    pub id: i64,
-    pub platform: String,
-    pub url: String,
-    pub label: String,
-    pub icon: Option<String>,
-    pub visible: bool,
-    pub sort_order: i64,
-}
+// ── SocialLink row mapper & handlers ─────────────────────────────────────────
 
 fn row_to_social_link(row: &rusqlite::Row<'_>) -> rusqlite::Result<SocialLinkResponse> {
     let visible: i64 = row.get(5)?;
@@ -793,8 +703,6 @@ fn row_to_social_link(row: &rusqlite::Row<'_>) -> rusqlite::Result<SocialLinkRes
         sort_order: row.get(6)?,
     })
 }
-
-// ── SocialLink handlers ───────────────────────────────────────────────────────
 
 /// Create a new social link.
 pub async fn create_social_link(
@@ -892,10 +800,6 @@ pub async fn delete_social_link(
 /// GET /api/admin/db-dump
 ///
 /// Returns a consistent SQLite snapshot of the live database via VACUUM INTO.
-/// Used by the /sync-dashboard-data skill (W-SYNC.4.4) to pull live EFS state
-/// for diffing against the source-tree seed migrations (ADR-010).
-///
-/// Auth: inherits Cognito `require_auth` middleware from the parent router.
 async fn db_dump_handler(State(db): State<Arc<Db>>) -> ApiResult<Response> {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -903,10 +807,8 @@ async fn db_dump_handler(State(db): State<Arc<Db>>) -> ApiResult<Response> {
         .unwrap_or(0);
     let tmp_path = format!("/tmp/baba-dump-{}.db", nanos);
 
-    // Run VACUUM INTO under the connection mutex, then release before reading.
     {
         let conn = db.conn.lock().unwrap();
-        // VACUUM INTO does not accept parameter binding; tmp_path is internal.
         conn.execute(&format!("VACUUM INTO '{}'", tmp_path), [])
             .map_err(db_err)?;
     }

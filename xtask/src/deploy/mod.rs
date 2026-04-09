@@ -40,8 +40,9 @@ pub enum DeployAction {
     },
     /// Push to Amazon ECR
     Push {
-        /// Image URI
-        #[arg(long)]
+        /// Full ECR image URI (e.g. 123456789012.dkr.ecr.us-east-1.amazonaws.com/repo:tag).
+        /// Defaults to deploy-baba-ui:latest (local tag built by `just build-image`).
+        #[arg(long, default_value = "deploy-baba-ui:latest")]
         image: String,
         /// AWS profile
         #[arg(long)]

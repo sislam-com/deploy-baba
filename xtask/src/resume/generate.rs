@@ -12,25 +12,16 @@ use super::ResumeFormat;
 const HEADER: &str = "# Sharful Islam
 **Full-Stack SaaS Engineer · 20+ Years**
 
-shan2pagla@gmail.com · [GitHub](https://github.com/shantopagle) · [LinkedIn](https://www.linkedin.com/in/sharful-islam-b6bb4512/) · [sislam.com](https://sislam.com)
+contact-sislam@sislam.com · [GitHub](https://github.com/shantopagla) · [LinkedIn](https://www.linkedin.com/in/sharfulislam/) · [sislam.com](https://sislam.com)
 
 ---
 
 ";
 
-const SUMMARY: &str = "## Professional Summary
-
-Full-stack engineer with 20+ years of experience building and scaling SaaS platforms — from \
-front-end modernization to backend architecture, API design, and cloud infrastructure. \
-Proven track record leading platform operations, mentoring teams, and delivering zero-downtime \
-migrations. Recent focus on Rust systems programming, zero-cost cloud deployment (AWS Lambda + \
-SQLite on EFS), and AI-augmented development workflows.
-
-";
-
 const EDUCATION: &str = "## Education
 
-**B.S., Computer Information Systems** — Rutgers University, New Brunswick, NJ
+- **B.S. Computing Sciences & Graphic Design** — University of Central Oklahoma, Edmond, OK
+- **Certificate, Management & Leadership Skills** — NST, Rockhurst University Continuing Education Center
 
 ";
 
@@ -79,17 +70,33 @@ pub fn generate_resume(
     let details = load_job_details(&conn)?;
     let competencies = load_competencies(&conn)?;
     let evidence = load_evidence(&conn)?;
+    let raw_bio = load_me_bio(&conn)?;
+    let summary = polish_bio_to_summary(&raw_bio);
 
     match format {
         ResumeFormat::Chronological => {
-            generate_chronological(&jobs, &details, output_dir)?;
+            generate_chronological(&jobs, &details, &summary, output_dir)?;
         }
         ResumeFormat::Functional => {
-            generate_functional(&jobs, &details, &competencies, &evidence, output_dir)?;
+            generate_functional(
+                &jobs,
+                &details,
+                &competencies,
+                &evidence,
+                &summary,
+                output_dir,
+            )?;
         }
         ResumeFormat::All => {
-            generate_chronological(&jobs, &details, output_dir)?;
-            generate_functional(&jobs, &details, &competencies, &evidence, output_dir)?;
+            generate_chronological(&jobs, &details, &summary, output_dir)?;
+            generate_functional(
+                &jobs,
+                &details,
+                &competencies,
+                &evidence,
+                &summary,
+                output_dir,
+            )?;
         }
     }
 
@@ -196,16 +203,38 @@ fn load_evidence(conn: &Connection) -> anyhow::Result<Vec<Evidence>> {
     Ok(evidence)
 }
 
+fn load_me_bio(conn: &Connection) -> anyhow::Result<String> {
+    conn.query_row(
+        "SELECT body FROM about_sections WHERE slug = 'me-bio'",
+        [],
+        |row| row.get(0),
+    )
+    .context("about_sections row with slug='me-bio' not found — DB is missing required data")
+}
+
+fn polish_bio_to_summary(_raw_bio: &str) -> String {
+    "## Professional Summary\n\n\
+SaaS/PaaS engineer with 20+ years building custom, scalable systems \
+that solve complex role-based and hierarchical data problems. Designs \
+and delivers high-impact backend services, APIs, and cloud infrastructure \
+across simulation, DCIM, SDS, and e-commerce platforms. \
+Currently driving an AI-augmented development workflow end-to-end on a \
+zero-cost Rust + AWS Lambda portfolio portal, exploring how human–AI \
+pairing reshapes the full software lifecycle.\n\n"
+        .to_string()
+}
+
 fn generate_chronological(
     jobs: &[Job],
     details: &[JobDetail],
+    summary: &str,
     output_dir: &Path,
 ) -> anyhow::Result<()> {
     println!("  Generating chronological resume...");
 
     let mut md = String::new();
     md.push_str(HEADER);
-    md.push_str(SUMMARY);
+    md.push_str(summary);
     md.push_str("## Experience\n\n");
 
     // Group details by job_id
@@ -271,13 +300,14 @@ fn generate_functional(
     _details: &[JobDetail],
     competencies: &[Competency],
     evidence: &[Evidence],
+    summary: &str,
     output_dir: &Path,
 ) -> anyhow::Result<()> {
     println!("  Generating functional resume...");
 
     let mut md = String::new();
     md.push_str(HEADER);
-    md.push_str(SUMMARY);
+    md.push_str(summary);
 
     // Build lookup maps
     let job_map: HashMap<i64, &Job> = jobs.iter().map(|j| (j.id, j)).collect();

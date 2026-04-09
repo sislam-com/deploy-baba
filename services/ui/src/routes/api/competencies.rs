@@ -3,41 +3,12 @@ use axum::{
     routing::get,
     Json, Router,
 };
-use serde::Serialize;
 use std::sync::Arc;
-use utoipa::ToSchema;
 
 use crate::db::Db;
 use crate::state::AppState;
 
-#[derive(Serialize, ToSchema)]
-pub struct Competency {
-    pub id: i64,
-    pub slug: String,
-    pub name: String,
-    pub description: String,
-    pub icon: Option<String>,
-    pub sort_order: i64,
-}
-
-#[derive(Serialize, ToSchema)]
-pub struct EvidenceItem {
-    pub id: i64,
-    pub job_id: i64,
-    pub job_slug: String,
-    pub company: String,
-    pub detail_id: Option<i64>,
-    pub highlight_text: Option<String>,
-    pub detail_text: Option<String>,
-    pub sort_order: i64,
-}
-
-#[derive(Serialize, ToSchema)]
-pub struct CompetencyWithEvidence {
-    #[serde(flatten)]
-    pub competency: Competency,
-    pub evidence: Vec<EvidenceItem>,
-}
+pub use api_openapi::models::{Competency, CompetencyWithEvidence, EvidenceItem};
 
 #[utoipa::path(
     get,

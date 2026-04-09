@@ -175,17 +175,19 @@ infra-output PROFILE="default":
 build-image:
     cargo xtask deploy docker
 
-# Build + push image to ECR Public
-push-image PROFILE="default":
-    just aws-check {{PROFILE}} && cargo xtask deploy push --profile {{PROFILE}}
+# Push a locally-built image to Amazon ECR.
+# IMAGE must be the full ECR URI: <account>.dkr.ecr.<region>.amazonaws.com/<repo>:<tag>
+# Example: just push-image default 123456789012.dkr.ecr.us-east-1.amazonaws.com/deploy-baba-ui:latest
+push-image PROFILE="default" IMAGE="deploy-baba-ui:latest":
+    just aws-check {{PROFILE}} && cargo xtask deploy push --image {{IMAGE}} --profile {{PROFILE}}
 
-# Full deploy: quality gate → build → push → Lambda update
+# Full deploy: quality gate → zip build → Lambda update (zip-based Lambda, ADR-003)
 deploy PROFILE="default":
-    just quality && just push-image {{PROFILE}} && cargo xtask deploy lambda --profile {{PROFILE}}
+    just quality && just lambda-deploy {{PROFILE}}
 
 # Deploy without quality gate (fast path)
 deploy-fast PROFILE="default":
-    just push-image {{PROFILE}} && cargo xtask deploy lambda --profile {{PROFILE}}
+    just lambda-deploy {{PROFILE}}
 
 # Dry run: build + validate, no push
 deploy-dry PROFILE="default":

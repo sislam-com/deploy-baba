@@ -33,6 +33,7 @@ askama_axum = { workspace = true }
 # OpenAPI
 utoipa = { workspace = true }
 
+
 # Serialization + error handling
 serde = { workspace = true }
 serde_json = { workspace = true }

@@ -3,55 +3,18 @@ use axum::{
     routing::get,
     Json, Router,
 };
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use utoipa::ToSchema;
 
 use crate::db::Db;
 use crate::state::AppState;
 
-#[derive(Serialize, ToSchema)]
-pub struct Job {
-    pub id: i64,
-    pub slug: String,
-    pub company: String,
-    pub title: String,
-    pub location: Option<String>,
-    pub start_date: String,
-    pub end_date: Option<String>,
-    pub summary: String,
-    pub tech_stack: Option<Vec<String>>,
-    pub sort_order: i64,
-}
-
-#[derive(Serialize, ToSchema)]
-pub struct JobDetail {
-    pub id: i64,
-    pub detail_text: String,
-    pub category: Option<String>,
-    pub sort_order: i64,
-}
-
-#[derive(Serialize, ToSchema)]
-pub struct JobWithDetails {
-    #[serde(flatten)]
-    pub job: Job,
-    pub details: Vec<JobDetail>,
-}
-
-#[derive(Deserialize)]
-pub struct JobsQuery {
-    #[allow(dead_code)]
-    pub view: Option<String>,
-}
+pub use api_openapi::models::{Job, JobDetail, JobWithDetails, JobsQuery};
 
 #[utoipa::path(
     get,
     path = "/api/jobs",
     tag = "resume",
-    params(
-        ("view" = Option<String>, Query, description = "View mode: 'chronological' (default)")
-    ),
+    params(JobsQuery),
     responses(
         (status = 200, description = "List of all job positions", body = Vec<Job>)
     )
