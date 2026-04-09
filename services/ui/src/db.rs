@@ -60,6 +60,10 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "014_add_sync_unique_indexes",
         include_str!("../migrations/014_add_sync_unique_indexes.sql"),
     ),
+    (
+        "015_sync_dashboard_2026-04-09",
+        include_str!("../migrations/015_sync_dashboard_2026-04-09.sql"),
+    ),
 ];
 
 /// Re-exported from `api_openapi::models::social` — the canonical SSOT.

@@ -1,5 +1,5 @@
 # deploy-baba — Plan Index
-**GitHub:** `shantopagla/deploy-baba` | **Last updated:** 2026-04-08
+**GitHub:** `shantopagla/deploy-baba` | **Last updated:** 2026-04-09
 **Source repo:** `~/shanto` (Baba Toolchain, ~85K LOC) | **Status:** ~93% complete
 
 See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming rules.
@@ -92,6 +92,8 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | ADR-010 | SQLite Upsert as the Canonical Re-Seed Convention | W-SYNC, W-RSM, W-ABT, W-SL, W-XT |
 | ADR-011 | Synchronous Email Lambda Invocation with Typed Response Propagation + Acknowledgement Email | W-CTF, W-UI |
 | ADR-012 | OpenAPI SSOT + Public/Admin Spec Split | W-APIO, W-UI |
+| ADR-013 | Admin Dashboard Dark Theme Convention — light-theme tokens banned in `dashboard_*.html`; canonical dark-palette class table for all dashboard list/detail/form views | W-AUTH, W-ABT, W-SL, W-RSM, W-UI |
+| ADR-014 | Resume Professional Summary Sourced from DB (`about_sections.me-bio`) — hardcoded `SUMMARY` const deleted; generator loads + polishes bio at generation time; errors on missing row | W-RSM, W-XT |
 
 ---
 
