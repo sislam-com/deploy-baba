@@ -1,4 +1,4 @@
-# ADR-010: Synchronous Email Lambda Invocation with Typed Response Propagation
+# ADR-011: Synchronous Email Lambda Invocation with Typed Response Propagation
 
 **Date:** 2026-04-07
 **Status:** Accepted

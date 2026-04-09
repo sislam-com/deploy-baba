@@ -139,3 +139,5 @@ Note: `-chdir=<dir>` must come before the subcommand name.
 - → W-DX (justfile recipes that call xtask)
 - → `plans/drift/DRL-2026-03-18-xtask.md` — all fixed items and open issues
 - → `plans/cross-cutting/aws-setup-spec.md` — IAM policy for AWS SDK calls
+- → ADR-010 (upsert re-seed convention — xtask read-only loader pattern reused for future dump tooling)
+- → W-SYNC (hosts fix tracking for hardcoded `deploy-baba-backups` bucket name mismatch vs `infra/s3.tf`)

@@ -31,6 +31,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | social-links | W-SL | `services/ui/src/db.rs`, `services/ui/src/routes/dashboard.rs`, `services/ui/src/routes/api/admin.rs`, `services/ui/migrations/010-011` | DONE | — |
 | contact-form | W-CTF | `services/email/`, `services/ui/src/routes/contact.rs`, `infra/ses.tf`, `infra/email-lambda.tf`, `infra/apigateway.tf` | WIP | e2e test (W-CTF.4.12) — deploy step pending |
 | secrets-manager | W-SEC | `xtask/src/secret.rs`, `infra/secrets.tf`, `infra/vpc-endpoints.tf`, `services/ui/src/routes/contact.rs` | DONE | Deploy: `just infra-apply` + `just secret-put pow-secret $(openssl rand -hex 32)` + `just lambda-deploy` |
+| dashboard-sync | W-SYNC | `plans/modules/dashboard-sync.md`, `services/ui/migrations/`, `services/ui/src/db.rs`, `services/ui/src/routes/api/admin.rs`, `.claude/skills/sync-dashboard-data/` | DONE | 4.1–4.5 complete; zero drift on first run 2026-04-08; .4.6/.4.7 deferred (on-demand) |
 
 ---
 
@@ -47,7 +48,8 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 1. ~~**W-AUTH.POST-FIX**~~ — **RESOLVED** for `POST /api/contact` via API Gateway HTTP API (ADR-009). Dashboard edit forms (PUT/PATCH via OAC path) remain broken — out of scope for now. See `DRL-2026-03-27-function-url-auth`.
 
 ### P1 — Must Fix (blocking clean CI)
-1. ~~**W-XT.4.1**~~ — CLI naming: 3 justfile mismatches fixed (`fmt`→`format`, `--crate`→`crate` subcommand, `gate`→`all`) — **RESOLVED**
+1. ~~**W-SYNC.4.5**~~ — **DONE 2026-04-08:** pulled live EFS DB via dump endpoint; zero drift — live matches seeds exactly. ~~`.4.2`~~ + ~~`.4.3`~~ + ~~`.4.4`~~ + ~~`.4.5`~~ DONE. W-SYNC is now on-demand (run `/sync-dashboard-data` after dashboard edits).
+2. ~~**W-XT.4.1**~~ — CLI naming: 3 justfile mismatches fixed (`fmt`→`format`, `--crate`→`crate` subcommand, `gate`→`all`) — **RESOLVED**
 2. ~~**W-TF.4.1**~~ — `infra/eventbridge.tf`: already uses `state = "ENABLED"` — **RESOLVED** (see DRL-2026-03-25-opentofu)
 3. ~~**W-TF.4.2**~~ — `infra/s3.tf`: `filter {}` already present — **RESOLVED** (see DRL-2026-03-25-opentofu)
 4. **W-XT.4.2** — Remove or wire up `EnvironmentInterpolator` (dead code)
@@ -87,7 +89,8 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | ADR-007 | OpenTofu Over Terraform | W-OTF, W-XT |
 | ADR-008 | Cognito Authentication for Admin Dashboard | W-AUTH, W-UI, W-OTF |
 | ADR-009 | API Gateway HTTP API for POST /api/contact (OAC body hash workaround) | W-CTF, W-UI |
-| ADR-010 | Synchronous Email Lambda Invocation with Typed Response Propagation + Acknowledgement Email | W-CTF, W-UI |
+| ADR-010 | SQLite Upsert as the Canonical Re-Seed Convention | W-SYNC, W-RSM, W-ABT, W-SL, W-XT |
+| ADR-011 | Synchronous Email Lambda Invocation with Typed Response Propagation + Acknowledgement Email | W-CTF, W-UI |
 
 ---
 

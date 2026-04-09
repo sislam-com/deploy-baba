@@ -142,6 +142,25 @@ See: `.claude/skills/add-drift-log/SKILL.md`
 
 ---
 
+### `/sync-dashboard-data` — Sync Dashboard Edits to Migrations
+
+Walks the four-phase workflow (Pull → Diff → Author → Verify+Deploy) to capture
+dashboard edits as upsert-style source migrations, using ADR-010 and W-SYNC.
+
+```
+/sync-dashboard-data
+```
+
+What it does:
+1. Pulls the live EFS DB snapshot via `GET /api/admin/db-dump`
+2. Diffs it table-by-table against a freshly seeded local DB
+3. Scaffolds the sync migration via `/add-migration` with the ADR-010 upsert template
+4. Guides verification (INSERT path + UPDATE path) and `just lambda-deploy`
+
+See: `.claude/skills/sync-dashboard-data/SKILL.md`
+
+---
+
 ### `/add-adr` — Write an Architecture Decision Record
 
 Documents a significant architectural decision.

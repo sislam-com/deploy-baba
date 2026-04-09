@@ -1,11 +1,17 @@
 use axum::{
+    body::Body,
     extract::{Path, State},
-    http::StatusCode,
-    routing::{post, put},
+    http::{
+        header::{CONTENT_DISPOSITION, CONTENT_TYPE},
+        StatusCode,
+    },
+    response::Response,
+    routing::{get, post, put},
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 use utoipa::ToSchema;
 
 use crate::db::Db;
@@ -881,10 +887,50 @@ pub async fn delete_social_link(
     Ok(StatusCode::NO_CONTENT)
 }
 
+// ── DB dump handler ───────────────────────────────────────────────────────────
+
+/// GET /api/admin/db-dump
+///
+/// Returns a consistent SQLite snapshot of the live database via VACUUM INTO.
+/// Used by the /sync-dashboard-data skill (W-SYNC.4.4) to pull live EFS state
+/// for diffing against the source-tree seed migrations (ADR-010).
+///
+/// Auth: inherits Cognito `require_auth` middleware from the parent router.
+async fn db_dump_handler(State(db): State<Arc<Db>>) -> ApiResult<Response> {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let tmp_path = format!("/tmp/baba-dump-{}.db", nanos);
+
+    // Run VACUUM INTO under the connection mutex, then release before reading.
+    {
+        let conn = db.conn.lock().unwrap();
+        // VACUUM INTO does not accept parameter binding; tmp_path is internal.
+        conn.execute(&format!("VACUUM INTO '{}'", tmp_path), [])
+            .map_err(db_err)?;
+    }
+
+    let bytes =
+        std::fs::read(&tmp_path).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let _ = std::fs::remove_file(&tmp_path);
+
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(CONTENT_TYPE, "application/octet-stream")
+        .header(
+            CONTENT_DISPOSITION,
+            format!("attachment; filename=\"baba-dump-{}.db\"", nanos),
+        )
+        .body(Body::from(bytes))
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+}
+
 // ── Router ────────────────────────────────────────────────────────────────────
 
 pub fn router() -> Router<AppState> {
     Router::new()
+        .route("/db-dump", get(db_dump_handler))
         .route("/jobs", post(create_job))
         .route("/jobs/:id", put(update_job).delete(delete_job))
         .route("/jobs/:job_id/details", post(create_job_detail))

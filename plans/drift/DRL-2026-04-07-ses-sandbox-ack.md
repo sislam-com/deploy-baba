@@ -27,12 +27,12 @@ The SES account in `us-east-1` is in **sandbox mode**. In sandbox mode:
   `MessageRejected: Email address is not verified. The following identities failed
   the check in region us-east-1: <recipient>`
 
-This failure mode was explicitly predicted in ADR-010:
+This failure mode was explicitly predicted in ADR-011:
 
 > Requires SES production access (out of sandbox) so the email Lambda can send to
 > arbitrary unverified submitter addresses. If the account is in sandbox, the ack
 > will silently fail and be logged.
-> — `plans/adr/ADR-010-emailer-response.md:89`
+> — `plans/adr/ADR-011-emailer-response.md:89`
 
 IAM policy in `infra/email-lambda.tf:59-81` is **not** the cause — it correctly
 authorises `ses:SendEmail` against `it@sislam.com`. IAM has no concept of recipient
@@ -84,7 +84,7 @@ failure is grep-able and doesn't pollute the error stream.
 
 ## Cross-References
 
-→ ADR-010 (`plans/adr/ADR-010-emailer-response.md`) — documents this trade-off
+→ ADR-011 (`plans/adr/ADR-011-emailer-response.md`) — documents this trade-off
 → W-CTF.4.13 (`plans/modules/contact-form.md:81`)
 → `infra/email-lambda.tf`
 → `services/email/src/main.rs` — `try_send_ack()`

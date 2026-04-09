@@ -50,3 +50,8 @@ Seeded with LinkedIn (sort_order=0) and GitHub (sort_order=1).
 - `POST /api/admin/social-links` — create
 - `PUT /api/admin/social-links/:id` — update
 - `DELETE /api/admin/social-links/:id` — delete
+
+## Cross-References
+
+- → ADR-010 (upsert re-seed convention — social_links has UNIQUE(platform))
+- → W-SYNC (dashboard → migrations sync workflow)

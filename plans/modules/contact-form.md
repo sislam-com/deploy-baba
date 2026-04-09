@@ -50,7 +50,7 @@ Falls back to `"dev-secret-change-me"` locally when `POW_SECRET_ARN` not set.
 - **Acknowledgement email (W-CTF.4.13 — TODO):** sends a second email to the submitter's address from
   `it@sislam.com` (separately-verified SES email identity). Controlled by `SES_ACK_FROM_EMAIL` env var;
   skipped silently if unset. Best-effort — failure logs at error level but does not change `success: true`.
-  See ADR-010 § Acknowledgement Email for full contract.
+  See ADR-011 § Acknowledgement Email for full contract.
 - SES domain identity: `mail.sislam.com` with DKIM, SPF (~all softfail), DMARC (p=none)
 - SES email identity: `it@sislam.com` (verified separately — required for ack send)
 - SES production access granted 2026-04-08 for `us-east-1` — ack emails to arbitrary submitter addresses now live. See `docs/aws-setup.md` §SES for the reproducible manual setup steps.
@@ -90,7 +90,7 @@ Falls back to `"dev-secret-change-me"` locally when `POW_SECRET_ARN` not set.
 → ADR-003 (Lambda Function URL — POST exception via API Gateway, see ADR-009)
 → ADR-004 (Dual-mode entry point)
 → ADR-009 (API Gateway HTTP API for POST /api/contact — DRL-FUA-3 workaround)
-→ ADR-010 (Synchronous email Lambda invoke with typed ContactResponse propagation)
+→ ADR-011 (Synchronous email Lambda invoke with typed ContactResponse propagation)
 → W-SEC (Secrets Manager integration for POW_SECRET)
 → DRL-2026-04-03-contact-form (contact form implementation log)
 → DRL-2026-04-03-pow-apigateway (POST+PoW+API Gateway drift log — to be created)

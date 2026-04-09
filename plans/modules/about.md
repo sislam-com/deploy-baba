@@ -107,3 +107,5 @@ render their respective Askama template.
 - → W-UI (ui-service framework)
 - → W-RSM (resume pattern reference for DB queries + Askama templates)
 - → ADR-002 (SQLite on EFS)
+- → ADR-010 (upsert re-seed convention — about_sections already has UNIQUE(slug))
+- → W-SYNC (dashboard → migrations sync workflow)
