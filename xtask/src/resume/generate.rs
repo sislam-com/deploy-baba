@@ -10,7 +10,7 @@ use std::process::Command;
 use super::ResumeFormat;
 
 const HEADER: &str = "# Sharful Islam
-**Full-Stack SaaS Engineer · 20+ Years**
+**SaaS/PaaS engineer with a passion for building custom, scalable systems · 20+ Years**
 
 contact-sislam@sislam.com · [GitHub](https://github.com/shantopagla) · [LinkedIn](https://www.linkedin.com/in/sharfulislam/) · [sislam.com](https://sislam.com)
 
