@@ -78,26 +78,40 @@ sqlite3 /tmp/baba-live.db "SELECT count(*) FROM jobs;"
 
 **Verify snapshot freshness:** Before proceeding to Phase 2, check that the
 row counts in `/tmp/baba-live.db` match what you see in the dashboard UI.
-If counts are off, the server may not be running — start it and re-pull.
+If counts are off, the server may not be running — use the fallback below.
+
+### Fallback — server not running
+
+If the local server cannot be started (compile error, port conflict, etc.),
+use `sqlite3` directly — it reads the WAL sidecar transparently:
+
+```bash
+sqlite3 deploy-baba.db "VACUUM INTO '/tmp/baba-live.db'"
+sqlite3 /tmp/baba-live.db "SELECT count(*) FROM jobs;"
+```
+
+This is safe: `sqlite3` opens the DB in WAL mode and checkpoints all pending
+writes into the `VACUUM INTO` target. Prefer the `db-dump` endpoint when
+possible (it runs inside the app's connection pool), but this fallback is
+equally correct.
 
 ---
 
 ## Phase 2 — Diff
 
-Compare the pulled DB against a fresh local DB seeded from source migrations:
+Seed a **fresh temporary DB** from source migrations and diff against the live
+snapshot. **Do NOT delete `deploy-baba.db`** — that destroys live dashboard data.
 
 ```bash
-# Start with a clean local DB
-rm -f deploy-baba.db
-just dev &   # starts on :3000; Ctrl-C after "listening"
-sleep 2 && kill %1
+# Seed to temp path — no server, no compilation needed
+rm -f /tmp/baba-seed.db
+sqlite3 /tmp/baba-seed.db < <(cat services/ui/migrations/*.sql)
 
-# Dump both DBs per-table and diff
+# Diff per-table
 for table in jobs job_details competencies competency_evidence about_sections social_links; do
-    sqlite3 /tmp/baba-live.db ".dump $table" > /tmp/live-${table}.sql
-    sqlite3 deploy-baba.db    ".dump $table" > /tmp/seed-${table}.sql
     echo "=== $table ==="
-    diff /tmp/seed-${table}.sql /tmp/live-${table}.sql || true
+    diff <(sqlite3 /tmp/baba-seed.db ".dump $table") \
+         <(sqlite3 /tmp/baba-live.db ".dump $table") || true
 done
 ```
 
@@ -105,6 +119,10 @@ For each table, classify changes as:
 - **INSERT** — new natural key in live DB not in seeds
 - **UPDATE** — same key, different column values
 - **DELETE** — key exists in seeds but gone from live DB
+
+> **Ignore auto-increment `id` differences.** The `id` column is not part of any
+> natural key. A fresh-seeded DB may assign different `id` values than a DB that
+> accumulated rows over time. These are harmless and should not produce a migration.
 
 ---
 
