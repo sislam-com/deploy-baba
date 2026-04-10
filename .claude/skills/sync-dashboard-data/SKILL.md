@@ -35,8 +35,15 @@ Implements the W-SYNC four-phase workflow (Pull → Diff → Author → Verify+D
 
 ## Phase 1 — Pull (automated via `GET /api/admin/db-dump`)
 
-The new `db_dump_handler` in `services/ui/src/routes/api/admin.rs` returns a consistent
+The `db_dump_handler` in `services/ui/src/routes/api/admin.rs` returns a consistent
 SQLite snapshot via `VACUUM INTO`. It is Cognito-gated in production and open in dev mode.
+
+> **CRITICAL — never use `cp deploy-baba.db /tmp/baba-live.db`.**
+> The DB runs in WAL mode (`PRAGMA journal_mode=WAL`). A plain `cp` of the main
+> `.db` file can miss writes still buffered in the `-wal` sidecar, producing a stale
+> snapshot that matches the seed DB and hides real drift. **Always pull via the
+> `db-dump` endpoint** which issues `VACUUM INTO` — this checkpoints the WAL and
+> produces a single, consistent file with all committed writes.
 
 ### Production (Cognito auth required)
 
@@ -53,14 +60,25 @@ sqlite3 /tmp/baba-live.db "SELECT count(*) FROM jobs;"
 
 ### Local dev (no Cognito)
 
+If `just ui` is already running, use it directly. If not, start it first:
+
 ```bash
+# If server is NOT already running:
 just ui &
 sleep 2
+
+# Pull snapshot via db-dump (always — even when server is already running):
 curl -fsS -o /tmp/baba-live.db http://localhost:3000/api/admin/db-dump
 file /tmp/baba-live.db   # → "SQLite 3.x database"
 sqlite3 /tmp/baba-live.db "SELECT count(*) FROM jobs;"
-kill %1
+
+# Kill server only if YOU started it above:
+# kill %1
 ```
+
+**Verify snapshot freshness:** Before proceeding to Phase 2, check that the
+row counts in `/tmp/baba-live.db` match what you see in the dashboard UI.
+If counts are off, the server may not be running — start it and re-pull.
 
 ---
 
