@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-09
 **Status:** Accepted
-**Affected modules:** W-RSM, W-XT
+**Affected modules:** W-RSM, W-XT, W-RST
 
 ## Context
 
@@ -78,10 +78,24 @@ Specific rules:
 | AI rewrite at generation time (Claude API call) | Adds network dependency and non-determinism to a local CLI tool |
 | Fallback to `SUMMARY` const when DB row missing | Masks missing data; contradicts "errors over silent failures" principle |
 
+## Forward Note (2026-04-10)
+
+The `polish_bio_to_summary()` v1 seam described in this ADR is claimed by
+**W-RST.4.3** — replacement with a real `LlmProvider::generate()` call
+through the W-LLM provider abstraction (ADR-015). This ADR remains the
+canonical source of truth for summary-from-DB loading (`load_me_bio()`,
+the DB row requirement, and the no-fallback policy); ADR-015 governs the
+provider-abstracted LLM call that eventually fills the seam. The
+`generate_resume` call site does not change — only `polish_bio_to_summary`
+internals change.
+
 ## Cross-References
 
 - → W-RSM (resume work-item tracking)
 - → W-XT (`xtask/src/resume/generate.rs` implementation)
+- → W-RST (W-RST.4.3 claims the `polish_bio_to_summary` v1 seam)
+- → W-LLM (provider abstraction used by W-RST.4.3)
 - → ADR-002 (SQLite as single source of truth for application data)
 - → ADR-010 (upsert convention — ensures `me-bio` row survives re-deploys)
+- → ADR-015 (LLM provider abstraction + grounding contract)
 - → `/resume-generate` skill (`.claude/skills/resume-generate/SKILL.md`)

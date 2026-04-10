@@ -48,6 +48,8 @@ Example: `DRL-2026-03-18-terraform.md`
 | `RSM` | resume | `services/ui/src/routes/resume.rs`, `services/ui/migrations/001-007` |
 | `CTF` | contact-form | `services/email/` + `services/ui/src/routes/contact.rs` + `infra/ses.tf` + `infra/email-lambda.tf` |
 | `SYNC` | dashboard-sync | `services/ui/migrations/`, `services/ui/src/db.rs`, `.claude/skills/` |
+| `LLM` | llm-core + adapters | `crates/llm-core/`, `crates/llm-anthropic/` — pluggable LLM provider abstraction (trait crate + vendor adapter crates) |
+| `RST` | resume-tailor | `services/ui/src/tailor/`, `crates/api-openapi/src/models/tailor.rs` — JD-driven AI resume tailoring pipeline, consumer of W-LLM; distinct from W-RSM static generator |
 
 ---
 

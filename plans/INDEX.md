@@ -32,6 +32,8 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | contact-form | W-CTF | `services/email/`, `services/ui/src/routes/contact.rs`, `infra/ses.tf`, `infra/email-lambda.tf`, `infra/apigateway.tf` | WIP | e2e test (W-CTF.4.12) — deploy step pending |
 | secrets-manager | W-SEC | `xtask/src/secret.rs`, `infra/secrets.tf`, `infra/vpc-endpoints.tf`, `services/ui/src/routes/contact.rs` | DONE | Deploy: `just infra-apply` + `just secret-put pow-secret $(openssl rand -hex 32)` + `just lambda-deploy` |
 | dashboard-sync | W-SYNC | `plans/modules/dashboard-sync.md`, `services/ui/migrations/`, `services/ui/src/db.rs`, `services/ui/src/routes/api/admin.rs`, `.claude/skills/sync-dashboard-data/` | DONE | 4.1–4.5 complete; zero drift on first run 2026-04-08; .4.6/.4.7 deferred (on-demand) |
+| llm-core + llm-anthropic | W-LLM | `crates/llm-core/`, `crates/llm-anthropic/` | TODO | All items; W-LLM.4.5/4.6 DEFERRED |
+| resume-tailor | W-RST | `services/ui/src/tailor/`, `crates/api-openapi/src/models/tailor.rs`, `services/ui/migrations/016` | TODO | All items; BLOCKED-on-deploy for 4.3/4.4/4.5 until W-SEC deployed + `anthropic-api-key` in SM |
 
 ---
 
@@ -68,6 +70,8 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 14. ~~**W-CTF.4.1–4.10**~~ — Contact form + SES + PoW + API Gateway — **DONE** (deployed 2026-04-03)
 15. ~~**W-CTF.4.11 + W-SEC**~~ — Migrate `POW_SECRET` from Lambda env var → AWS Secrets Manager + xtask secret commands — **DONE** (code complete; `just infra-apply` + `just secret-put pow-secret ...` + `just lambda-deploy` still needed)
 16. ~~**W-CTF.4.13**~~ — Acknowledgement email to submitter — **DONE** (SES production access granted 2026-04-08; `SES_ACK_FROM_EMAIL` restored; external Gmail delivery verified. See `DRL-2026-04-07-ses-sandbox-ack` (RESOLVED).)
+17. **W-LLM.4.1–4.4** — LLM provider abstraction + Claude reference adapter (see `plans/modules/llm-core.md`) — TODO
+18. **W-RST.4.1–4.10** — AI Resume Tailor pipeline on W-LLM (see `plans/modules/resume-tailor.md`) — TODO; BLOCKED-on-deploy for items 4.3/4.4/4.5 until W-SEC deployed + `anthropic-api-key` in SM
 
 ### P3 — Polish & Publish
 9. **W-PUB.1** — `just publish-dry` passes for all 10 library crates
@@ -91,9 +95,10 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | ADR-009 | API Gateway HTTP API for POST /api/contact (OAC body hash workaround) | W-CTF, W-UI |
 | ADR-010 | SQLite Upsert as the Canonical Re-Seed Convention | W-SYNC, W-RSM, W-ABT, W-SL, W-XT |
 | ADR-011 | Synchronous Email Lambda Invocation with Typed Response Propagation + Acknowledgement Email | W-CTF, W-UI |
-| ADR-012 | OpenAPI SSOT + Public/Admin Spec Split | W-APIO, W-UI |
+| ADR-012 | OpenAPI SSOT + Public/Admin Spec Split | W-APIO, W-UI, W-LLM, W-RST |
 | ADR-013 | Admin Dashboard Dark Theme Convention — light-theme tokens banned in `dashboard_*.html`; canonical dark-palette class table for all dashboard list/detail/form views | W-AUTH, W-ABT, W-SL, W-RSM, W-UI |
-| ADR-014 | Resume Professional Summary Sourced from DB (`about_sections.me-bio`) — hardcoded `SUMMARY` const deleted; generator loads + polishes bio at generation time; errors on missing row | W-RSM, W-XT |
+| ADR-014 | Resume Professional Summary Sourced from DB (`about_sections.me-bio`) — hardcoded `SUMMARY` const deleted; generator loads + polishes bio at generation time; errors on missing row | W-RSM, W-XT, W-RST |
+| ADR-015 | LLM Provider Abstraction + Grounding Contract — `crates/llm-core` (vendor-agnostic trait) + `crates/llm-anthropic` (first impl); universal grounding contract at prompt-assembly layer; Claude as MVP provider; cargo feature-flag selection | W-LLM, W-RST, W-RSM, W-SEC, W-APIO, W-UI, W-DX |
 
 ---
 
@@ -120,6 +125,7 @@ api-core     ←── api-openapi, api-graphql, api-grpc, api-merger, services/
 api-openapi  ←── api-merger, services/ui
 api-graphql  ←── api-merger
 api-grpc     ←── api-merger
+llm-core     ←── llm-anthropic, services/ui (via W-RST tailor pipeline)
 ```
 
 Full dependency order: `plans/cross-cutting/dependency-graph.md`
