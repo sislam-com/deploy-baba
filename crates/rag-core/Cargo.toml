@@ -1,0 +1,18 @@
+[package]
+name = "rag-core"
+description = "Vendor-agnostic RAG traits and chunkers for deploy-baba"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+async-trait = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

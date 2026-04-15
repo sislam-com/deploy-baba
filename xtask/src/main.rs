@@ -14,6 +14,7 @@ mod database;
 mod deploy;
 mod infra;
 mod quality;
+mod rag;
 mod resume;
 mod secret;
 mod test;
@@ -73,6 +74,11 @@ enum Commands {
         #[command(subcommand)]
         action: database::DatabaseAction,
     },
+    /// RAG index management (ingest / query)
+    Rag {
+        #[command(subcommand)]
+        action: rag::RagAction,
+    },
     /// Resume generation and upload
     Resume {
         #[command(subcommand)]
@@ -114,6 +120,7 @@ async fn run() -> anyhow::Result<()> {
         Commands::Deploy { action } => deploy::execute(action).await,
         Commands::Cache { action } => cache::execute(action).await,
         Commands::Database { action } => database::execute(action).await,
+        Commands::Rag { action } => rag::execute(action).await,
         Commands::Resume { action } => resume::execute(action).await,
         Commands::Secret { action } => secret::execute(action).await,
         Commands::Publish {

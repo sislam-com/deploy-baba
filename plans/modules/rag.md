@@ -1,5 +1,5 @@
 # W-RAG: rag-core + rag-sqlite
-**Crate(s):** `crates/rag-core/`, `crates/rag-sqlite/` | **Status:** PROPOSED
+**Crate(s):** `crates/rag-core/`, `crates/rag-sqlite/` | **Status:** WIP (P1 DONE, P2/P3 TODO)
 **Coverage floor:** 70% | **Depends on:** W-LLM, W-UI, W-OTF | **Depended on by:** (none yet)
 
 ## W-RAG.1 Purpose
@@ -151,14 +151,14 @@ injects this contract via `PromptBundle.system_prompt`.
 | ID | Task | Status | Notes |
 |----|------|--------|-------|
 | W-RAG.1.1 | Land design PR (this plan module + ADR-016 + index/conventions updates) | DONE | feat/rag-impl |
-| W-RAG.1.2 | Confirm W-LLM module + ADR-015 exist on disk; author them if not | TODO | Prerequisite for W-RAG.4.1+ |
-| W-RAG.2.1 | Create `crates/rag-core` with trait surface | TODO | |
-| W-RAG.2.2 | Create `crates/rag-sqlite` + sqlite-vec loader | TODO | |
-| W-RAG.2.3 | Migration `015_rag_index.sql` | TODO | ADR-010 upsert; skill: add-migration |
-| W-RAG.3.1 | Chunker impls: rust (syn), hcl, markdown, claude-cache | TODO | |
-| W-RAG.3.2 | `xtask rag ingest` — walk, chunk, upsert | TODO | |
-| W-RAG.3.3 | `xtask rag query` — hybrid retrieve, print citations | TODO | FTS-only mode works without embedder |
-| W-RAG.3.4 | Justfile verbs: `rag-index`, `rag-query`, `ask` | TODO | |
+| W-RAG.1.2 | Confirm W-LLM module + ADR-015 exist on disk; author them if not | DONE | W-LLM shipped (feat/llm-core); ADR-015 in plans/adr/ |
+| W-RAG.2.1 | Create `crates/rag-core` with trait surface | DONE | ChunkSource→chunk_file, Embedder, Retriever, PromptAssembler, DefaultPromptAssembler; 21 unit tests pass |
+| W-RAG.2.2 | Create `crates/rag-sqlite` + FTS5 retrieval | DONE | RagStore (Mutex<Connection>, upsert_document, FTS5 BM25 retrieve); 5 tests pass. sqlite-vec deferred to P2 |
+| W-RAG.2.3 | Migration `016_rag_index.sql` | DONE | Added to services/ui/migrations/ + db.rs MIGRATIONS array |
+| W-RAG.3.1 | Chunker impls: rust (regex), hcl (brace-balance), markdown (H2/H3), claude-cache (JSON-leaf+MD) | DONE | 4 chunkers, each with 4–5 unit tests; oversize sliding-window split |
+| W-RAG.3.2 | `xtask rag ingest` — walk, chunk, upsert | DONE | `cargo xtask rag ingest`; skips `.` dirs + target/; best-effort git SHA |
+| W-RAG.3.3 | `xtask rag query` — FTS5 retrieve, print citations | DONE | `cargo xtask rag query "..."` prints ranked chunks with path+score+preview |
+| W-RAG.3.4 | Justfile verbs: `rag-index`, `rag-query`, `rag-index-full` | DONE | `just rag-index`, `just rag-index-full`, `just rag-query QUERY` |
 | W-RAG.4.1 | Wire `Embedder` impl from `llm-anthropic` (or Voyage) | BLOCKED | W-LLM shipped |
 | W-RAG.4.2 | `PromptAssembler` + `llm-core::generate` integration | BLOCKED | W-LLM shipped |
 | W-RAG.5.1 | `xtask deploy` failure hook → RAG explain | TODO | Needs W-RAG.4.2 |

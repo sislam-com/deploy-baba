@@ -225,6 +225,20 @@ resume-upload PROFILE="default":
 resume PROFILE="default" DB="deploy-baba.db":
     just resume-generate {{DB}} && just resume-upload {{PROFILE}}
 
+# ── RAG ──────────────────────────────────────────────────────────────────────
+
+# Index all corpora (Rust, HCL, plans) into the RAG FTS index
+rag-index DB="deploy-baba.db":
+    cargo xtask rag ingest --db-path {{DB}}
+
+# Index all corpora + .claude/ agent cache (local dev only)
+rag-index-full DB="deploy-baba.db":
+    cargo xtask rag ingest --db-path {{DB}} --include-cache
+
+# Query the RAG index and print ranked chunks
+rag-query QUERY DB="deploy-baba.db":
+    cargo xtask rag query --db-path {{DB}} "{{QUERY}}"
+
 # ── crates.io ────────────────────────────────────────────────────────────────
 
 # Dry-run publish for all library crates

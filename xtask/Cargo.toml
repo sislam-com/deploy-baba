@@ -23,6 +23,10 @@ rusqlite = { workspace = true }
 llm-core = { workspace = true }
 llm-anthropic = { workspace = true }
 
+# RAG
+rag-core = { workspace = true }
+rag-sqlite = { workspace = true }
+
 # AWS SDK
 aws-config = { workspace = true }
 aws-sdk-sts = { workspace = true }
