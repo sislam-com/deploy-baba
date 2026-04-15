@@ -32,6 +32,9 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | contact-form | W-CTF | `services/email/`, `services/ui/src/routes/contact.rs`, `infra/ses.tf`, `infra/email-lambda.tf`, `infra/apigateway.tf` | WIP | e2e test (W-CTF.4.12) — deploy step pending |
 | secrets-manager | W-SEC | `xtask/src/secret.rs`, `infra/secrets.tf`, `infra/vpc-endpoints.tf`, `services/ui/src/routes/contact.rs` | DONE | Deploy: `just infra-apply` + `just secret-put pow-secret $(openssl rand -hex 32)` + `just lambda-deploy` |
 | dashboard-sync | W-SYNC | `plans/modules/dashboard-sync.md`, `services/ui/migrations/`, `services/ui/src/db.rs`, `services/ui/src/routes/api/admin.rs`, `.claude/skills/sync-dashboard-data/` | DONE | 4.1–4.5 complete; zero drift on first run 2026-04-08; .4.6/.4.7 deferred (on-demand) |
+| llm-core | W-LLM | `crates/llm-core/`, `crates/llm-anthropic/` | PROPOSED | Greenfield — no crates on disk yet (design only). See ADR-015. Required by W-RAG. |
+| resume-tailor | W-RST | `xtask/src/resume/`, `crates/llm-core/` | PROPOSED | LLM-powered resume polish pipeline; blocked on W-LLM. |
+| rag | W-RAG | `crates/rag-core/`, `crates/rag-sqlite/` | PROPOSED | P1 CLI → P2 deploy-failure diagnosis → P3 /api/ask; blocked on W-LLM for generation. |
 
 ---
 
@@ -74,6 +77,13 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 10. **W-PUB.2** — Tag `v0.1.0` + `just publish`
 11. **W-UI.4.1** — Wire utoipa-rapidoc properly (currently using inline HTML)
 
+### P3 — LLM + RAG Subsystem (new, phased)
+12. **W-LLM** — Author `crates/llm-core` + `crates/llm-anthropic` + ADR-015 (prerequisite for W-RAG generation and W-RST)
+13. **W-RAG.2.1–3.4** — `rag-core` + `rag-sqlite` crates, chunkers, `xtask rag ingest/query`, justfile verbs (P1: FTS-only CLI, no embedder needed)
+14. **W-RAG.4.1–4.2** — Wire embedder + generate via W-LLM (BLOCKED on W-LLM)
+15. **W-RAG.5.1** — Deploy-failure diagnosis hook (P2; BLOCKED on W-RAG.4.2)
+16. **W-RAG.6.1–6.3** — Public `/api/ask` endpoint + rate-limit + Lambda bundle (P3; BLOCKED on W-RAG.4.2)
+
 ---
 
 ## ADR Index
@@ -94,6 +104,8 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | ADR-012 | OpenAPI SSOT + Public/Admin Spec Split | W-APIO, W-UI |
 | ADR-013 | Admin Dashboard Dark Theme Convention — light-theme tokens banned in `dashboard_*.html`; canonical dark-palette class table for all dashboard list/detail/form views | W-AUTH, W-ABT, W-SL, W-RSM, W-UI |
 | ADR-014 | Resume Professional Summary Sourced from DB (`about_sections.me-bio`) — hardcoded `SUMMARY` const deleted; generator loads + polishes bio at generation time; errors on missing row | W-RSM, W-XT |
+| ADR-015 | LLM Provider Abstraction — pluggable `llm-core` vendor-agnostic trait + `llm-anthropic` first impl; universal grounding contract at prompt-assembly layer; feature-flag selection | W-LLM, W-RST, W-RAG |
+| ADR-016 | RAG Architecture — SQLite + sqlite-vec + FTS5 hybrid retrieval; all embedding/generation via llm-core (ADR-015); per-corpus chunkers; `.claude/` cache local-CLI only | W-RAG |
 
 ---
 

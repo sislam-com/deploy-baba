@@ -48,6 +48,9 @@ Example: `DRL-2026-03-18-terraform.md`
 | `RSM` | resume | `services/ui/src/routes/resume.rs`, `services/ui/migrations/001-007` |
 | `CTF` | contact-form | `services/email/` + `services/ui/src/routes/contact.rs` + `infra/ses.tf` + `infra/email-lambda.tf` |
 | `SYNC` | dashboard-sync | `services/ui/migrations/`, `services/ui/src/db.rs`, `.claude/skills/` |
+| `LLM` | llm-core + llm-anthropic | `crates/llm-core/`, `crates/llm-anthropic/` |
+| `RST` | resume-tailor | `xtask/src/resume/`, `crates/llm-core/` |
+| `RAG` | rag (retrieval-augmented generation) | `crates/rag-core/`, `crates/rag-sqlite/` |
 
 ---
 
