@@ -160,10 +160,20 @@ fn index_corpus(
 
 /// Recursively walk `dir`, calling `f` for each file whose extension matches `ext`.
 /// Use `"*"` for `ext` to match all files.
+///
+/// Uses `&mut dyn FnMut` internally to avoid monomorphization recursion depth.
 fn walk_dir(
     dir: &Path,
     ext: &str,
-    mut f: impl FnMut(&Path) -> anyhow::Result<()>,
+    f: impl FnMut(&Path) -> anyhow::Result<()>,
+) -> anyhow::Result<()> {
+    walk_dir_dyn(dir, ext, &mut { f })
+}
+
+fn walk_dir_dyn(
+    dir: &Path,
+    ext: &str,
+    f: &mut dyn FnMut(&Path) -> anyhow::Result<()>,
 ) -> anyhow::Result<()> {
     for entry in
         std::fs::read_dir(dir).with_context(|| format!("Failed to read dir: {}", dir.display()))?
@@ -176,7 +186,7 @@ fn walk_dir(
             if name.starts_with('.') || name == "target" {
                 continue;
             }
-            walk_dir(&path, ext, &mut f)?;
+            walk_dir_dyn(&path, ext, f)?;
         } else if ext == "*"
             || path
                 .extension()
