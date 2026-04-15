@@ -151,7 +151,7 @@ is injected at startup in `main.rs`.
 | W-LLM.4.2 | Scaffold `crates/llm-anthropic`: `Cargo.toml` (dep on llm-core + Anthropic SDK), `src/lib.rs` (`AnthropicProvider` impl, constructor injection, model constants) | TODO | Depends on W-LLM.4.1 |
 | W-LLM.4.3 | Add `crates/llm-core` + `crates/llm-anthropic` to `[workspace.members]` in root `Cargo.toml`; add `llm-core` + `llm-anthropic` feature deps to `services/ui/Cargo.toml` | TODO | Workspace plumbing |
 | W-LLM.4.4 | Per-crate README files for `llm-core` and `llm-anthropic` (W-DX.3 alignment) | TODO | Describes trait, feature flags, secret name |
-| W-LLM.4.5 | **Future**: `crates/llm-openai`, `crates/llm-bedrock`, `crates/llm-ollama` — additional `LlmProvider` adapters. Not scheduled. | DEFERRED | |
+| W-LLM.4.5 | **Future**: `crates/llm-openai`, `crates/llm-bedrock`, `crates/llm-ollama`, `crates/llm-gemini` — additional `LlmProvider` adapters. Not scheduled. `llm-gemini` is the correct entry point if Gemini models are ever evaluated as an alternative to Claude for W-RST (see W-GDR cross-reference). | DEFERRED | |
 | W-LLM.4.6 | **Future**: `crates/llm-fastembed` — local ONNX `EmbeddingProvider` impl. Ships alongside W-RST.4.11. ADR-016 created at that point. | DEFERRED | |
 
 ---

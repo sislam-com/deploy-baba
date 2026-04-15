@@ -50,6 +50,7 @@ Example: `DRL-2026-03-18-terraform.md`
 | `SYNC` | dashboard-sync | `services/ui/migrations/`, `services/ui/src/db.rs`, `.claude/skills/` |
 | `LLM` | llm-core + adapters | `crates/llm-core/`, `crates/llm-anthropic/` — pluggable LLM provider abstraction (trait crate + vendor adapter crates) |
 | `RST` | resume-tailor | `services/ui/src/tailor/`, `crates/api-openapi/src/models/tailor.rs` — JD-driven AI resume tailoring pipeline, consumer of W-LLM; distinct from W-RSM static generator |
+| `GDR` | gdrive-planning | `justfile`, `.claude/settings.json`, `.github/workflows/` |
 
 ---
 
