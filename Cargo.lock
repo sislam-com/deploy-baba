@@ -2329,6 +2329,30 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92daf443525c4cce67b150400bc2316076100ce0b3686209eb8cf3c31612e6f0"
 
 [[package]]
+name = "llm-anthropic"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "llm-core",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "llm-core"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "lock_api"
 version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4221,6 +4245,8 @@ dependencies = [
  "aws-sdk-sts",
  "clap",
  "flate2",
+ "llm-anthropic",
+ "llm-core",
  "rusqlite",
  "serde",
  "serde_json",

@@ -1,6 +1,8 @@
 //! Resume markdown generation and pandoc conversion
 
 use anyhow::Context;
+use llm_anthropic::AnthropicProvider;
+use llm_core::{ChatMessage, GenerationConfig, LlmProvider, LlmRequest, MessageRole};
 use rusqlite::{Connection, OpenFlags};
 use std::collections::HashMap;
 use std::fs;
@@ -53,10 +55,11 @@ struct Evidence {
     text: String,
 }
 
-pub fn generate_resume(
+pub async fn generate_resume(
     db_path: &Path,
     output_dir: &Path,
     format: &ResumeFormat,
+    api_key: Option<String>,
 ) -> anyhow::Result<()> {
     check_pandoc()?;
 
@@ -71,7 +74,19 @@ pub fn generate_resume(
     let competencies = load_competencies(&conn)?;
     let evidence = load_evidence(&conn)?;
     let raw_bio = load_me_bio(&conn)?;
-    let summary = polish_bio_to_summary(&raw_bio);
+
+    let summary = match api_key {
+        Some(key) => {
+            println!("  Polishing Professional Summary via Claude...");
+            polish_bio_to_summary_ai(&raw_bio, &key)
+                .await
+                .unwrap_or_else(|e| {
+                    eprintln!("  Warning: AI polish failed ({e}), using static summary.");
+                    polish_bio_to_summary_static(&raw_bio)
+                })
+        }
+        None => polish_bio_to_summary_static(&raw_bio),
+    };
 
     match format {
         ResumeFormat::Chronological => {
@@ -212,7 +227,8 @@ fn load_me_bio(conn: &Connection) -> anyhow::Result<String> {
     .context("about_sections row with slug='me-bio' not found — DB is missing required data")
 }
 
-fn polish_bio_to_summary(_raw_bio: &str) -> String {
+/// Static fallback summary used when `--ai` is absent or the API call fails.
+fn polish_bio_to_summary_static(_raw_bio: &str) -> String {
     "## Professional Summary\n\n\
 SaaS/PaaS engineer with 20+ years building custom, scalable systems \
 that solve complex role-based and hierarchical data problems. Designs \
@@ -222,6 +238,49 @@ Currently driving an AI-augmented development workflow end-to-end on a \
 zero-cost Rust + AWS Lambda portfolio portal, exploring how human–AI \
 pairing reshapes the full software lifecycle.\n\n"
         .to_string()
+}
+
+/// Calls Claude to rephrase `raw_bio` into a polished resume Professional Summary section.
+///
+/// Enforces the grounding contract: the model may only rephrase content present in `raw_bio`.
+/// On error, the caller falls back to [`polish_bio_to_summary_static`].
+async fn polish_bio_to_summary_ai(raw_bio: &str, api_key: &str) -> anyhow::Result<String> {
+    let provider = AnthropicProvider::new(api_key);
+
+    let system = "You are a professional resume writer. \
+        Your task is to rephrase the bio provided by the user into a polished, \
+        third-person Professional Summary suitable for a technical resume. \
+        Output ONLY the summary paragraph(s) — no headers, no preamble, no explanation. \
+        You MUST NOT invent credentials, companies, titles, or skills not present in the bio. \
+        Keep it to 3–5 sentences."
+        .to_owned();
+
+    let user_content =
+        format!("Rephrase the following bio into a resume Professional Summary:\n\n{raw_bio}");
+
+    let req = LlmRequest {
+        model: provider.default_model().to_owned(),
+        messages: vec![ChatMessage {
+            role: MessageRole::User,
+            content: user_content,
+        }],
+        system: Some(system),
+        tools: vec![],
+        grounding: None,
+        config: GenerationConfig {
+            max_tokens: 300,
+            temperature: 0.3,
+            prompt_version: "polish-bio-v1",
+        },
+    };
+
+    let resp = provider
+        .generate(req)
+        .await
+        .map_err(|e| anyhow::anyhow!("LLM generate failed: {e}"))?;
+
+    let polished = resp.content.trim().to_owned();
+    Ok(format!("## Professional Summary\n\n{polished}\n\n"))
 }
 
 fn generate_chronological(
