@@ -1,5 +1,5 @@
 use anyhow::Result;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 mod auth;
 mod db;
@@ -9,6 +9,41 @@ mod router;
 mod routes;
 mod state;
 mod tailor;
+
+// ─── Anthropic API key ────────────────────────────────────────────────────────
+//
+// Loaded once per cold start. Sources, in order:
+//   1. ANTHROPIC_API_KEY_ARN env var → fetch from Secrets Manager (Lambda)
+//   2. ANTHROPIC_API_KEY env var     → direct value (local dev / CI with key)
+//   3. Absent                        → None (LLM routes return 503)
+
+static ANTHROPIC_API_KEY: OnceLock<Option<String>> = OnceLock::new();
+
+async fn init_anthropic_key() {
+    if ANTHROPIC_API_KEY.get().is_some() {
+        return;
+    }
+
+    let value = if let Ok(arn) = std::env::var("ANTHROPIC_API_KEY_ARN") {
+        let config = aws_config::load_from_env().await;
+        let client = aws_sdk_secretsmanager::Client::new(&config);
+        match client.get_secret_value().secret_id(&arn).send().await {
+            Ok(resp) => resp.secret_string().map(|s| s.to_string()),
+            Err(e) => {
+                tracing::error!("Failed to fetch ANTHROPIC_API_KEY from Secrets Manager: {e}");
+                None
+            }
+        }
+    } else if let Ok(key) = std::env::var("ANTHROPIC_API_KEY") {
+        tracing::info!("→ ANTHROPIC_API_KEY loaded from env (dev mode)");
+        Some(key)
+    } else {
+        tracing::warn!("ANTHROPIC_API_KEY_ARN and ANTHROPIC_API_KEY not set — LLM routes disabled");
+        None
+    };
+
+    ANTHROPIC_API_KEY.set(value).ok();
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -24,9 +59,20 @@ async fn main() -> Result<()> {
     routes::contact::init_pow_secret().await;
     tracing::info!("→ PoW secret ready");
 
+    init_anthropic_key().await;
+    let anthropic_api_key = ANTHROPIC_API_KEY
+        .get()
+        .and_then(|v| v.as_deref())
+        .map(|s| Arc::new(s.to_owned()));
+    tracing::info!(
+        "→ Anthropic key ready (present={})",
+        anthropic_api_key.is_some()
+    );
+
     let app_state = state::AppState {
         db,
         auth: auth_config,
+        anthropic_api_key,
     };
 
     let app = router::build(app_state);

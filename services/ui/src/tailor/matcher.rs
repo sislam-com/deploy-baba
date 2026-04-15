@@ -15,8 +15,8 @@ use std::collections::HashSet;
 
 static STOP_WORDS: &[&str] = &[
     "a", "an", "and", "are", "as", "at", "be", "been", "by", "for", "from", "has", "have", "in",
-    "is", "it", "its", "of", "on", "or", "that", "the", "their", "they", "this", "to", "was",
-    "we", "were", "which", "will", "with", "you",
+    "is", "it", "its", "of", "on", "or", "that", "the", "their", "they", "this", "to", "was", "we",
+    "were", "which", "will", "with", "you",
 ];
 
 // ── Tokenisation ─────────────────────────────────────────────────────────
@@ -202,7 +202,10 @@ mod tests {
             .map(|s| s.to_string())
             .collect();
         let score = overlap_score(&candidate, &jd);
-        assert!((score - 1.0).abs() < f32::EPSILON, "expected 1.0, got {score}");
+        assert!(
+            (score - 1.0).abs() < f32::EPSILON,
+            "expected 1.0, got {score}"
+        );
     }
 
     #[test]
@@ -210,7 +213,10 @@ mod tests {
         let candidate: HashSet<String> = ["rust", "python"].iter().map(|s| s.to_string()).collect();
         let jd: HashSet<String> = ["rust", "aws"].iter().map(|s| s.to_string()).collect();
         let score = overlap_score(&candidate, &jd);
-        assert!((score - 0.5).abs() < f32::EPSILON, "expected 0.5, got {score}");
+        assert!(
+            (score - 0.5).abs() < f32::EPSILON,
+            "expected 0.5, got {score}"
+        );
     }
 
     #[test]

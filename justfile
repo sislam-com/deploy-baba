@@ -263,6 +263,13 @@ secret-get NAME PROFILE="default":
 secret-list PROFILE="default":
     just aws-check {{PROFILE}} && cargo xtask secret list --profile {{PROFILE}}
 
+# Run llm-anthropic live integration tests using the key stored in Secrets Manager.
+# Requires AWS auth and the anthropic-api-key secret to be provisioned.
+test-llm PROFILE="default":
+    just aws-check {{PROFILE}} && \
+    ANTHROPIC_API_KEY=$(just secret-get anthropic-api-key {{PROFILE}}) \
+    cargo test -p llm-anthropic -- --ignored --nocapture
+
 # ── Agent Cache ──────────────────────────────────────────────────────────────
 
 # Show cache age and whether it's stale vs current HEAD
