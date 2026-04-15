@@ -142,6 +142,8 @@ llm-core     ←── llm-anthropic, services/ui (via W-RST tailor pipeline)
 
 Full dependency order: `plans/cross-cutting/dependency-graph.md`
 
+Implementation sequencing for W-LLM/W-RST/W-RAG/W-GDR: `plans/cross-cutting/execution-roadmap.md`
+
 ---
 
 ## Repository Structure
