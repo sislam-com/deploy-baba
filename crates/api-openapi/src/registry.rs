@@ -115,6 +115,16 @@ pub const ALL_MODELS: &[(&str, ModelFactory)] = &[
     ("Evidence", || {
         serde_json::to_value(Evidence::example()).expect("Evidence example")
     }),
+    // tailor
+    ("TailorRequest", || {
+        serde_json::to_value(TailorRequest::example()).expect("TailorRequest example")
+    }),
+    ("MatchedBullet", || {
+        serde_json::to_value(MatchedBullet::example()).expect("MatchedBullet example")
+    }),
+    ("TailorResponse", || {
+        serde_json::to_value(TailorResponse::example()).expect("TailorResponse example")
+    }),
 ];
 
 #[cfg(test)]

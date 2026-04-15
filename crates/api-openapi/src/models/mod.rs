@@ -40,6 +40,7 @@ pub mod health;
 pub mod resume;
 pub mod social;
 pub mod stack; // empty — stack returns serde_json::Value directly
+pub mod tailor;
 
 // Flat re-exports so consumers can write `use api_openapi::models::*`
 pub use common::*;
@@ -52,3 +53,4 @@ pub use contact::*;
 pub use demo::*;
 pub use resume::*;
 pub use social::*;
+pub use tailor::*;

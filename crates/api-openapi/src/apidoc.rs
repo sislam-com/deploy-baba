@@ -14,7 +14,8 @@ use crate::models::{
     CompetencyInput, CompetencyWithEvidence, ContactResponse, ContactSubmitRequest, CrateInfo,
     Evidence, EvidenceInput, EvidenceItem, Field, GenerateSpecRequest, GenerateSpecResponse,
     HealthResponse, Job, JobDetail, JobDetailInput, JobInput, JobWithDetails, JobsQuery,
-    ParseConfigRequest, ParseConfigResponse, SocialLink, SocialLinkInput, SocialLinkResponse,
+    MatchedBullet, ParseConfigRequest, ParseConfigResponse, SocialLink, SocialLinkInput,
+    SocialLinkResponse, TailorRequest, TailorResponse,
 };
 use utoipa::OpenApi;
 
@@ -81,9 +82,13 @@ pub struct PublicApiDoc;
         CompetencyInput,
         EvidenceInput,
         Evidence,
+        TailorRequest,
+        MatchedBullet,
+        TailorResponse,
     )),
     tags(
         (name = "admin", description = "Protected admin CRUD (requires auth)"),
+        (name = "tailor", description = "JD-driven resume tailoring (admin only)"),
     ),
     modifiers(&SecurityAddon),
 )]
