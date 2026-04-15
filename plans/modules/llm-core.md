@@ -1,5 +1,5 @@
 # W-LLM: llm-core + llm-anthropic
-**Crates:** `crates/llm-core/`, `crates/llm-anthropic/` | **Status:** TODO
+**Crates:** `crates/llm-core/`, `crates/llm-anthropic/` | **Status:** WIP
 **Coverage floor:** N/A (library crates) | **Depends on:** — | **Depended on by:** W-RST, W-UI (via W-RST)
 
 ---
@@ -151,8 +151,9 @@ is injected at startup in `main.rs`.
 | W-LLM.4.2 | Scaffold `crates/llm-anthropic`: `Cargo.toml` (dep on llm-core + reqwest), `src/lib.rs` (`AnthropicProvider` impl, constructor injection, model constants) | DONE | Direct HTTP against Anthropic Messages API; clippy clean |
 | W-LLM.4.3 | Add `crates/llm-core` + `crates/llm-anthropic` to `[workspace.members]` in root `Cargo.toml`; add `async-trait` to workspace deps; add path entries to `[workspace.dependencies]` | DONE | Workspace plumbing; `services/ui` feature wiring deferred to W-RST PR |
 | W-LLM.4.4 | Per-crate README files for `llm-core` and `llm-anthropic` (W-DX.3 alignment) | TODO | Describes trait, feature flags, secret name |
-| W-LLM.4.5 | **Future**: `crates/llm-openai`, `crates/llm-bedrock`, `crates/llm-ollama`, `crates/llm-gemini` — additional `LlmProvider` adapters. Not scheduled. `llm-gemini` is the correct entry point if Gemini models are ever evaluated as an alternative to Claude for W-RST (see W-GDR cross-reference). | DEFERRED | |
-| W-LLM.4.6 | **Future**: `crates/llm-fastembed` — local ONNX `EmbeddingProvider` impl. Ships alongside W-RST.4.11. ADR-016 created at that point. | DEFERRED | |
+| W-LLM.4.5 | `llm-anthropic` integration tests: `provider_id_is_anthropic`, `default_model_is_haiku` (CI-safe); `live_generate_*` (3 `#[ignore]` tests, run via `just test-llm PROFILE`) | DONE (2026-04-15) | |
+| W-LLM.4.6 | **Future**: `crates/llm-openai`, `crates/llm-bedrock`, `crates/llm-ollama`, `crates/llm-gemini` — additional `LlmProvider` adapters. Not scheduled. | DEFERRED | |
+| W-LLM.4.7 | **Future**: `crates/llm-fastembed` — local ONNX `EmbeddingProvider` impl. Ships alongside W-RST.4.11. ADR-016 created at that point. | DEFERRED | |
 
 ---
 
