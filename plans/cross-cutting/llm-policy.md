@@ -1,81 +1,154 @@
-# Cross-Cutting: LLM Policy
+# LLM Policy — deploy-baba
 
-**Applies to:** W-LLM, W-RST, W-RAG (and any future LLM-touching feature)
+**Last updated:** 2026-04-10
+**Owner:** W-LLM, W-RST, W-RAG
+**Status:** Active — updated when providers or models change
 
-## Rule 1 — All LLM access goes through `llm-core`
+This is a living operational policy document, not an ADR. It covers runtime
+rules that will be revised over time without requiring new architecture
+decisions. For the structural decision (pluggable provider framework +
+grounding contract), see **ADR-015**.
 
-No feature crate or xtask module may make direct HTTP calls to Anthropic, OpenAI, or any other
-LLM provider. All access must go through the `llm-core` trait surface (`Completer`, `Embedder`,
-`PromptAssembler`). The concrete implementation lives in `llm-anthropic`.
+---
 
-**Why:** centralises retry logic, token counting, error types, and secrets management in one place.
-Changing provider or model requires only a new impl crate, not changes in consumers.
+## Active Provider Registry
 
-## Rule 2 — Secrets via AWS Secrets Manager only
+| Adapter crate | Provider | Default model | Upgrade model | Secret name (AWS SM) | Feature flag |
+|---------------|----------|--------------|---------------|----------------------|--------------|
+| `llm-anthropic` | Anthropic Claude | `claude-haiku-4-5-20251001` | `claude-sonnet-4-6` | `deploy-baba/prod/anthropic-api-key` | `llm-anthropic` (default) |
 
-The Anthropic API key is stored at `deploy-baba/prod/anthropic-api-key` in AWS Secrets Manager
-(W-SEC). It is read once at Lambda cold start via an `init_api_key()` function mirroring
-`init_pow_secret()`. It must never appear in:
-- Lambda environment variables (visible in AWS console)
-- Source code or hardcoded fallbacks (except `dev-*` local-only defaults for offline dev)
-- Committed files of any kind
+Any change to this table (new provider, model swap, secret rename) requires
+a revision to **ADR-015** (alternatives and affected modules sections) and a
+corresponding bump to `prompt_version` in the affected prompts.
 
-Use `just secret-put anthropic-api-key $KEY prod` to write it.
+---
 
-## Rule 3 — Universal grounding contract (all generation calls)
+## Prompt Versioning
 
-Every `PromptBundle` produced by a `PromptAssembler` must include:
+Every prompt that reaches an LLM has a `prompt_version` string constant
+compiled into the binary. Convention: `"<domain>-v<N>"` (e.g.
+`"rst-parser-v1"`, `"rst-generator-v1"`).
 
-### System prompt fragment (append to every system prompt)
+**Rules:**
+- Bumping a prompt's semantic intent → bump its `prompt_version`.
+- Adding/removing allowed fields in `GroundingContract.allowed_source_text`
+  → bump `prompt_version`.
+- Typo or punctuation fix that does not change semantics → no bump required.
+- Switching models or providers → bump `prompt_version` (different model =
+  different response distribution, stale cache entries must not be reused).
 
-```
-You are a precise assistant. Answer only from the provided <source> blocks.
-Cite every claim with [source N] referring to the Nth source block.
-If the answer cannot be found in the sources, say so explicitly.
-```
+**Cache key invariant:**
+`sha256(jd_text || provider_id || model || prompt_version)`
 
-### Retrieved context format
+Changing any of the four inputs correctly invalidates `tailor_cache` entries.
+Changing semantics without bumping `prompt_version` produces silent drift —
+forbidden.
 
-Each retrieved chunk is wrapped as:
+---
 
-```xml
-<source kind="{rust|hcl|plan|cache}" path="{repo-relative path}" sha="{git sha of file}">
-{chunk content}
-</source>
-```
+## Cost Caps
 
-Blocks are numbered sequentially from 1 and referenced as `[source 1]`, `[source 2]`, etc. in the
-model's response.
+- **Per-request budget:** 4 000 input tokens + 1 000 output tokens (hard
+  ceiling per LLM call). Enforced in `llm-core` before constructing
+  `LlmRequest`. Requests that exceed the input ceiling return
+  `LlmError::ContextTooLarge` before any network call.
+- **Daily ceiling:** 100 000 tokens/day (soft warning at 80 000, hard stop
+  at 100 000). Tracked via `tailor_cache.created_at` + a simple count query.
+  No external metering service — SQLite is the budget ledger.
+- **Monthly cap:** Not currently enforced programmatically. Monitor via the
+  Anthropic console billing page. Revisit if usage approaches $10/month.
 
-### Response format
+---
 
-The `Completer` response is parsed for `[source N]` markers. The caller is responsible for
-mapping marker indices back to `RankedChunk` metadata for citation rendering.
+## Rate Limits
 
-**Why this contract exists:** without explicit citations, LLM responses about code are hard to
-verify and may hallucinate file paths or function names. Grounding with `<source>` blocks and
-mandatory citation markers makes outputs auditable.
+- **Per-Cognito-user:** 10 tailor requests per 24 h. Enforced via
+  `tailor_cache` count query on `(jd_hash, created_at > 24h ago)`.
+- **Per-endpoint:** No global rate limit beyond the daily token ceiling above.
+  The endpoint is Cognito-gated so anonymous abuse is not a concern.
 
-## Rule 4 — Embedding caching by content hash
+---
 
-Before calling `Embedder::embed`, check whether the chunk's content hash (stored in
-`meta_json.content_hash`) matches the stored embedding. If it matches, skip the API call. This
-applies to both `rag-sqlite` (W-RAG) and any future embedding pipeline in W-RST.
+## Retry + Fallback Policy
 
-Invalidation: whenever a chunk's content changes (detected by hash mismatch), the stored embedding
-is overwritten.
+- **429 (rate limited) from provider:** Retry with exponential backoff
+  (2 s, 4 s, 8 s). After 3 retries, return `LlmError::RateLimited` to the
+  caller; the handler returns HTTP 503 with a `Retry-After` header.
+- **5xx from provider:** Retry once after 2 s. If still failing, return
+  `LlmError::Upstream` → HTTP 502.
+- **No silent fallback between providers or models.** Switching to a
+  different provider or model on failure would produce a cache entry keyed
+  to the original `(provider_id, model)` but generated by a different
+  model — cache poisoning. If the configured adapter is unavailable, fail
+  loudly.
 
-## Rule 5 — `.claude/` cache corpus is local-CLI only
+---
 
-The `.claude/` agent-cache, memory files, and conversation history are gitignored and
-machine-local. They may be indexed by `just rag-index` for the local developer CLI (W-RAG P1).
-They must **not** be bundled into the Lambda zip or served via `/api/ask` (W-RAG P3).
+## PII Scrubbing (CloudWatch Logs)
+
+The current payload (user-pasted job descriptions + author-owned resume
+bullets) is not PII in the strict sense. However, to support future use
+cases where the input might include third-party content:
+
+- **Log the JD hash, not the JD body.**
+- **Log response length + model, not the response body.**
+- **Never log the Anthropic API key** (this is a toolchain invariant, not
+  specific to this feature).
+- If the pipeline is ever extended to process third-party resumes or
+  candidate data, add structured scrubbing before any logging.
+
+---
+
+## Model Migration Runbook
+
+When switching from one embedding model to another (future, W-RST.4.11 /
+W-LLM.4.6):
+
+1. Provision the new embedding model in `llm-policy.md` (add row to registry).
+2. Bump `embedding_model` constant in the relevant adapter.
+3. Drop and recreate `job_detail_embeddings` (embedding dimensions change).
+4. Run `just resume-embed` to backfill all rows under the new model.
+5. Verify matcher queries filter by `model = <new-model>`.
+6. Delete the old adapter row from the registry.
+
+When switching LLM providers for generation:
+
+1. Update the active-provider registry row (or add a new row + flip the
+   cargo feature flag in `services/ui/Cargo.toml`).
+2. Bump `prompt_version` for every affected prompt.
+3. `tailor_cache` entries are automatically bypassed for new
+   `(provider_id, model, prompt_version)` combinations — no manual purge
+   needed.
+4. Update ADR-015 alternatives section to note the old provider as
+   "retired" with date.
+
+---
+
+## Adapter Onboarding Checklist
+
+When adding a new `LlmProvider` impl (e.g. `crates/llm-openai`):
+
+- [ ] Implement `LlmProvider` trait from `llm-core`
+- [ ] Declare required secret name(s) in the adapter's `Cargo.toml` metadata
+  or in a `const REQUIRED_SECRET: &str = "..."` at crate root
+- [ ] Add a row to the Active Provider Registry table above
+- [ ] Add the cargo feature flag to `services/ui/Cargo.toml`
+- [ ] Add integration test that runs when the provider's API key env var is
+  present; skips otherwise
+- [ ] Add token-counting implementation (required by the cost-cap middleware
+  in `llm-core`)
+- [ ] Update ADR-015 alternatives section to note why the new provider was
+  added (use case differentiation, not replacement)
+- [ ] Announce in MEMORY.md under "Key Decisions" if the new provider becomes
+  the default
+
+---
 
 ## Cross-References
 
-- → ADR-015 (LLM Provider Abstraction — trait design and provider selection)
-- → ADR-016 (RAG Architecture — grounding contract application in retrieval pipeline)
-- → W-SEC (secrets management — `anthropic-api-key` in AWS Secrets Manager)
-- → W-LLM (implementing crates: `llm-core`, `llm-anthropic`)
-- → W-RAG (primary consumer)
-- → W-RST (secondary consumer)
+- → ADR-015 (structural decision: pluggable framework + grounding contract)
+- → W-LLM (llm-core + llm-anthropic module plan)
+- → W-RST (resume-tailor — primary consumer)
+- → W-RAG (retrieval-augmented generation — secondary consumer; `.claude/` corpus local-CLI only per ADR-016)
+- → W-SEC (secrets management — API key storage + rotation)
+- → ADR-016 (RAG architecture — grounding contract application in retrieval pipeline)

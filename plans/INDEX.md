@@ -1,5 +1,5 @@
 # deploy-baba — Plan Index
-**GitHub:** `shantopagla/deploy-baba` | **Last updated:** 2026-04-09
+**GitHub:** `shantopagla/deploy-baba` | **Last updated:** 2026-04-15
 **Source repo:** `~/shanto` (Baba Toolchain, ~85K LOC) | **Status:** ~93% complete
 
 See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming rules.
@@ -32,9 +32,10 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | contact-form | W-CTF | `services/email/`, `services/ui/src/routes/contact.rs`, `infra/ses.tf`, `infra/email-lambda.tf`, `infra/apigateway.tf` | WIP | e2e test (W-CTF.4.12) — deploy step pending |
 | secrets-manager | W-SEC | `xtask/src/secret.rs`, `infra/secrets.tf`, `infra/vpc-endpoints.tf`, `services/ui/src/routes/contact.rs` | DONE | Deploy: `just infra-apply` + `just secret-put pow-secret $(openssl rand -hex 32)` + `just lambda-deploy` |
 | dashboard-sync | W-SYNC | `plans/modules/dashboard-sync.md`, `services/ui/migrations/`, `services/ui/src/db.rs`, `services/ui/src/routes/api/admin.rs`, `.claude/skills/sync-dashboard-data/` | DONE | 4.1–4.5 complete; zero drift on first run 2026-04-08; .4.6/.4.7 deferred (on-demand) |
-| llm-core | W-LLM | `crates/llm-core/`, `crates/llm-anthropic/` | PROPOSED | Greenfield — no crates on disk yet (design only). See ADR-015. Required by W-RAG. |
-| resume-tailor | W-RST | `xtask/src/resume/`, `crates/llm-core/` | PROPOSED | LLM-powered resume polish pipeline; blocked on W-LLM. |
+| llm-core + llm-anthropic | W-LLM | `crates/llm-core/`, `crates/llm-anthropic/` | TODO | All items; W-LLM.4.5/4.6 DEFERRED |
+| resume-tailor | W-RST | `services/ui/src/tailor/`, `crates/api-openapi/src/models/tailor.rs`, `services/ui/migrations/016` | TODO | All items; BLOCKED-on-deploy for 4.3/4.4/4.5 until W-SEC deployed + `anthropic-api-key` in SM |
 | rag | W-RAG | `crates/rag-core/`, `crates/rag-sqlite/` | PROPOSED | P1 CLI → P2 deploy-failure diagnosis → P3 /api/ask; blocked on W-LLM for generation. |
+| gdrive-planning | W-GDR | `justfile`, `.claude/settings.json`, `.github/workflows/` | TODO | Drive MCP plan export/import (W-GDR.4.1–4.3); Stop hook quality gate (W-GDR.4.4); evaluated from Gemini proposal 2026-04-15 |
 
 ---
 
@@ -53,7 +54,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 ### P1 — Must Fix (blocking clean CI)
 1. ~~**W-SYNC.4.5**~~ — **DONE 2026-04-08:** pulled live EFS DB via dump endpoint; zero drift — live matches seeds exactly. ~~`.4.2`~~ + ~~`.4.3`~~ + ~~`.4.4`~~ + ~~`.4.5`~~ DONE. W-SYNC is now on-demand (run `/sync-dashboard-data` after dashboard edits).
 2. ~~**W-XT.4.1**~~ — CLI naming: 3 justfile mismatches fixed (`fmt`→`format`, `--crate`→`crate` subcommand, `gate`→`all`) — **RESOLVED**
-2. ~~**W-TF.4.1**~~ — `infra/eventbridge.tf`: already uses `state = "ENABLED"` — **RESOLVED** (see DRL-2026-03-25-opentofu)
+3. ~~**W-TF.4.1**~~ — `infra/eventbridge.tf`: already uses `state = "ENABLED"` — **RESOLVED** (see DRL-2026-03-25-opentofu)
 3. ~~**W-TF.4.2**~~ — `infra/s3.tf`: `filter {}` already present — **RESOLVED** (see DRL-2026-03-25-opentofu)
 4. **W-XT.4.2** — Remove or wire up `EnvironmentInterpolator` (dead code)
 5. **W-OTF.4.1–4.7** — Migrate infrastructure tooling from Terraform → OpenTofu (see `plans/modules/opentofu.md`)
@@ -71,10 +72,13 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 14. ~~**W-CTF.4.1–4.10**~~ — Contact form + SES + PoW + API Gateway — **DONE** (deployed 2026-04-03)
 15. ~~**W-CTF.4.11 + W-SEC**~~ — Migrate `POW_SECRET` from Lambda env var → AWS Secrets Manager + xtask secret commands — **DONE** (code complete; `just infra-apply` + `just secret-put pow-secret ...` + `just lambda-deploy` still needed)
 16. ~~**W-CTF.4.13**~~ — Acknowledgement email to submitter — **DONE** (SES production access granted 2026-04-08; `SES_ACK_FROM_EMAIL` restored; external Gmail delivery verified. See `DRL-2026-04-07-ses-sandbox-ack` (RESOLVED).)
+17. **W-LLM.4.1–4.4** — LLM provider abstraction + Claude reference adapter (see `plans/modules/llm-core.md`) — TODO
+18. **W-RST.4.1–4.10** — AI Resume Tailor pipeline on W-LLM (see `plans/modules/resume-tailor.md`) — TODO; BLOCKED-on-deploy for items 4.3/4.4/4.5 until W-SEC deployed + `anthropic-api-key` in SM
 
 ### P3 — Polish & Publish
-9. **W-PUB.1** — `just publish-dry` passes for all 10 library crates
-10. **W-PUB.2** — Tag `v0.1.0` + `just publish`
+9. **W-GDR.4.1–4.4** — Google Drive MCP setup + `plan-export`/`plan-import` justfile recipes + `Stop` hook quality gate (see `plans/modules/gdrive-planning.md`)
+10. **W-PUB.1** — `just publish-dry` passes for all 10 library crates
+11. **W-PUB.2** — Tag `v0.1.0` + `just publish`
 11. **W-UI.4.1** — Wire utoipa-rapidoc properly (currently using inline HTML)
 
 ### P3 — LLM + RAG Subsystem (new, phased)
@@ -101,10 +105,10 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | ADR-009 | API Gateway HTTP API for POST /api/contact (OAC body hash workaround) | W-CTF, W-UI |
 | ADR-010 | SQLite Upsert as the Canonical Re-Seed Convention | W-SYNC, W-RSM, W-ABT, W-SL, W-XT |
 | ADR-011 | Synchronous Email Lambda Invocation with Typed Response Propagation + Acknowledgement Email | W-CTF, W-UI |
-| ADR-012 | OpenAPI SSOT + Public/Admin Spec Split | W-APIO, W-UI |
+| ADR-012 | OpenAPI SSOT + Public/Admin Spec Split | W-APIO, W-UI, W-LLM, W-RST |
 | ADR-013 | Admin Dashboard Dark Theme Convention — light-theme tokens banned in `dashboard_*.html`; canonical dark-palette class table for all dashboard list/detail/form views | W-AUTH, W-ABT, W-SL, W-RSM, W-UI |
-| ADR-014 | Resume Professional Summary Sourced from DB (`about_sections.me-bio`) — hardcoded `SUMMARY` const deleted; generator loads + polishes bio at generation time; errors on missing row | W-RSM, W-XT |
-| ADR-015 | LLM Provider Abstraction — pluggable `llm-core` vendor-agnostic trait + `llm-anthropic` first impl; universal grounding contract at prompt-assembly layer; feature-flag selection | W-LLM, W-RST, W-RAG |
+| ADR-014 | Resume Professional Summary Sourced from DB (`about_sections.me-bio`) — hardcoded `SUMMARY` const deleted; generator loads + polishes bio at generation time; errors on missing row | W-RSM, W-XT, W-RST |
+| ADR-015 | LLM Provider Abstraction + Grounding Contract — `crates/llm-core` (vendor-agnostic trait) + `crates/llm-anthropic` (first impl); universal grounding contract at prompt-assembly layer; Claude as MVP provider; cargo feature-flag selection | W-LLM, W-RST, W-RAG, W-RSM, W-SEC, W-APIO, W-UI |
 | ADR-016 | RAG Architecture — SQLite + sqlite-vec + FTS5 hybrid retrieval; all embedding/generation via llm-core (ADR-015); per-corpus chunkers; `.claude/` cache local-CLI only | W-RAG |
 
 ---
@@ -119,6 +123,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | DRL-2026-03-27-function-url-auth | 2026-03-27 | Lambda Function URL auth incident + revert | 2 entries + 2 open items (W-AUTH.POST-FIX, DRL-FUA-2) |
 | DRL-2026-04-03-contact-form | 2026-04-03 | Contact Form + SES Email Lambda implementation | 4 entries, resolved |
 | DRL-2026-04-03-pow-apigateway | 2026-04-03 | POST+PoW via API Gateway — replaces GET+query params | OAC body hash workaround, ADR-009 |
+| DRL-2026-04-03-secrets-manager | 2026-04-03 | W-SEC/W-CTF: POW_SECRET + cognito_temp_password migrated from Lambda env vars to AWS Secrets Manager | Code complete; deploy: `just infra-apply` + `just secret-put pow-secret` + `just lambda-deploy` |
 | DRL-2026-04-07-ses-sandbox-ack | 2026-04-07 | SES sandbox blocks ack emails to unverified recipients | **RESOLVED 2026-04-08** — production access granted; W-CTF.4.13 DONE; SES_ACK_FROM_EMAIL restored |
 | DRL-2026-04-08-api-openapi-orphan | 2026-04-08 | api-openapi was orphaned from services/ui (W-APIO SSOT) | **RESOLVED 2026-04-08** — SSOT refactor complete; 29 models, dual-spec, 84 tests |
 
@@ -132,6 +137,7 @@ api-core     ←── api-openapi, api-graphql, api-grpc, api-merger, services/
 api-openapi  ←── api-merger, services/ui
 api-graphql  ←── api-merger
 api-grpc     ←── api-merger
+llm-core     ←── llm-anthropic, services/ui (via W-RST tailor pipeline)
 ```
 
 Full dependency order: `plans/cross-cutting/dependency-graph.md`

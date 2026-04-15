@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-08
 **Status:** Accepted
-**Affected modules:** W-APIO, W-UI
+**Affected modules:** W-APIO, W-UI, W-LLM, W-RST
 
 ## Context
 
@@ -70,5 +70,6 @@ Specific rules:
 
 - → W-APIO (primary affected module)
 - → W-UI (`services/ui` imports models, serves dual-spec)
+- → W-LLM + W-RST (resume-tailor models in `crates/api-openapi/src/models/tailor.rs` — `TailorRequest`, `TailorResponse`, `MatchedBullet` must register in `ALL_MODELS` per this ADR)
 - → DRL-2026-04-08-api-openapi-orphan (orphan finding that triggered this ADR)
 - → ADR-008 (Cognito auth — `require_auth` gates admin spec endpoint)
