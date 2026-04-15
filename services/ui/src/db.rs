@@ -65,8 +65,12 @@ const MIGRATIONS: &[(&str, &str)] = &[
         include_str!("../migrations/015_sync_dashboard_2026-04-09.sql"),
     ),
     (
-        "016_rag_index",
-        include_str!("../migrations/016_rag_index.sql"),
+        "016_sync_dashboard_2026-04-10",
+        include_str!("../migrations/016_sync_dashboard_2026-04-10.sql"),
+    ),
+    (
+        "017_rag_index",
+        include_str!("../migrations/017_rag_index.sql"),
     ),
 ];
 
