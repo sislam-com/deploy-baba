@@ -53,7 +53,7 @@
                 <span class="text-xs font-semibold uppercase tracking-wider text-cyan-400">Answer</span>
                 <span id="model-badge" class="text-xs text-gray-600"></span>
             </div>
-            <div id="answer-text" class="text-gray-200 leading-relaxed whitespace-pre-wrap text-sm"></div>
+            <div id="answer-text" class="ask-prose text-sm"></div>
         </div>
 
         <!-- Citations -->
@@ -82,6 +82,29 @@
 
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
+<style>
+.ask-prose { color: #e5e7eb; line-height: 1.7; }
+.ask-prose h1 { font-size: 1.4rem; font-weight: 700; color: #f9fafb; margin: 1.2rem 0 0.5rem; }
+.ask-prose h2 { font-size: 1.15rem; font-weight: 600; color: #f3f4f6; margin: 1rem 0 0.4rem; }
+.ask-prose h3 { font-size: 1rem; font-weight: 600; color: #d1d5db; margin: 0.8rem 0 0.3rem; }
+.ask-prose p  { margin: 0.6rem 0; }
+.ask-prose ul, .ask-prose ol { margin: 0.6rem 0 0.6rem 1.4rem; }
+.ask-prose ul { list-style: disc; }
+.ask-prose ol { list-style: decimal; }
+.ask-prose li { margin: 0.25rem 0; }
+.ask-prose strong { color: #f3f4f6; font-weight: 600; }
+.ask-prose em { color: #d1d5db; font-style: italic; }
+.ask-prose code { background: #374151; color: #67e8f9; font-family: monospace;
+    font-size: 0.85em; padding: 0.1em 0.35em; border-radius: 4px; }
+.ask-prose pre { background: #1f2937; border: 1px solid #374151; border-radius: 8px;
+    padding: 1rem; overflow-x: auto; margin: 0.8rem 0; }
+.ask-prose pre code { background: none; padding: 0; color: #d1fae5; font-size: 0.8em; }
+.ask-prose blockquote { border-left: 3px solid #22d3ee; padding-left: 1rem;
+    color: #9ca3af; margin: 0.6rem 0; }
+.ask-prose a { color: #22d3ee; text-decoration: underline; }
+.ask-prose hr { border-color: #374151; margin: 1rem 0; }
+</style>
 <script>
 (function () {
     const form      = document.getElementById('ask-form');
@@ -140,8 +163,8 @@
                 return;
             }
 
-            // Render answer
-            answerEl.textContent = data.answer;
+            // Render answer as markdown
+            answerEl.innerHTML = marked.parse(data.answer);
             modelEl.textContent  = `· ${data.model}`;
 
             // Render citations
