@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}Ask — Sharful Islam{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+
+    <!-- Page header -->
+    <div class="mb-10">
+        <h1 class="text-4xl font-bold text-white mb-2">Ask the Codebase</h1>
+        <p class="text-gray-400">
+            Ask anything about this portfolio project — architecture decisions, how features
+            work, why something was built a certain way. Answers are grounded in the actual
+            source code, infrastructure, and design documents.
+        </p>
+        <p class="text-gray-600 text-sm mt-2">
+            Powered by Claude + SQLite FTS5 retrieval over Rust source, OpenTofu HCL, and ADRs.
+        </p>
+    </div>
+
+    <!-- Query form -->
+    <form id="ask-form" class="space-y-4">
+        <div>
+            <label for="query" class="block text-sm font-medium text-gray-300 mb-1">Your question</label>
+            <textarea id="query" name="query" rows="3" required maxlength="1000"
+                      class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white
+                             placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500
+                             focus:border-transparent transition resize-none"
+                      placeholder="e.g. How does Lambda load secrets at cold start? Why SQLite instead of PostgreSQL?"></textarea>
+        </div>
+
+        <div class="flex items-center gap-4">
+            <button type="submit" id="submit-btn"
+                    class="bg-cyan-600 hover:bg-cyan-500 disabled:bg-gray-700 disabled:cursor-not-allowed
+                           text-white font-semibold py-2.5 px-6 rounded-lg transition focus:outline-none
+                           focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 focus:ring-offset-gray-900">
+                Ask
+            </button>
+            <span id="status" class="text-sm text-gray-500 hidden">Retrieving sources and generating answer…</span>
+        </div>
+    </form>
+
+    <!-- Error banner -->
+    <div id="error-banner" class="hidden mt-6 px-4 py-3 rounded-lg text-sm font-medium
+                                   bg-red-900/60 border border-red-700 text-red-300"></div>
+
+    <!-- Answer panel (hidden until first response) -->
+    <div id="answer-panel" class="hidden mt-8 space-y-6">
+
+        <!-- Answer -->
+        <div class="bg-gray-800/60 border border-gray-700 rounded-xl p-6">
+            <div class="flex items-center gap-2 mb-4">
+                <span class="text-xs font-semibold uppercase tracking-wider text-cyan-400">Answer</span>
+                <span id="model-badge" class="text-xs text-gray-600"></span>
+            </div>
+            <div id="answer-text" class="text-gray-200 leading-relaxed whitespace-pre-wrap text-sm"></div>
+        </div>
+
+        <!-- Citations -->
+        <div id="citations-section">
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Sources</h3>
+            <ul id="citations-list" class="space-y-2"></ul>
+        </div>
+
+        <!-- Token usage -->
+        <p id="token-info" class="text-xs text-gray-600"></p>
+    </div>
+
+    <!-- Example questions -->
+    <div class="mt-12">
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-600 mb-4">Try asking</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {% for example in examples %}
+            <button onclick="fillQuery(this)"
+                    class="text-left bg-gray-800/40 border border-gray-700 hover:border-gray-500
+                           rounded-lg px-4 py-3 text-sm text-gray-400 hover:text-gray-200 transition">
+                {{ example }}
+            </button>
+            {% endfor %}
+        </div>
+    </div>
+
+</div>
+
+<script>
+(function () {
+    const form      = document.getElementById('ask-form');
+    const submitBtn = document.getElementById('submit-btn');
+    const status    = document.getElementById('status');
+    const errBanner = document.getElementById('error-banner');
+    const panel     = document.getElementById('answer-panel');
+    const answerEl  = document.getElementById('answer-text');
+    const modelEl   = document.getElementById('model-badge');
+    const citList   = document.getElementById('citations-list');
+    const tokenEl   = document.getElementById('token-info');
+
+    function showError(msg) {
+        errBanner.textContent = msg;
+        errBanner.classList.remove('hidden');
+    }
+
+    function hideError() {
+        errBanner.classList.add('hidden');
+    }
+
+    function kindIcon(kind) {
+        const icons = { rust: '🦀', hcl: '🏗', plan: '📋', cache: '💾' };
+        return icons[kind] || '📄';
+    }
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const query = document.getElementById('query').value.trim();
+        if (!query) return;
+
+        // Reset UI
+        hideError();
+        panel.classList.add('hidden');
+        submitBtn.disabled = true;
+        status.classList.remove('hidden');
+
+        try {
+            const res = await fetch('/api/ask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query, top_k: 10 }),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                const msg = data.error || `Error ${res.status}`;
+                if (res.status === 429) {
+                    showError('Rate limit reached — please wait a minute and try again.');
+                } else if (res.status === 503) {
+                    showError('The Q&A feature is not available right now.');
+                } else {
+                    showError(msg);
+                }
+                return;
+            }
+
+            // Render answer
+            answerEl.textContent = data.answer;
+            modelEl.textContent  = `· ${data.model}`;
+
+            // Render citations
+            citList.innerHTML = '';
+            data.citations.forEach((c, i) => {
+                const li = document.createElement('li');
+                li.className = 'flex items-start gap-2 text-xs text-gray-500';
+                li.innerHTML = `
+                    <span class="text-gray-600 font-mono mt-0.5">[${i + 1}]</span>
+                    <span>${kindIcon(c.kind)}
+                        <span class="font-mono text-gray-400">${c.path}</span>
+                        <span class="text-gray-600 ml-1">sha:${c.sha.slice(0,7)}</span>
+                    </span>`;
+                citList.appendChild(li);
+            });
+
+            tokenEl.textContent = `${data.input_tokens} in · ${data.output_tokens} out`;
+            panel.classList.remove('hidden');
+
+        } catch (_) {
+            showError('Network error — please check your connection and try again.');
+        } finally {
+            submitBtn.disabled = false;
+            status.classList.add('hidden');
+        }
+    });
+})();
+
+function fillQuery(btn) {
+    document.getElementById('query').value = btn.textContent.trim();
+    document.getElementById('query').focus();
+}
+</script>
+{% endblock %}
