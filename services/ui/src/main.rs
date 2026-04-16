@@ -92,7 +92,11 @@ async fn main() -> Result<()> {
     } else {
         let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
         tracing::info!("→ http://localhost:3000");
-        axum::serve(listener, app).await?;
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await?;
     }
 
     Ok(())

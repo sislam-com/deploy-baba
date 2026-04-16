@@ -36,7 +36,7 @@ use llm_anthropic::AnthropicProvider;
 use llm_core::{ChatMessage, GenerationConfig, LlmProvider, LlmRequest, MessageRole};
 use rag_core::{DefaultPromptAssembler, PromptAssembler, Retriever};
 use rag_sqlite::RagStore;
-use std::net::SocketAddr;
+use std::net::{Ipv4Addr, SocketAddr};
 
 use crate::state::AppState;
 pub use api_openapi::models::{AskCitation, AskRequest, AskResponse};
@@ -92,11 +92,15 @@ fn err(status: StatusCode, msg: &str) -> (StatusCode, Json<serde_json::Value>) {
     )
 )]
 pub async fn ask(
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    connect_info: Option<ConnectInfo<SocketAddr>>,
     State(state): State<AppState>,
     State(rag): State<Arc<RagStore>>,
     Json(req): Json<AskRequest>,
 ) -> ApiResult<AskResponse> {
+    // Fall back to loopback when ConnectInfo is absent (e.g. Lambda path).
+    let ip: IpAddr = connect_info
+        .map(|c| c.0.ip())
+        .unwrap_or(IpAddr::V4(Ipv4Addr::LOCALHOST));
     // Gate 1: public enablement flag
     if std::env::var("RAG_PUBLIC_ENABLED").as_deref() != Ok("1") {
         return Err(err(StatusCode::SERVICE_UNAVAILABLE, "RAG Q&A not enabled"));
@@ -111,7 +115,7 @@ pub async fn ask(
         .to_owned();
 
     // Gate 3: rate limit
-    if !check_rate_limit(addr.ip()) {
+    if !check_rate_limit(ip) {
         return Err(err(
             StatusCode::TOO_MANY_REQUESTS,
             "Rate limit exceeded (10/min)",
