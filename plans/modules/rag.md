@@ -159,12 +159,12 @@ injects this contract via `PromptBundle.system_prompt`.
 | W-RAG.3.2 | `xtask rag ingest` — walk, chunk, upsert | DONE | `cargo xtask rag ingest`; skips `.` dirs + target/; best-effort git SHA |
 | W-RAG.3.3 | `xtask rag query` — FTS5 retrieve, print citations | DONE | `cargo xtask rag query "..."` prints ranked chunks with path+score+preview |
 | W-RAG.3.4 | Justfile verbs: `rag-index`, `rag-query`, `rag-index-full` | DONE | `just rag-index`, `just rag-index-full`, `just rag-query QUERY` |
-| W-RAG.4.1 | Wire `Embedder` impl from `llm-anthropic` (or Voyage) | BLOCKED | W-LLM shipped |
-| W-RAG.4.2 | `PromptAssembler` + `llm-core::generate` integration | BLOCKED | W-LLM shipped |
-| W-RAG.5.1 | `xtask deploy` failure hook → RAG explain | TODO | Needs W-RAG.4.2 |
-| W-RAG.6.1 | `services/ui/src/routes/api/ask.rs` + router wiring | TODO | skill: add-route; needs W-RAG.4.2 |
-| W-RAG.6.2 | Bundle `sqlite-vec` aarch64 SO into Lambda zip | TODO | Confirm binary size (~300 KB) |
-| W-RAG.6.3 | Rate-limit + `RAG_PUBLIC_ENABLED` feature flag | TODO | Needs W-RAG.6.1 |
+| W-RAG.4.1 | Wire `Embedder` impl from `llm-anthropic` (or Voyage) | TODO | Deferred to P2; needs API key provisioned |
+| W-RAG.4.2 | `PromptAssembler` + `llm-core::generate` integration | DONE (2026-04-15) | FTS retrieve → DefaultPromptAssembler → AnthropicProvider; both CLI + HTTP |
+| W-RAG.5.1 | `xtask deploy` failure hook → RAG explain | TODO | Needs W-RAG.4.2 (DONE) |
+| W-RAG.6.1 | `services/ui/src/routes/api/ask.rs` + router wiring | DONE (2026-04-15) | POST /api/ask; Arc<RagStore> in AppState; WAL concurrent reader |
+| W-RAG.6.2 | Bundle `sqlite-vec` aarch64 SO into Lambda zip | TODO | P2; confirm binary size (~300 KB) |
+| W-RAG.6.3 | Rate-limit + `RAG_PUBLIC_ENABLED` feature flag | DONE (2026-04-15) | LazyLock<Mutex<HashMap>> 10/min per IP; RAG_PUBLIC_ENABLED=1 gate |
 
 ## W-RAG.5 Test Strategy
 
