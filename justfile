@@ -239,6 +239,10 @@ rag-index-full DB="deploy-baba.db":
 rag-query QUERY DB="deploy-baba.db":
     cargo xtask rag query --db-path {{DB}} "{{QUERY}}"
 
+# Retrieve chunks + generate a grounded answer via Claude (requires ANTHROPIC_API_KEY)
+ask QUERY DB="deploy-baba.db":
+    cargo xtask rag ask --db-path {{DB}} "{{QUERY}}"
+
 # ── crates.io ────────────────────────────────────────────────────────────────
 
 # Dry-run publish for all library crates

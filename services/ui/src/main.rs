@@ -1,4 +1,5 @@
 use anyhow::Result;
+use rag_sqlite::RagStore;
 use std::sync::{Arc, OnceLock};
 
 mod auth;
@@ -53,6 +54,11 @@ async fn main() -> Result<()> {
     let db = Arc::new(db::Db::open(&db_path)?);
     tracing::info!("→ Database ready at {}", db_path);
 
+    // Open a separate connection for the RAG store (WAL mode allows concurrent readers).
+    let rag_conn = rusqlite::Connection::open(&db_path)?;
+    let rag = Arc::new(RagStore::new(rag_conn).map_err(|e| anyhow::anyhow!("{e}"))?);
+    tracing::info!("→ RAG store ready");
+
     let auth_config = Arc::new(auth::AuthConfig::from_env());
     tracing::info!("→ Auth ready (dev_mode={})", auth_config.dev_mode);
 
@@ -73,6 +79,7 @@ async fn main() -> Result<()> {
         db,
         auth: auth_config,
         anthropic_api_key,
+        rag,
     };
 
     let app = router::build(app_state);

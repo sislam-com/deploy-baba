@@ -32,6 +32,7 @@ pub const fn _assert_model<T: ApiModel>() {}
 
 pub mod about;
 pub mod admin;
+pub mod ask;
 pub mod common;
 pub mod contact;
 pub mod crates;
@@ -49,6 +50,7 @@ pub use health::*;
 // stack module is empty — no re-export needed
 pub use about::*;
 pub use admin::*;
+pub use ask::*;
 pub use contact::*;
 pub use demo::*;
 pub use resume::*;

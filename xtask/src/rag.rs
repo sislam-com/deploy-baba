@@ -41,6 +41,21 @@ pub enum RagAction {
         #[arg(long, default_value = "10")]
         top_k: usize,
     },
+    /// Retrieve + generate: retrieve chunks via FTS, assemble grounded prompt, call Claude.
+    /// Requires ANTHROPIC_API_KEY env var.
+    Ask {
+        /// Path to the SQLite database.
+        #[arg(long, default_value = "deploy-baba.db")]
+        db_path: PathBuf,
+        /// The natural-language question.
+        query: String,
+        /// Number of source chunks to retrieve (default 10, max 20).
+        #[arg(long, default_value = "10")]
+        top_k: usize,
+        /// Max tokens for the LLM response.
+        #[arg(long, default_value = "1024")]
+        max_tokens: u32,
+    },
 }
 
 pub async fn execute(action: RagAction) -> anyhow::Result<()> {
@@ -55,6 +70,12 @@ pub async fn execute(action: RagAction) -> anyhow::Result<()> {
             query,
             top_k,
         } => query_cmd(&db_path, &query, top_k).await,
+        RagAction::Ask {
+            db_path,
+            query,
+            top_k,
+            max_tokens,
+        } => ask_cmd(&db_path, &query, top_k, max_tokens).await,
     }
 }
 
@@ -197,6 +218,83 @@ fn walk_dir_dyn(
             f(&path)?;
         }
     }
+    Ok(())
+}
+
+// ── Ask ───────────────────────────────────────────────────────────────────
+
+async fn ask_cmd(db_path: &Path, query: &str, top_k: usize, max_tokens: u32) -> anyhow::Result<()> {
+    use llm_anthropic::AnthropicProvider;
+    use llm_core::{ChatMessage, GenerationConfig, LlmProvider, LlmRequest, MessageRole};
+    use rag_core::{DefaultPromptAssembler, PromptAssembler, Retriever};
+
+    let api_key = std::env::var("ANTHROPIC_API_KEY")
+        .map_err(|_| anyhow::anyhow!("ANTHROPIC_API_KEY env var required for `rag ask`"))?;
+
+    let top_k = top_k.clamp(1, 20);
+
+    println!("Retrieving chunks for: {query:?}");
+    let conn = Connection::open(db_path)
+        .with_context(|| format!("Failed to open {}", db_path.display()))?;
+    let store = RagStore::new(conn).context("Failed to initialise RAG schema")?;
+
+    let chunks = store
+        .retrieve(query, top_k)
+        .await
+        .map_err(|e| anyhow::anyhow!("retrieval failed: {e}"))?;
+
+    if chunks.is_empty() {
+        println!("No matching chunks found — try `just rag-index` first.");
+        return Ok(());
+    }
+
+    println!("Found {} chunk(s). Calling Claude...\n", chunks.len());
+
+    let assembler = DefaultPromptAssembler;
+    let bundle = assembler.assemble(query, &chunks);
+
+    let provider = AnthropicProvider::new(api_key);
+    let req = LlmRequest {
+        model: provider.default_model().to_owned(),
+        messages: vec![ChatMessage {
+            role: MessageRole::User,
+            content: bundle.user_message,
+        }],
+        system: Some(bundle.system_prompt),
+        tools: vec![],
+        grounding: None,
+        config: GenerationConfig {
+            max_tokens,
+            temperature: 0.2,
+            prompt_version: "ask-v1",
+        },
+    };
+
+    let resp = provider
+        .generate(req)
+        .await
+        .map_err(|e| anyhow::anyhow!("LLM generate failed: {e}"))?;
+
+    println!("─── Answer ───────────────────────────────────────────────────");
+    println!("{}", resp.content);
+    println!();
+    println!(
+        "─── Sources ({} cited) ────────────────────────────────────────",
+        bundle.citations.len()
+    );
+    for (i, c) in bundle.citations.iter().enumerate() {
+        println!(
+            "  [{n}] {path} (sha={sha})",
+            n = i + 1,
+            path = c.path,
+            sha = &c.sha[..7.min(c.sha.len())]
+        );
+    }
+    println!();
+    println!(
+        "Tokens: {} in / {} out | Model: {}",
+        resp.input_tokens, resp.output_tokens, resp.model
+    );
     Ok(())
 }
 

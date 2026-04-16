@@ -1,4 +1,5 @@
 pub mod admin;
+pub mod ask;
 pub mod competencies;
 pub mod crates;
 pub mod demo;
@@ -16,4 +17,5 @@ pub fn router() -> Router<AppState> {
         .nest("/demo", demo::router())
         .nest("/jobs", jobs::router())
         .nest("/competencies", competencies::router())
+        .merge(ask::router())
 }
