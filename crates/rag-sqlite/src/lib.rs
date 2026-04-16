@@ -153,10 +153,44 @@ impl RagStore {
 
 // ── Retriever impl ────────────────────────────────────────────────────────
 
+/// Convert a natural-language query string into an FTS5 OR expression.
+///
+/// FTS5 treats raw multi-word input as an implicit AND — every term must appear
+/// in a row for it to match. For short natural-language queries this is too
+/// strict and returns zero results when any term is absent. Joining with `OR`
+/// lets BM25 rank partial matches so even queries that mix known and unknown
+/// terms surface the best available chunks.
+///
+/// Terms are lowercased and stripped to alphanumeric characters to avoid
+/// FTS5 syntax errors from punctuation in the user query.
+fn to_fts5_or_query(query: &str) -> String {
+    let terms: Vec<String> = query
+        .split_whitespace()
+        .filter_map(|t| {
+            let clean: String = t
+                .chars()
+                .filter(|c| c.is_alphanumeric())
+                .collect::<String>()
+                .to_lowercase();
+            if clean.is_empty() {
+                None
+            } else {
+                Some(clean)
+            }
+        })
+        .collect();
+    if terms.is_empty() {
+        // Fallback: use the raw query and let SQLite return an error if malformed
+        return query.to_owned();
+    }
+    terms.join(" OR ")
+}
+
 #[async_trait]
 impl Retriever for RagStore {
     async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<RankedChunk>, RagError> {
         let conn = self.conn.lock().unwrap();
+        let fts_query = to_fts5_or_query(query);
 
         let mut stmt = conn
             .prepare(
@@ -172,7 +206,7 @@ impl Retriever for RagStore {
             .map_err(|e| RagError::Database(e.to_string()))?;
 
         let rows = stmt
-            .query_map(params![query, top_k as i64], |row| {
+            .query_map(params![fts_query, top_k as i64], |row| {
                 Ok(RankedChunk {
                     chunk_id: row.get(0)?,
                     document_id: row.get(1)?,
@@ -278,5 +312,31 @@ mod tests {
 
         let results = store.retrieve("python django flask", 5).await.unwrap();
         assert!(results.is_empty(), "no match should return empty vec");
+    }
+
+    #[test]
+    fn to_fts5_or_query_joins_with_or() {
+        assert_eq!(to_fts5_or_query("SQLite database"), "sqlite OR database");
+        assert_eq!(to_fts5_or_query("FTS5 full-text"), "fts5 OR fulltext");
+        assert_eq!(to_fts5_or_query("single"), "single");
+    }
+
+    #[tokio::test]
+    async fn partial_match_returns_results_via_or_query() {
+        // "retrieval" is not in the corpus but "sqlite" is — OR query should still match.
+        let store = RagStore::in_memory().unwrap();
+        let chunks = fixture_chunks(&["SQLite is the database engine used by deploy-baba."]);
+        store
+            .upsert_document("plan", "plans/adr/ADR-002.md", "abc", &chunks)
+            .unwrap();
+
+        let results = store
+            .retrieve("SQLite retrieval nonexistentterm", 5)
+            .await
+            .unwrap();
+        assert!(
+            !results.is_empty(),
+            "OR query should match on 'sqlite' even when other terms miss"
+        );
     }
 }
