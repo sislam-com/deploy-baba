@@ -271,7 +271,7 @@ secret-list PROFILE="default":
 # Requires AWS auth and the anthropic-api-key secret to be provisioned.
 test-llm PROFILE="default":
     just aws-check {{PROFILE}} && \
-    ANTHROPIC_API_KEY=$(just secret-get anthropic-api-key {{PROFILE}}) \
+    ANTHROPIC_API_KEY=$(cargo xtask secret get anthropic-api-key --profile {{PROFILE}} | tail -1) \
     cargo test -p llm-anthropic -- --ignored --nocapture
 
 # ── Agent Cache ──────────────────────────────────────────────────────────────
