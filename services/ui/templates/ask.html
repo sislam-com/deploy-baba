@@ -82,7 +82,6 @@
 
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
 <style>
 .ask-prose { color: #e5e7eb; line-height: 1.7; }
 .ask-prose h1 { font-size: 1.4rem; font-weight: 700; color: #f9fafb; margin: 1.2rem 0 0.5rem; }
@@ -104,8 +103,101 @@
     color: #9ca3af; margin: 0.6rem 0; }
 .ask-prose a { color: #22d3ee; text-decoration: underline; }
 .ask-prose hr { border-color: #374151; margin: 1rem 0; }
+.citation-ref { color: #22d3ee; font-size: 0.8em; font-weight: 600; }
 </style>
 <script>
+// Lightweight markdown → HTML renderer covering the patterns Claude produces.
+function renderMarkdown(src) {
+    function esc(t) {
+        return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+    function inline(t) {
+        return esc(t)
+            // code spans (before bold/italic to protect backtick content)
+            .replace(/`([^`]+)`/g, '<code>$1</code>')
+            // bold **text** or __text__
+            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+            .replace(/__([^_]+)__/g, '<strong>$1</strong>')
+            // italic *text* or _text_
+            .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+            .replace(/_([^_]+)_/g, '<em>$1</em>')
+            // [source N] → styled citation marker
+            .replace(/\[source (\d+)\]/g, '<span class="citation-ref">[source $1]</span>');
+    }
+
+    const lines = src.split('\n');
+    let html = '';
+    let i = 0;
+    while (i < lines.length) {
+        const line = lines[i];
+
+        // Fenced code block
+        if (line.startsWith('```')) {
+            const lang = line.slice(3).trim();
+            let code = '';
+            i++;
+            while (i < lines.length && !lines[i].startsWith('```')) {
+                code += esc(lines[i]) + '\n';
+                i++;
+            }
+            html += `<pre><code${lang ? ` class="lang-${esc(lang)}"` : ''}>${code}</code></pre>`;
+            i++;
+            continue;
+        }
+
+        // Headings
+        const h3 = line.match(/^###\s+(.*)/);
+        const h2 = line.match(/^##\s+(.*)/);
+        const h1 = line.match(/^#\s+(.*)/);
+        if (h3) { html += `<h3>${inline(h3[1])}</h3>`; i++; continue; }
+        if (h2) { html += `<h2>${inline(h2[1])}</h2>`; i++; continue; }
+        if (h1) { html += `<h1>${inline(h1[1])}</h1>`; i++; continue; }
+
+        // Horizontal rule
+        if (/^---+$/.test(line.trim())) { html += '<hr>'; i++; continue; }
+
+        // Blockquote
+        if (line.startsWith('> ')) {
+            html += `<blockquote>${inline(line.slice(2))}</blockquote>`; i++; continue;
+        }
+
+        // Unordered list
+        if (/^[-*]\s/.test(line)) {
+            html += '<ul>';
+            while (i < lines.length && /^[-*]\s/.test(lines[i])) {
+                html += `<li>${inline(lines[i].slice(2))}</li>`;
+                i++;
+            }
+            html += '</ul>';
+            continue;
+        }
+
+        // Ordered list
+        if (/^\d+\.\s/.test(line)) {
+            html += '<ol>';
+            while (i < lines.length && /^\d+\.\s/.test(lines[i])) {
+                html += `<li>${inline(lines[i].replace(/^\d+\.\s/, ''))}</li>`;
+                i++;
+            }
+            html += '</ol>';
+            continue;
+        }
+
+        // Blank line
+        if (line.trim() === '') { i++; continue; }
+
+        // Paragraph
+        let para = '';
+        while (i < lines.length && lines[i].trim() !== '' &&
+               !/^[#>\-*`\d]/.test(lines[i]) && !/^---/.test(lines[i])) {
+            para += (para ? ' ' : '') + lines[i];
+            i++;
+        }
+        if (para) html += `<p>${inline(para)}</p>`;
+    }
+    return html;
+}
+
 (function () {
     const form      = document.getElementById('ask-form');
     const submitBtn = document.getElementById('submit-btn');
@@ -164,7 +256,7 @@
             }
 
             // Render answer as markdown
-            answerEl.innerHTML = marked.parse(data.answer);
+            answerEl.innerHTML = renderMarkdown(data.answer);
             modelEl.textContent  = `· ${data.model}`;
 
             // Render citations
