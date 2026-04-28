@@ -28,6 +28,9 @@ pub enum ResumeAction {
         /// Resume format(s) to generate
         #[arg(long, default_value = "all")]
         format: ResumeFormat,
+        /// Use Claude to polish the Professional Summary (reads ANTHROPIC_API_KEY env var)
+        #[arg(long)]
+        ai: bool,
     },
     /// Upload generated resume files to S3
     Upload {
@@ -52,6 +55,9 @@ pub enum ResumeAction {
         /// Resume format(s) to generate
         #[arg(long, default_value = "all")]
         format: ResumeFormat,
+        /// Use Claude to polish the Professional Summary (reads ANTHROPIC_API_KEY env var)
+        #[arg(long)]
+        ai: bool,
     },
 }
 
@@ -61,7 +67,11 @@ pub async fn execute(action: ResumeAction) -> anyhow::Result<()> {
             db_path,
             output_dir,
             format,
-        } => generate::generate_resume(&db_path, &output_dir, &format),
+            ai,
+        } => {
+            let api_key = resolve_api_key(ai)?;
+            generate::generate_resume(&db_path, &output_dir, &format, api_key).await
+        }
         ResumeAction::Upload {
             profile,
             output_dir,
@@ -71,9 +81,25 @@ pub async fn execute(action: ResumeAction) -> anyhow::Result<()> {
             db_path,
             output_dir,
             format,
+            ai,
         } => {
-            generate::generate_resume(&db_path, &output_dir, &format)?;
+            let api_key = resolve_api_key(ai)?;
+            generate::generate_resume(&db_path, &output_dir, &format, api_key).await?;
             upload::upload_resume_files(&output_dir, profile).await
         }
     }
+}
+
+/// Reads ANTHROPIC_API_KEY from the environment when `--ai` is requested.
+fn resolve_api_key(ai: bool) -> anyhow::Result<Option<String>> {
+    if !ai {
+        return Ok(None);
+    }
+    let key = std::env::var("ANTHROPIC_API_KEY").map_err(|_| {
+        anyhow::anyhow!(
+            "--ai requires ANTHROPIC_API_KEY to be set in the environment. \
+             Export the key or omit --ai to use the static summary."
+        )
+    })?;
+    Ok(Some(key))
 }

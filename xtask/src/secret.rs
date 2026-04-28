@@ -6,7 +6,7 @@ use clap::Subcommand;
 const SECRET_PREFIX: &str = "deploy-baba/prod/";
 
 /// Known secret short-names (enforced on Put to prevent typos).
-const KNOWN_SECRETS: &[&str] = &["pow-secret", "cognito-temp-password"];
+const KNOWN_SECRETS: &[&str] = &["pow-secret", "cognito-temp-password", "anthropic-api-key"];
 
 fn full_id(name: &str) -> String {
     format!("{}{}", SECRET_PREFIX, name)

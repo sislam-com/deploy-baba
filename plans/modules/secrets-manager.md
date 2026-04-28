@@ -18,6 +18,7 @@ and managed through xtask commands (`just secret-put`, `just secret-get`).
 | Secret name | SM path | Used by |
 |-------------|---------|---------|
 | `pow-secret` | `/deploy-baba/prod/pow-secret` | UI Lambda — PoW HMAC key |
+| `anthropic-api-key` | `/deploy-baba/prod/anthropic-api-key` | UI Lambda — Anthropic API key for W-RST/W-RAG LLM calls |
 
 ### Infra changes (`infra/secrets.tf` — new file)
 - `aws_secretsmanager_secret` — creates the secret resource
@@ -89,6 +90,9 @@ fetch eagerly at Lambda cold start in `main.rs`.
 | W-SEC.4.6 | Update `contact.rs` to fetch POW_SECRET from SM at cold start via `init_pow_secret()` | DONE |
 | W-SEC.4.7 | `just infra-apply` + `just secret-put pow-secret <value>` + `just lambda-deploy` | OPEN — deploy step |
 | W-SEC.4.8 | Verify: submit contact form → challenge → solve → POST → email received | OPEN — W-CTF.4.12 |
+| W-SEC.4.9 | Add `anthropic-api-key` SM resource + IAM policy + `ANTHROPIC_API_KEY_ARN` Lambda env var | DONE (2026-04-15) |
+| W-SEC.4.10 | Load `anthropic-api-key` at cold start in `services/ui/src/main.rs` via `init_anthropic_key()` + OnceLock | DONE (2026-04-15) |
+| W-SEC.4.11 | `just infra-apply PROFILE` + `just secret-put anthropic-api-key <KEY> PROFILE` + `just lambda-deploy PROFILE` | OPEN — provision step |
 
 ### Additional changes beyond original design
 - `infra/secrets.tf` also includes `cognito-temp-password` SM secret (full secret audit)

@@ -10,11 +10,12 @@
 /// automatically by `utoipa-axum` via `routes!()` macros in the router build
 /// function, so there is no hand-maintained `paths(...)` list anywhere.
 use crate::models::{
-    AboutSectionInput, AboutSectionResponse, ApiError, ChallengeResponse, Competency,
-    CompetencyInput, CompetencyWithEvidence, ContactResponse, ContactSubmitRequest, CrateInfo,
-    Evidence, EvidenceInput, EvidenceItem, Field, GenerateSpecRequest, GenerateSpecResponse,
-    HealthResponse, Job, JobDetail, JobDetailInput, JobInput, JobWithDetails, JobsQuery,
-    ParseConfigRequest, ParseConfigResponse, SocialLink, SocialLinkInput, SocialLinkResponse,
+    AboutSectionInput, AboutSectionResponse, ApiError, AskCitation, AskRequest, AskResponse,
+    ChallengeResponse, Competency, CompetencyInput, CompetencyWithEvidence, ContactResponse,
+    ContactSubmitRequest, CrateInfo, Evidence, EvidenceInput, EvidenceItem, Field,
+    GenerateSpecRequest, GenerateSpecResponse, HealthResponse, Job, JobDetail, JobDetailInput,
+    JobInput, JobWithDetails, JobsQuery, MatchedBullet, ParseConfigRequest, ParseConfigResponse,
+    SocialLink, SocialLinkInput, SocialLinkResponse, TailorRequest, TailorResponse,
 };
 use utoipa::OpenApi;
 
@@ -51,6 +52,9 @@ use utoipa::OpenApi;
         ChallengeResponse,
         ContactSubmitRequest,
         ContactResponse,
+        AskRequest,
+        AskCitation,
+        AskResponse,
     )),
     tags(
         (name = "health", description = "Service health checks"),
@@ -61,6 +65,7 @@ use utoipa::OpenApi;
         (name = "contact", description = "Contact form and PoW challenge"),
         (name = "about", description = "About page content"),
         (name = "social", description = "Social links"),
+        (name = "ask", description = "RAG Q&A over the deploy-baba codebase"),
     ),
 )]
 pub struct PublicApiDoc;
@@ -81,9 +86,13 @@ pub struct PublicApiDoc;
         CompetencyInput,
         EvidenceInput,
         Evidence,
+        TailorRequest,
+        MatchedBullet,
+        TailorResponse,
     )),
     tags(
         (name = "admin", description = "Protected admin CRUD (requires auth)"),
+        (name = "tailor", description = "JD-driven resume tailoring (admin only)"),
     ),
     modifiers(&SecurityAddon),
 )]

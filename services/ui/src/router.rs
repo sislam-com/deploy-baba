@@ -83,6 +83,7 @@ pub fn build(state: AppState) -> Router {
         .route("/", get(routes::resume::handler))
         .route("/about/me", get(routes::about::about_me))
         .route("/about/repo", get(routes::about::about_repo))
+        .route("/ask", get(routes::ask::ask_page))
         .route("/contact", get(routes::contact::contact_page))
         .route(
             "/api/contact/challenge",

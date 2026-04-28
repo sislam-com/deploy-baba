@@ -225,6 +225,24 @@ resume-upload PROFILE="default":
 resume PROFILE="default" DB="deploy-baba.db":
     just resume-generate {{DB}} && just resume-upload {{PROFILE}}
 
+# ── RAG ──────────────────────────────────────────────────────────────────────
+
+# Index all corpora (Rust, HCL, plans) into the RAG FTS index
+rag-index DB="deploy-baba.db":
+    cargo xtask rag ingest --db-path {{DB}}
+
+# Index all corpora + .claude/ agent cache (local dev only)
+rag-index-full DB="deploy-baba.db":
+    cargo xtask rag ingest --db-path {{DB}} --include-cache
+
+# Query the RAG index and print ranked chunks
+rag-query QUERY DB="deploy-baba.db":
+    cargo xtask rag query --db-path {{DB}} "{{QUERY}}"
+
+# Retrieve chunks + generate a grounded answer via Claude (requires ANTHROPIC_API_KEY)
+ask QUERY DB="deploy-baba.db":
+    cargo xtask rag ask --db-path {{DB}} "{{QUERY}}"
+
 # ── crates.io ────────────────────────────────────────────────────────────────
 
 # Dry-run publish for all library crates
@@ -248,6 +266,13 @@ secret-get NAME PROFILE="default":
 # List all managed secrets under the deploy-baba/prod/ prefix
 secret-list PROFILE="default":
     just aws-check {{PROFILE}} && cargo xtask secret list --profile {{PROFILE}}
+
+# Run llm-anthropic live integration tests using the key stored in Secrets Manager.
+# Requires AWS auth and the anthropic-api-key secret to be provisioned.
+test-llm PROFILE="default":
+    just aws-check {{PROFILE}} && \
+    ANTHROPIC_API_KEY=$(cargo xtask secret get anthropic-api-key --profile {{PROFILE}} | tail -1) \
+    cargo test -p llm-anthropic -- --ignored --nocapture
 
 # ── Agent Cache ──────────────────────────────────────────────────────────────
 

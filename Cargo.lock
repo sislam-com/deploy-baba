@@ -1291,6 +1291,10 @@ dependencies = [
  "infra-types",
  "jsonwebtoken",
  "lambda_http",
+ "llm-anthropic",
+ "llm-core",
+ "rag-core",
+ "rag-sqlite",
  "rand 0.8.5",
  "reqwest",
  "rusqlite",
@@ -2329,6 +2333,30 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92daf443525c4cce67b150400bc2316076100ce0b3686209eb8cf3c31612e6f0"
 
 [[package]]
+name = "llm-anthropic"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "llm-core",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "llm-core"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "lock_api"
 version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2804,6 +2832,29 @@ name = "r-efi"
 version = "5.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69cdb34c158ceb288df11e18b4bd39de994f6657d83847bdffdbd7f346754b0f"
+
+[[package]]
+name = "rag-core"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "rag-sqlite"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "rag-core",
+ "rusqlite",
+ "serde_json",
+ "thiserror",
+ "tokio",
+]
 
 [[package]]
 name = "rand"
@@ -4221,6 +4272,10 @@ dependencies = [
  "aws-sdk-sts",
  "clap",
  "flate2",
+ "llm-anthropic",
+ "llm-core",
+ "rag-core",
+ "rag-sqlite",
  "rusqlite",
  "serde",
  "serde_json",

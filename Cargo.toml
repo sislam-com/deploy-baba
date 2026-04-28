@@ -1,6 +1,10 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/llm-core",
+    "crates/llm-anthropic",
+    "crates/rag-core",
+    "crates/rag-sqlite",
     "crates/config-core",
     "crates/config-toml",
     "crates/config-yaml",
@@ -38,6 +42,7 @@ toml = "0.8"
 # Error handling
 thiserror = "2"
 anyhow = "1"
+async-trait = "0.1"
 
 # Async
 tokio = { version = "1", features = ["full"] }
@@ -105,6 +110,10 @@ api-graphql = { path = "crates/api-graphql" }
 api-grpc = { path = "crates/api-grpc" }
 api-merger = { path = "crates/api-merger" }
 infra-types = { path = "crates/infra-types" }
+llm-core = { path = "crates/llm-core" }
+llm-anthropic = { path = "crates/llm-anthropic" }
+rag-core = { path = "crates/rag-core" }
+rag-sqlite = { path = "crates/rag-sqlite" }
 
 [profile.release]
 lto = true

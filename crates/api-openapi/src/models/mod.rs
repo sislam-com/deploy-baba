@@ -32,6 +32,7 @@ pub const fn _assert_model<T: ApiModel>() {}
 
 pub mod about;
 pub mod admin;
+pub mod ask;
 pub mod common;
 pub mod contact;
 pub mod crates;
@@ -40,6 +41,7 @@ pub mod health;
 pub mod resume;
 pub mod social;
 pub mod stack; // empty — stack returns serde_json::Value directly
+pub mod tailor;
 
 // Flat re-exports so consumers can write `use api_openapi::models::*`
 pub use common::*;
@@ -48,7 +50,9 @@ pub use health::*;
 // stack module is empty — no re-export needed
 pub use about::*;
 pub use admin::*;
+pub use ask::*;
 pub use contact::*;
 pub use demo::*;
 pub use resume::*;
 pub use social::*;
+pub use tailor::*;
