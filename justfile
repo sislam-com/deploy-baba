@@ -147,11 +147,17 @@ aws-setup:
 aws-whoami PROFILE="default":
     aws sts get-caller-identity --profile {{PROFILE}}
 
+# ── Developer Environment ─────────────────────────────────────────────────────
+
+# Verify all prerequisites (rustup, cargo-lambda, node≥20, pnpm, tofu, AWS SSO, cache)
+dev-doctor:
+    bash scripts/dev-doctor.sh
+
 # ── Infrastructure (OpenTofu) ────────────────────────────────────────────────
 
-# Bootstrap: create S3 state bucket + write sentinel SSM param (first run only)
+# Bootstrap: create S3 state bucket + DynamoDB lock table (idempotent, run once per account)
 infra-bootstrap PROFILE="default" REGION="us-east-1":
-    cargo xtask infra bootstrap --profile {{PROFILE}} --region {{REGION}}
+    bash scripts/bootstrap-tfstate.sh
 
 # Preview infrastructure changes
 infra-plan PROFILE="default":
@@ -287,3 +293,17 @@ cache-refresh:
 # Delete the cache to force a full re-scan next session
 cache-clear:
     cargo xtask cache clear
+
+# ── Release Management ────────────────────────────────────────────────────────
+
+# Dry-run: print the next version derived from conventional commits since the last dev-v* tag
+release-next:
+    cargo xtask release next
+
+# Create a dev-vX.Y.Z annotated tag at HEAD (CI runs this automatically after a successful deploy)
+release-tag KIND="dev" PUSH="":
+    cargo xtask release tag --kind {{KIND}} {{ if PUSH != "" { "--push" } else { "" } }}
+
+# Promote the latest dev-v* tag to vX.Y.Z, triggering deploy-prod.yml (with manual approval)
+release-promote PUSH="":
+    cargo xtask release promote {{ if PUSH != "" { "--push" } else { "" } }}

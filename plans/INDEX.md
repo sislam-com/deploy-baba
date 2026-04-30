@@ -36,10 +36,10 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | resume-tailor | W-RST | `services/ui/src/tailor/`, `crates/api-openapi/src/models/tailor.rs`, `services/ui/migrations/016` | TODO | All items; BLOCKED-on-deploy for 4.3/4.4/4.5 until W-SEC deployed + `anthropic-api-key` in SM |
 | rag | W-RAG | `crates/rag-core/`, `crates/rag-sqlite/` | PROPOSED | P1 CLI → P2 deploy-failure diagnosis → P3 /api/ask; blocked on W-LLM for generation. |
 | gdrive-planning | W-GDR | `justfile`, `.claude/settings.json`, `.github/workflows/` | TODO | Drive MCP plan export/import (W-GDR.4.1–4.3); Stop hook quality gate (W-GDR.4.4); evaluated from Gemini proposal 2026-04-15 |
-| ai-dlc | W-AIL | `.claude/agents/`, `.claude/skills/` | TODO | plan-doctor + drift-detector subagents; /plan-sync, /cache-refresh, /memory-curate skills; weekly schedule |
-| ci | W-CI | `.github/workflows/` | TODO | GitHub OIDC roles; deploy-dev.yml + deploy-prod.yml; xtask release subcommand; SPA sync |
+| ai-dlc | W-AIL | `.claude/agents/`, `.claude/skills/` | DONE | plan-doctor + drift-detector subagents; /plan-sync, /cache-refresh, /memory-curate skills; weekly schedule |
+| ci | W-CI | `.github/workflows/` | WIP | GitHub OIDC roles; deploy-dev.yml + deploy-prod.yml; xtask release subcommand; SPA sync |
 | web (SPA) | W-WEB | `web/` | TODO | Vite 6 + React 18 SPA replacing all 15 Askama templates; openapi-fetch client; phases D.1–D.5 |
-| dev-environment | W-DEV | `scripts/`, `.devcontainer/` | TODO | bootstrap-tfstate.sh; dev-doctor.sh; devcontainer; initial-setup.md |
+| dev-environment | W-DEV | `scripts/`, `.devcontainer/` | DONE | bootstrap-tfstate.sh; dev-doctor.sh; devcontainer; initial-setup.md |
 
 ---
 
@@ -47,11 +47,11 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 
 ### P0.1 — AI-DLC + Deployment Automation + Full SPA (this import, branch: `feat/llm-core`)
 
-1. **W-AIL.4.1–4.5** — Anti-rot agents (`plan-doctor`, `drift-detector`) and skills (`/plan-sync`, `/cache-refresh`, `/memory-curate`). Phase B.
-2. **W-DEV.4.1–4.6** — Dev-environment scripts + devcontainer + initial-setup.md. Phase E.
-3. **W-CI.4.1–4.10** — CI/CD with OIDC + xtask release subcommand + dev Lambda + workflows (Lambda-only, Phase C.1).
+1. ~~**W-AIL.4.1–4.5**~~ **DONE** — Anti-rot agents + skills (Phase B complete).
+2. ~~**W-DEV.4.1–4.6**~~ **DONE** — Dev-environment scripts + devcontainer (Phase E complete).
+3. ~~**W-CI.4.1–4.4, 4.6–4.8**~~ **DONE** — xtask release subcommand + OIDC infra + workflows (Phase C.1 code complete). Remaining: W-CI.4.5 (dev Lambda workspace, one-time manual), W-CI.4.9 (GitHub Variables), W-CI.4.10 (production environment).
 4. **W-WEB.4.1–4.3** — SPA scaffold (`web/`) + missing JSON API endpoints. Phase D.1.
-5. **W-CI.4.11–4.12** — Extend workflows with SPA sync steps. Phase C.2.
+5. **W-CI.4.11–4.12** — Extend workflows with SPA sync steps. Phase C.2 (after D.1).
 6. **W-WEB.4.4–4.5** — Port `/ask` + `/dashboard/*` to React. Phase D.2.
 7. **W-WEB.4.6** — Port marketing routes. Phase D.3.
 8. **W-WEB.4.7–4.8** — Flip Axum router + SPA sync handler + s3-spa.tf. Phase D.4.

@@ -1,5 +1,5 @@
 # W-DEV: Developer Environment
-**Path:** `scripts/`, `.devcontainer/`, `docs/`, `plans/cross-cutting/initial-setup.md` | **Status:** TODO
+**Path:** `scripts/`, `.devcontainer/`, `docs/`, `plans/cross-cutting/initial-setup.md` | **Status:** DONE
 **Coverage floor:** n/a | **Depends on:** W-DX, W-OTF | **Depended on by:** W-CI (bootstrap-tfstate.sh used in one-time setup before CI can apply infra)
 
 ## W-DEV.1 Purpose
@@ -87,12 +87,12 @@ OpenTofu is not installed as a devcontainer feature (no official feature exists)
 
 | ID | Task | Status | Notes |
 |---|---|---|---|
-| W-DEV.4.1 | `scripts/bootstrap-tfstate.sh` | TODO | Idempotent; adapted from njnewsroomproject |
-| W-DEV.4.2 | `scripts/dev-doctor.sh` | TODO | Prerequisite checker; used as postCreateCommand |
-| W-DEV.4.3 | `.devcontainer/devcontainer.json` | TODO | Node 20 + aws-cli + github-cli features |
-| W-DEV.4.4 | `plans/cross-cutting/initial-setup.md` | TODO | Full first-run guide |
-| W-DEV.4.5 | `just dev-doctor` recipe | TODO | `bash scripts/dev-doctor.sh` |
-| W-DEV.4.6 | `just infra-bootstrap` recipe | TODO | `bash scripts/bootstrap-tfstate.sh` (closes W-XT.4.3) |
+| W-DEV.4.1 | `scripts/bootstrap-tfstate.sh` | DONE | Idempotent; adapted from njnewsroomproject; just infra-bootstrap now calls this |
+| W-DEV.4.2 | `scripts/dev-doctor.sh` | DONE | Checks rustup/cargo-lambda/node≥20/pnpm/tofu/AWS SSO/cache freshness |
+| W-DEV.4.3 | `.devcontainer/devcontainer.json` | DONE | Node 20 + aws-cli + github-cli features + opentofu install |
+| W-DEV.4.4 | `plans/cross-cutting/initial-setup.md` | DONE | Created in Phase A |
+| W-DEV.4.5 | `just dev-doctor` recipe | DONE | `bash scripts/dev-doctor.sh` |
+| W-DEV.4.6 | `just infra-bootstrap` recipe | DONE | `bash scripts/bootstrap-tfstate.sh` (updated from xtask call) |
 
 ## W-DEV.5 Test Strategy
 

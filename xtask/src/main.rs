@@ -15,6 +15,7 @@ mod deploy;
 mod infra;
 mod quality;
 mod rag;
+mod release;
 mod resume;
 mod secret;
 mod test;
@@ -97,6 +98,8 @@ enum Commands {
         #[arg(long)]
         dry_run: bool,
     },
+    /// Release management (next version, tag, promote dev→prod)
+    Release(release::ReleaseArgs),
 }
 
 #[tokio::main]
@@ -127,6 +130,9 @@ async fn run() -> anyhow::Result<()> {
             environment,
             dry_run,
         } => publish(environment, dry_run).await,
+        Commands::Release(args) => tokio::task::spawn_blocking(|| release::run(args))
+            .await
+            .map_err(|e| anyhow::anyhow!("release task panicked: {e}"))?,
     }
 }
 

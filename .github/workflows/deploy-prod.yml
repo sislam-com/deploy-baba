@@ -1,0 +1,59 @@
+name: Deploy Prod
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to prod
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.CI_DEPLOY_PROD_ROLE_ARN }}
+          aws-region: us-east-1
+
+      # ── Build Lambda ──────────────────────────────────────────────────────────
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install cargo-lambda
+        run: pip install cargo-lambda
+
+      - name: Build Lambda binary
+        run: |
+          cargo lambda build --release --package deploy-baba-ui --target aarch64-unknown-linux-gnu
+          mkdir -p infra/build
+          zip -j infra/build/lambda.zip target/lambda/deploy-baba-ui/bootstrap
+
+      - name: Update Lambda code
+        run: |
+          aws lambda update-function-code \
+            --function-name ${{ vars.PROD_UI_FN_NAME }} \
+            --zip-file fileb://infra/build/lambda.zip \
+            --architectures arm64 \
+            --region us-east-1
+
+      - name: Wait for Lambda update
+        run: |
+          aws lambda wait function-updated \
+            --function-name ${{ vars.PROD_UI_FN_NAME }} \
+            --region us-east-1
+
+      # ── Smoke test ────────────────────────────────────────────────────────────
+
+      - name: Smoke test /health
+        run: |
+          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" "${{ vars.PROD_FN_URL }}health" || echo "000")
+          echo "Health check status: ${STATUS}"
+          [[ "${STATUS}" == "200" ]]

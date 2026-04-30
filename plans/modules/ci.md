@@ -1,5 +1,5 @@
 # W-CI: CI/CD Pipeline
-**Path:** `.github/workflows/` | **Status:** TODO
+**Path:** `.github/workflows/` | **Status:** WIP
 **Coverage floor:** n/a | **Depends on:** W-OTF, W-WEB, W-XT | **Depended on by:** (deployed binaries + SPA)
 
 ## W-CI.1 Purpose
@@ -79,14 +79,14 @@ Requires `permissions: contents: write` and `fetch-depth: 0` checkout.
 
 | ID | Task | Status | Notes |
 |---|---|---|---|
-| W-CI.4.1 | `xtask/src/release/{mod,git,version,changelog}.rs` | TODO | Conventional-commits versioning; `just release-next/tag/promote` |
-| W-CI.4.2 | Wire `release` subcommand in `xtask/src/main.rs` | TODO | Depends on W-CI.4.1 |
-| W-CI.4.3 | Add `just release-next`, `release-tag`, `release-promote` recipes | TODO | Justfile additions |
-| W-CI.4.4 | `infra/ci-oidc.tf` — two IAM OIDC roles | TODO | Requires OTF migration (W-OTF) to be on `tofu` binary |
-| W-CI.4.5 | Provision dev Lambda workspace (`tofu workspace new dev`) | TODO | Parameterised `infra/lambda.tf` on `var.environment` |
-| W-CI.4.6 | Update `.github/workflows/ci.yml` — add web + tofu jobs | TODO | web job conditional on `web/package.json` |
-| W-CI.4.7 | New `.github/workflows/deploy-dev.yml` (C.1 — Lambda only) | TODO | OIDC + lambda-build + lambda-update + health check + release tag |
-| W-CI.4.8 | New `.github/workflows/deploy-prod.yml` | TODO | `production` env gate + same deploy flow |
+| W-CI.4.1 | `xtask/src/release/{mod,git,version,changelog}.rs` | DONE | 23 unit tests; `just release-next/tag/promote` wired |
+| W-CI.4.2 | Wire `release` subcommand in `xtask/src/main.rs` | DONE | `spawn_blocking` wrapper since release ops are sync |
+| W-CI.4.3 | Add `just release-next`, `release-tag`, `release-promote` recipes | DONE | Justfile additions |
+| W-CI.4.4 | `infra/ci-oidc.tf` — two IAM OIDC roles | DONE | `deploy-baba-ci-deploy-dev` + `deploy-baba-ci-deploy-prod`; outputs role ARNs |
+| W-CI.4.5 | Provision dev Lambda workspace (`tofu workspace new dev`) | TODO | Requires `tofu workspace new dev` + apply (manual one-time) |
+| W-CI.4.6 | Update `.github/workflows/ci.yml` — add web + tofu jobs | DONE | web job conditional on `web/package.json`; tofu fmt+validate |
+| W-CI.4.7 | New `.github/workflows/deploy-dev.yml` (C.1 — Lambda only) | DONE | OIDC + lambda-build + lambda-update + health check + release tag |
+| W-CI.4.8 | New `.github/workflows/deploy-prod.yml` | DONE | `production` env gate (manual approval) + same deploy flow |
 | W-CI.4.9 | Set GitHub Variables (manual, one-time) | TODO | CI_DEPLOY_*_ROLE_ARN, *_UI_FN_NAME, *_SPA_BUCKET, *_FN_URL |
 | W-CI.4.10 | Create GitHub `production` environment + Required Reviewers | TODO | Repo Settings → Environments → production |
 | W-CI.4.11 | Extend deploy-dev.yml with SPA sync (C.2) | TODO | Blocked on W-WEB.4.1 (web/ scaffold exists) and W-CI.4.4 (s3-spa.tf applied) |
