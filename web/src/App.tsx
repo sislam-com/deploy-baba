@@ -8,6 +8,17 @@ const Contact = lazy(() => import('./routes/Contact'))
 const Ask = lazy(() => import('./routes/Ask'))
 const NotFound = lazy(() => import('./routes/NotFound'))
 
+const DashboardLayout = lazy(() => import('./routes/dashboard/Layout'))
+const DashboardHome = lazy(() => import('./routes/dashboard/index'))
+const Jobs = lazy(() => import('./routes/dashboard/Jobs'))
+const JobDetail = lazy(() => import('./routes/dashboard/JobDetail'))
+const Competencies = lazy(() => import('./routes/dashboard/Competencies'))
+const CompetencyDetail = lazy(() => import('./routes/dashboard/CompetencyDetail'))
+const About = lazy(() => import('./routes/dashboard/About'))
+const AboutDetail = lazy(() => import('./routes/dashboard/AboutDetail'))
+const SocialLinks = lazy(() => import('./routes/dashboard/SocialLinks'))
+const SocialLinkDetail = lazy(() => import('./routes/dashboard/SocialLinkDetail'))
+
 function LoadingSpinner() {
   return (
     <div className="flex items-center justify-center min-h-screen">
@@ -25,6 +36,19 @@ export default function App() {
         <Route path="/about/repo" element={<AboutRepo />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/ask" element={<Ask />} />
+
+        <Route path="/dashboard" element={<DashboardLayout />}>
+          <Route index element={<DashboardHome />} />
+          <Route path="jobs" element={<Jobs />} />
+          <Route path="jobs/:id" element={<JobDetail />} />
+          <Route path="competencies" element={<Competencies />} />
+          <Route path="competencies/:id" element={<CompetencyDetail />} />
+          <Route path="about" element={<About />} />
+          <Route path="about/:id" element={<AboutDetail />} />
+          <Route path="social-links" element={<SocialLinks />} />
+          <Route path="social-links/:id" element={<SocialLinkDetail />} />
+        </Route>
+
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>

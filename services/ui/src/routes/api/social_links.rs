@@ -14,9 +14,7 @@ pub use api_openapi::models::SocialLink;
         (status = 200, description = "All visible social links ordered by sort_order", body = Vec<SocialLink>)
     )
 )]
-pub async fn list_social_links(
-    State(db): State<Arc<Db>>,
-) -> Json<Vec<SocialLink>> {
+pub async fn list_social_links(State(db): State<Arc<Db>>) -> Json<Vec<SocialLink>> {
     let conn = db.conn.lock().unwrap();
     Json(load_social_links(&conn))
 }

@@ -1,11 +1,11 @@
+use crate::middleware::extract_token_from_headers;
+use crate::state::AppState;
 use axum::{
     extract::State,
     http::{HeaderMap, StatusCode},
     routing::get,
     Json, Router,
 };
-use crate::middleware::extract_token_from_headers;
-use crate::state::AppState;
 
 pub use api_openapi::models::AuthMe;
 

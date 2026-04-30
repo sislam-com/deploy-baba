@@ -21,9 +21,7 @@ fn db_err(e: impl std::fmt::Display) -> ApiError {
         (status = 500, description = "Database error")
     )
 )]
-pub async fn get_resume_data(
-    State(db): State<Arc<Db>>,
-) -> Result<Json<ResumeData>, ApiError> {
+pub async fn get_resume_data(State(db): State<Arc<Db>>) -> Result<Json<ResumeData>, ApiError> {
     let conn = db.conn.lock().unwrap();
 
     let bio = conn
@@ -61,8 +59,7 @@ pub async fn get_resume_data(
                 start_date: row.get(5)?,
                 end_date: row.get(6)?,
                 summary: row.get(7)?,
-                tech_stack: tech_raw
-                    .map(|s| s.split(',').map(|t| t.trim().to_string()).collect()),
+                tech_stack: tech_raw.map(|s| s.split(',').map(|t| t.trim().to_string()).collect()),
                 sort_order: row.get(9)?,
             })
         })
