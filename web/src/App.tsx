@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom'
 import { Suspense, lazy } from 'react'
 
+const Layout = lazy(() => import('./components/Layout'))
 const Home = lazy(() => import('./routes/Home'))
 const AboutMe = lazy(() => import('./routes/AboutMe'))
 const AboutRepo = lazy(() => import('./routes/AboutRepo'))
@@ -21,7 +22,7 @@ const SocialLinkDetail = lazy(() => import('./routes/dashboard/SocialLinkDetail'
 
 function LoadingSpinner() {
   return (
-    <div className="flex items-center justify-center min-h-screen">
+    <div className="flex items-center justify-center min-h-screen bg-gray-900">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400" />
     </div>
   )
@@ -31,12 +32,17 @@ export default function App() {
   return (
     <Suspense fallback={<LoadingSpinner />}>
       <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/about/me" element={<AboutMe />} />
-        <Route path="/about/repo" element={<AboutRepo />} />
-        <Route path="/contact" element={<Contact />} />
-        <Route path="/ask" element={<Ask />} />
+        {/* Marketing routes — share the nav/footer Layout */}
+        <Route element={<Layout />}>
+          <Route path="/" element={<Home />} />
+          <Route path="/about/me" element={<AboutMe />} />
+          <Route path="/about/repo" element={<AboutRepo />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/ask" element={<Ask />} />
+          <Route path="*" element={<NotFound />} />
+        </Route>
 
+        {/* Dashboard — own sidebar layout, auth-gated */}
         <Route path="/dashboard" element={<DashboardLayout />}>
           <Route index element={<DashboardHome />} />
           <Route path="jobs" element={<Jobs />} />
@@ -48,8 +54,6 @@ export default function App() {
           <Route path="social-links" element={<SocialLinks />} />
           <Route path="social-links/:id" element={<SocialLinkDetail />} />
         </Route>
-
-        <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>
   )
