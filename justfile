@@ -153,6 +153,41 @@ aws-whoami PROFILE="default":
 dev-doctor:
     bash scripts/dev-doctor.sh
 
+# ── Web / SPA (Vite + React) ──────────────────────────────────────────────────
+
+# Start Vite dev server on :5173 with /api proxy to :3000
+web:
+    pnpm --dir web dev
+
+# Build SPA to web/dist/
+web-build:
+    pnpm --dir web run build
+
+# Run Vitest unit tests
+web-test:
+    pnpm --dir web run test
+
+# TypeScript type check (no emit)
+web-typecheck:
+    pnpm --dir web run typecheck
+
+# ESLint
+web-lint:
+    pnpm --dir web run lint
+
+# Regenerate src/api/types.gen.ts from the running local server (requires just ui on :3000)
+web-types:
+    pnpm --dir web run types
+
+# Start both the Rust API server (:3000) and Vite dev server (:5173) in parallel
+dev-stack:
+    #!/usr/bin/env bash
+    set -e
+    trap 'kill 0' SIGINT SIGTERM EXIT
+    just ui &
+    just web &
+    wait
+
 # ── Infrastructure (OpenTofu) ────────────────────────────────────────────────
 
 # Bootstrap: create S3 state bucket + DynamoDB lock table (idempotent, run once per account)

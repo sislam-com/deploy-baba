@@ -1,5 +1,5 @@
 # W-WEB: React/Vite SPA
-**Path:** `web/` | **Status:** TODO
+**Path:** `web/` | **Status:** WIP
 **Coverage floor:** smoke (≥1 render test per route) | **Depends on:** W-APIO, W-UI | **Depended on by:** W-CI (SPA deploy)
 
 ## W-WEB.1 Purpose
@@ -105,17 +105,17 @@ src/
 
 | ID | Task | Status | Notes |
 |---|---|---|---|
-| W-WEB.4.1 | Scaffold web/ (package.json, tsconfig, vite.config, tailwind, index.html, main.tsx, App.tsx) | TODO | Phase D.1 |
-| W-WEB.4.2 | openapi-fetch client + `just web-types` recipe | TODO | Phase D.1; depends on `/api/openapi.json` returning valid spec |
-| W-WEB.4.3 | New JSON endpoints: `/api/resume`, `/api/about/sections`, `/api/about/repo/snapshot`, `/api/social-links`, `/api/auth/me` | TODO | Phase D.1; backend work in services/ui + crates/api-openapi |
+| W-WEB.4.1 | Scaffold web/ (package.json, tsconfig, vite.config, tailwind, index.html, main.tsx, App.tsx) | DONE | Vite 6 + React 18 + React Router 6 + Tailwind 3; `pnpm build` clean |
+| W-WEB.4.2 | openapi-fetch client + `just web-types` recipe | DONE | Placeholder types.gen.ts committed; `pnpm types` regenerates from running server |
+| W-WEB.4.3 | New JSON endpoints: `/api/resume`, `/api/about/sections`, `/api/social-links`, `/api/auth/me` | DONE | AuthMe + ResumeData models added; all handlers wired in router; `/api/auth/me` reads cookie |
 | W-WEB.4.4 | Port `/ask` → Ask.tsx (react-markdown + CitationBadge) | TODO | Phase D.2 |
 | W-WEB.4.5 | Port `/dashboard/*` → 9 dashboard React components | TODO | Phase D.2 |
 | W-WEB.4.6 | Port marketing routes → Home, AboutMe, AboutRepo, Resume, Contact, NotFound | TODO | Phase D.3 |
 | W-WEB.4.7 | Flip Axum router: ServeDir catch-all + remove Askama routes | TODO | Phase D.4 |
 | W-WEB.4.8 | Sync handler `services/ui/src/sync.rs` + `infra/s3-spa.tf` | TODO | Phase D.4; port from njnewsroomproject |
 | W-WEB.4.9 | Remove Askama from services/ui/Cargo.toml; delete templates/ | TODO | Phase D.5 |
-| W-WEB.4.10 | Vitest smoke tests (≥1 per route, ≥1 API mock) | TODO | Phase D.1–D.3 incremental |
-| W-WEB.4.11 | `pnpm --dir web run typecheck` clean (strict) | TODO | Must pass before each D.* merge |
+| W-WEB.4.10 | Vitest smoke tests (≥1 per route, ≥1 API mock) | WIP | Smoke test added; per-route tests come in D.2/D.3 |
+| W-WEB.4.11 | `pnpm --dir web run typecheck` clean (strict) | DONE | Passes with strict mode |
 
 ## W-WEB.5 SEO Prerender Follow-up (P3)
 

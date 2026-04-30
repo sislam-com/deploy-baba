@@ -38,7 +38,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | gdrive-planning | W-GDR | `justfile`, `.claude/settings.json`, `.github/workflows/` | TODO | Drive MCP plan export/import (W-GDR.4.1–4.3); Stop hook quality gate (W-GDR.4.4); evaluated from Gemini proposal 2026-04-15 |
 | ai-dlc | W-AIL | `.claude/agents/`, `.claude/skills/` | DONE | plan-doctor + drift-detector subagents; /plan-sync, /cache-refresh, /memory-curate skills; weekly schedule |
 | ci | W-CI | `.github/workflows/` | WIP | GitHub OIDC roles; deploy-dev.yml + deploy-prod.yml; xtask release subcommand; SPA sync |
-| web (SPA) | W-WEB | `web/` | TODO | Vite 6 + React 18 SPA replacing all 15 Askama templates; openapi-fetch client; phases D.1–D.5 |
+| web (SPA) | W-WEB | `web/` | WIP | Vite 6 + React 18 SPA replacing all 15 Askama templates; openapi-fetch client; phases D.1–D.5 |
 | dev-environment | W-DEV | `scripts/`, `.devcontainer/` | DONE | bootstrap-tfstate.sh; dev-doctor.sh; devcontainer; initial-setup.md |
 
 ---

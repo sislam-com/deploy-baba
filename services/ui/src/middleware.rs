@@ -36,6 +36,10 @@ pub async fn require_auth(
     }
 }
 
+pub fn extract_token_from_headers(headers: &HeaderMap) -> Option<String> {
+    extract_token(headers)
+}
+
 fn extract_token(headers: &HeaderMap) -> Option<String> {
     // 1. auth_token cookie
     if let Some(cookie_hdr) = headers.get("cookie") {

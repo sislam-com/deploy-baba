@@ -1,9 +1,13 @@
+pub mod about;
 pub mod admin;
 pub mod ask;
+pub mod auth_me;
 pub mod competencies;
 pub mod crates;
 pub mod demo;
 pub mod jobs;
+pub mod resume_data;
+pub mod social_links;
 pub mod stack;
 
 use axum::Router;
@@ -17,5 +21,9 @@ pub fn router() -> Router<AppState> {
         .nest("/demo", demo::router())
         .nest("/jobs", jobs::router())
         .nest("/competencies", competencies::router())
+        .nest("/about", about::router())
+        .nest("/social-links", social_links::router())
+        .nest("/resume", resume_data::router())
+        .nest("/auth", auth_me::router())
         .merge(ask::router())
 }

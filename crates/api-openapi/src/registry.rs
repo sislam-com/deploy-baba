@@ -135,6 +135,13 @@ pub const ALL_MODELS: &[(&str, ModelFactory)] = &[
     ("AskResponse", || {
         serde_json::to_value(AskResponse::example()).expect("AskResponse example")
     }),
+    // auth + portfolio (SPA endpoints)
+    ("AuthMe", || {
+        serde_json::to_value(AuthMe::example()).expect("AuthMe example")
+    }),
+    ("ResumeData", || {
+        serde_json::to_value(ResumeData::example()).expect("ResumeData example")
+    }),
 ];
 
 #[cfg(test)]
