@@ -1,5 +1,5 @@
 # deploy-baba — Plan Index
-**GitHub:** `shantopagla/deploy-baba` | **Last updated:** 2026-04-15
+**GitHub:** `shantopagla/deploy-baba` | **Last updated:** 2026-04-30
 **Source repo:** `~/shanto` (Baba Toolchain, ~85K LOC) | **Status:** ~93% complete
 
 See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming rules.
@@ -36,10 +36,29 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | resume-tailor | W-RST | `services/ui/src/tailor/`, `crates/api-openapi/src/models/tailor.rs`, `services/ui/migrations/016` | TODO | All items; BLOCKED-on-deploy for 4.3/4.4/4.5 until W-SEC deployed + `anthropic-api-key` in SM |
 | rag | W-RAG | `crates/rag-core/`, `crates/rag-sqlite/` | PROPOSED | P1 CLI → P2 deploy-failure diagnosis → P3 /api/ask; blocked on W-LLM for generation. |
 | gdrive-planning | W-GDR | `justfile`, `.claude/settings.json`, `.github/workflows/` | TODO | Drive MCP plan export/import (W-GDR.4.1–4.3); Stop hook quality gate (W-GDR.4.4); evaluated from Gemini proposal 2026-04-15 |
+| ai-dlc | W-AIL | `.claude/agents/`, `.claude/skills/` | TODO | plan-doctor + drift-detector subagents; /plan-sync, /cache-refresh, /memory-curate skills; weekly schedule |
+| ci | W-CI | `.github/workflows/` | TODO | GitHub OIDC roles; deploy-dev.yml + deploy-prod.yml; xtask release subcommand; SPA sync |
+| web (SPA) | W-WEB | `web/` | TODO | Vite 6 + React 18 SPA replacing all 15 Askama templates; openapi-fetch client; phases D.1–D.5 |
+| dev-environment | W-DEV | `scripts/`, `.devcontainer/` | TODO | bootstrap-tfstate.sh; dev-doctor.sh; devcontainer; initial-setup.md |
 
 ---
 
 ## Remaining Work — Priority Order
+
+### P0.1 — AI-DLC + Deployment Automation + Full SPA (this import, branch: `feat/llm-core`)
+
+1. **W-AIL.4.1–4.5** — Anti-rot agents (`plan-doctor`, `drift-detector`) and skills (`/plan-sync`, `/cache-refresh`, `/memory-curate`). Phase B.
+2. **W-DEV.4.1–4.6** — Dev-environment scripts + devcontainer + initial-setup.md. Phase E.
+3. **W-CI.4.1–4.10** — CI/CD with OIDC + xtask release subcommand + dev Lambda + workflows (Lambda-only, Phase C.1).
+4. **W-WEB.4.1–4.3** — SPA scaffold (`web/`) + missing JSON API endpoints. Phase D.1.
+5. **W-CI.4.11–4.12** — Extend workflows with SPA sync steps. Phase C.2.
+6. **W-WEB.4.4–4.5** — Port `/ask` + `/dashboard/*` to React. Phase D.2.
+7. **W-WEB.4.6** — Port marketing routes. Phase D.3.
+8. **W-WEB.4.7–4.8** — Flip Axum router + SPA sync handler + s3-spa.tf. Phase D.4.
+9. **W-WEB.4.9** — Remove Askama. Phase D.5.
+10. **W-AIL.4.7** — Wire weekly schedule (`dbb-plan-sync`, `dbb-memory-curate`) via `/schedule`.
+
+---
 
 ### P0 — New Feature (in progress on `cognito-login` branch)
 1. ~~**W-AUTH.4.1–4.15**~~ — Cognito auth + admin dashboard — **DONE** (code compiles clean, Cognito infra deployed to `us-east-1_I7c15vLHE`)
@@ -110,6 +129,12 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | ADR-014 | Resume Professional Summary Sourced from DB (`about_sections.me-bio`) — hardcoded `SUMMARY` const deleted; generator loads + polishes bio at generation time; errors on missing row | W-RSM, W-XT, W-RST |
 | ADR-015 | LLM Provider Abstraction + Grounding Contract — `crates/llm-core` (vendor-agnostic trait) + `crates/llm-anthropic` (first impl); universal grounding contract at prompt-assembly layer; Claude as MVP provider; cargo feature-flag selection | W-LLM, W-RST, W-RAG, W-RSM, W-SEC, W-APIO, W-UI |
 | ADR-016 | RAG Architecture — SQLite + sqlite-vec + FTS5 hybrid retrieval; all embedding/generation via llm-core (ADR-015); per-corpus chunkers; `.claude/` cache local-CLI only | W-RAG |
+| ADR-017 | AI-Assisted Development Lifecycle (AI-DLC) — 6-stage session lifecycle; agent-cache startup protocol; quality gates; maintenance stage anti-rot | all |
+| ADR-018 | Anti-rot Agents — plan-doctor + drift-detector subagents; /plan-sync, /cache-refresh, /memory-curate skills; weekly schedule | W-AIL |
+| ADR-019 | React/Vite SPA Replaces Askama — full replacement; hybrid JSON API + asset server; phases D.1–D.5; SEO prerender P3 | W-WEB, W-UI, W-AUTH, W-ABT, W-SL, W-RSM, W-RAG, W-OTF, W-CI |
+| ADR-020 | GitHub Actions CI with OIDC — two IAM roles (dev/prod); no long-lived keys; deploy-dev.yml + deploy-prod.yml | W-CI, W-OTF, W-WEB |
+| ADR-021 | Automated Release Tagging via xtask — `dev-vX.Y.Z` on CI; `vX.Y.Z` via `just release-promote`; conventional-commits versioning | W-CI, W-XT |
+| ADR-022 | Developer First-Run Environment — scripts/bootstrap-tfstate.sh; scripts/dev-doctor.sh; .devcontainer/; initial-setup.md | W-DEV, W-DX |
 
 ---
 
@@ -143,6 +168,23 @@ llm-core     ←── llm-anthropic, services/ui (via W-RST tailor pipeline)
 Full dependency order: `plans/cross-cutting/dependency-graph.md`
 
 Implementation sequencing for W-LLM/W-RST/W-RAG/W-GDR: `plans/cross-cutting/execution-roadmap.md`
+
+---
+
+## Cross-Cutting Docs
+
+| Doc | Purpose |
+|-----|---------|
+| `aws-architecture.md` | AWS resource topology |
+| `aws-setup-spec.md` | IAM policy + profile bootstrapping |
+| `dependency-graph.md` | Crate dependency order |
+| `execution-roadmap.md` | W-LLM/W-RST/W-RAG/W-GDR sequencing |
+| `llm-policy.md` | LLM ops: provider registry, prompt versioning, cost caps, retry/fallback, PII |
+| `publishing.md` | crates.io release plan (W-PUB) |
+| `quality-gates.md` | Quality gate definitions (Rust + Web + OpenTofu) |
+| `integration-tests.md` | W-QA test infrastructure plan |
+| `ai-dlc.md` | AI Development Lifecycle — session protocol + quality gates + maintenance agents |
+| `initial-setup.md` | Developer first-run guide (prerequisites, bootstrap, local dev loop) |
 
 ---
 

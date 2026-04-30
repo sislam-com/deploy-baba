@@ -52,6 +52,10 @@ Example: `DRL-2026-03-18-terraform.md`
 | `RST` | resume-tailor | `services/ui/src/tailor/`, `crates/api-openapi/src/models/tailor.rs` — JD-driven AI resume tailoring pipeline, consumer of W-LLM; distinct from W-RSM static generator |
 | `RAG` | rag (retrieval-augmented generation) | `crates/rag-core/`, `crates/rag-sqlite/` |
 | `GDR` | gdrive-planning | `justfile`, `.claude/settings.json`, `.github/workflows/` |
+| `AIL` | AI Development Lifecycle | `.claude/agents/`, `.claude/skills/`, `plans/cross-cutting/ai-dlc.md`, `.agent-cache/` |
+| `CI` | CI/CD pipeline | `.github/workflows/`, `infra/ci-oidc.tf`, `xtask/src/release/` |
+| `WEB` | Vite SPA (React 18 + TypeScript) | `web/` |
+| `DEV` | Developer environment | `scripts/`, `.devcontainer/`, `plans/cross-cutting/initial-setup.md` |
 
 ---
 
