@@ -96,8 +96,35 @@ These 5 deviations were found and fixed (Phase 0 complete):
 
 Full checklist: → `plans/cross-cutting/integration-tests.md`
 
+## Web / SPA Gates (once `web/` exists — ADR-019)
+
+| Gate | Command | When |
+|---|---|---|
+| Type-check | `pnpm --dir web run typecheck` | CI + pre-merge |
+| Lint | `pnpm --dir web run lint` | CI + pre-merge |
+| Unit tests | `pnpm --dir web run test` | CI + pre-merge |
+| Build | `pnpm --dir web run build` | CI + pre-merge |
+
+The `web` job in `ci.yml` is conditional on `web/package.json` existing — no-op until Phase D.1 lands.
+
+---
+
+## OpenTofu Gates
+
+| Gate | Command | When |
+|---|---|---|
+| Format | `tofu -chdir=infra fmt -check -recursive` | CI + pre-merge |
+| Validate | `tofu -chdir=infra init -backend=false && tofu -chdir=infra validate` | CI + pre-merge |
+| Plan | `just infra-plan-dev` | Pre-apply only |
+
+`tofu apply` is never run from CI without a manual approval step (see `plans/adr/ADR-020-github-actions-ci-oidc.md`).
+
+---
+
 ## Cross-References
 - → `plans/modules/xtask.md` — W-XT quality/coverage implementation
 - → `plans/modules/dx-justfile.md` — W-DX justfile recipe wiring
+- → `plans/modules/ci.md` — W-CI CI job definitions
 - → `plans/cross-cutting/dependency-graph.md` — crate list for coverage
 - → `plans/cross-cutting/integration-tests.md` — W-QA full test infrastructure plan
+- → `plans/cross-cutting/ai-dlc.md` — quality gate matrix in Session Lifecycle §4

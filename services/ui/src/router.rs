@@ -4,7 +4,7 @@ use axum::{
     Router,
 };
 use tower_http::cors::CorsLayer;
-use tower_http::services::ServeDir;
+use tower_http::services::{ServeDir, ServeFile};
 use tower_http::trace::TraceLayer;
 use utoipa::OpenApi;
 
@@ -13,95 +13,42 @@ use crate::routes;
 use crate::state::AppState;
 
 pub fn build(state: AppState) -> Router {
-    // ── Generate the full spec (admin + public paths, all schemas) ────────────
     let full_spec = ApiDoc::openapi();
-
-    // ── Public filtered spec — strips admin paths + security schemes ──────────
     let public_spec = api_openapi::filter::public_view(&full_spec);
 
     let public_spec_clone = public_spec.clone();
     let full_spec_clone = full_spec.clone();
 
-    // ── Admin routes — protected by require_auth middleware ──────────────────
     let admin_routes = routes::api::admin::router().route_layer(
         axum::middleware::from_fn_with_state(state.clone(), crate::middleware::require_auth),
     );
 
-    // ── Dashboard routes — all protected by require_auth middleware ───────────
-    let dashboard_route = Router::new()
-        .route("/dashboard", get(routes::dashboard::dashboard_home))
-        .route(
-            "/dashboard/jobs",
-            get(routes::dashboard::dashboard_jobs_list),
-        )
-        .route(
-            "/dashboard/jobs/new",
-            get(routes::dashboard::dashboard_job_new),
-        )
-        .route(
-            "/dashboard/jobs/:slug",
-            get(routes::dashboard::dashboard_job_detail),
-        )
-        .route(
-            "/dashboard/competencies",
-            get(routes::dashboard::dashboard_competencies_list),
-        )
-        .route(
-            "/dashboard/competencies/:slug",
-            get(routes::dashboard::dashboard_competency_detail),
-        )
-        .route(
-            "/dashboard/about",
-            get(routes::dashboard::dashboard_about_list),
-        )
-        .route(
-            "/dashboard/about/new",
-            get(routes::dashboard::dashboard_about_new),
-        )
-        .route(
-            "/dashboard/about/:slug",
-            get(routes::dashboard::dashboard_about_detail),
-        )
-        .route(
-            "/dashboard/social-links",
-            get(routes::dashboard::dashboard_social_links_list),
-        )
-        .route(
-            "/dashboard/social-links/new",
-            get(routes::dashboard::dashboard_social_link_new),
-        )
-        .route(
-            "/dashboard/social-links/:id",
-            get(routes::dashboard::dashboard_social_link_detail),
-        )
-        .route_layer(axum::middleware::from_fn_with_state(
-            state.clone(),
-            crate::middleware::require_auth,
-        ));
+    // SPA root — serves index.html as fallback for client-side routing
+    let spa_root = state.spa_root.clone();
+    let spa_assets_dir = spa_root.join("assets");
+    let index_html = spa_root.join("index.html");
 
     Router::new()
-        .route("/", get(routes::resume::handler))
-        .route("/about/me", get(routes::about::about_me))
-        .route("/about/repo", get(routes::about::about_repo))
-        .route("/ask", get(routes::ask::ask_page))
-        .route("/contact", get(routes::contact::contact_page))
+        // ── Health ───────────────────────────────────────────────────────────
+        .route("/health", get(routes::health::get_health))
+        // ── Contact API (not under /api to preserve ADR-009 path) ───────────
         .route(
             "/api/contact/challenge",
             get(routes::contact::challenge_issue),
         )
         .route("/api/contact", post(routes::contact::contact_submit))
+        // ── Resume file downloads ────────────────────────────────────────────
         .nest_service("/resume", ServeDir::new("target/resume"))
-        .route("/health", get(routes::health::get_health))
+        // ── API routes ───────────────────────────────────────────────────────
         .nest("/api", routes::api::router())
         .nest("/api/admin", admin_routes)
-        .merge(dashboard_route)
+        // ── Auth routes (server-side Cognito redirects) ─────────────────────
         .nest("/auth", routes::auth::router())
-        // Public OpenAPI spec — admin paths and security schemes removed
+        // ── OpenAPI specs ────────────────────────────────────────────────────
         .route(
             "/api/openapi.json",
             get(move || async move { axum::Json(public_spec_clone) }),
         )
-        // Full admin spec — auth-gated
         .route(
             "/api/openapi-admin.json",
             get(move || async move { axum::Json(full_spec_clone) }).route_layer(
@@ -111,8 +58,13 @@ pub fn build(state: AppState) -> Router {
                 ),
             ),
         )
+        // ── API Docs (RapiDoc) ───────────────────────────────────────────────
         .route("/docs", get(docs_handler))
         .route("/docs/admin", get(docs_admin_handler))
+        // ── SPA hashed assets — long-lived cache (filenames contain content hash) ─
+        .nest_service("/assets", ServeDir::new(&spa_assets_dir).precompressed_br())
+        // ── SPA fallback — serve index.html for any unmatched path ───────────
+        .fallback_service(ServeDir::new(&spa_root).fallback(ServeFile::new(&index_html)))
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
         .with_state(state)

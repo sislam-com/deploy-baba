@@ -165,7 +165,10 @@ pub async fn ask(
     let llm_resp = provider
         .generate(llm_req)
         .await
-        .map_err(|e| err(StatusCode::BAD_GATEWAY, &format!("LLM error: {e}")))?;
+        .map_err(|e| {
+            tracing::error!("Anthropic generate failed: {e}");
+            err(StatusCode::BAD_GATEWAY, &format!("LLM error: {e}"))
+        })?;
 
     let citations: Vec<AskCitation> = bundle
         .citations

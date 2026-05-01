@@ -15,7 +15,7 @@ jobs:
     name: Format & Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -30,7 +30,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --workspace
@@ -39,7 +39,35 @@ jobs:
     name: Documentation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo doc --no-deps --workspace
+
+  tofu:
+    name: OpenTofu
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: opentofu/setup-opentofu@v1
+      - run: tofu fmt -check -recursive infra/
+      - run: tofu -chdir=infra validate
+
+  web:
+    name: Web / SPA
+    runs-on: ubuntu-latest
+    if: hashFiles('web/package.json') != ''
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - run: pnpm --dir web install --frozen-lockfile
+      - run: pnpm --dir web run typecheck
+      - run: pnpm --dir web run test --run
+      - run: pnpm --dir web run build

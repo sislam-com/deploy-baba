@@ -34,11 +34,13 @@ xtask/src/
 │   ├── validate.rs  reads /deploy-baba/sentinel from SSM, verifies expected value
 │   └── ssm.rs       get_parameter, put_parameter helpers
 ├── deploy/
-│   ├── mod.rs       deploy mode selection (lambda vs ecs from stack.toml)
+│   ├── mod.rs       deploy mode: lambda | ecs | docker | push | wait | spa
 │   ├── docker.rs    docker build --platform linux/arm64, tag
 │   ├── ecr.rs       ECR Public auth + push
 │   ├── lambda.rs    cargo lambda build + zip + aws lambda update-function-code
-│   └── ecs.rs       register new task definition, update service
+│   ├── ecs.rs       register new task definition, update service
+│   └── spa.rs       wait_lambda_active, build_spa (pnpm), sync_to_s3 (walkdir + sdk),
+│                    invoke_sync_handler (assert "status":"ok"), smoke_test (reqwest /health)
 ├── infra/
 │   ├── mod.rs       tofu wrapper, reads AWS profile + region from stack.toml
 │   ├── tofu.rs      init, plan, apply, destroy, output (-json)
@@ -119,6 +121,8 @@ Note: `-chdir=<dir>` must come before the subcommand name.
 | W-XT.4.3 | Fully implement bootstrap.rs | OPEN | Fixed in DRL but needs `just infra-bootstrap` to be tested end-to-end |
 | W-XT.4.4 | cache.rs subcommand | DONE | Replaces inline Python heredoc in justfile (which `just` could not parse); implements status/refresh/clear via serde_json |
 | W-XT.4.5 | Resume generate + S3 upload | DONE | `xtask/src/resume/` — reads DB, builds resume artifact, uploads to S3, returns presigned download URL |
+| W-XT.4.6 | release subcommand | DONE | `xtask/src/release/{mod,git,version,changelog}.rs`; `just release-next/tag/promote`; 23 unit tests |
+| W-XT.4.7 | deploy spa subcommand | DONE | `xtask/src/deploy/spa.rs`; wait_lambda_active + build_spa + sync_to_s3 + invoke_sync_handler + smoke_test; `just deploy-full/spa-deploy/lambda-wait` |
 
 ---
 

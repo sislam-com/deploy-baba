@@ -1,0 +1,30 @@
+{
+  "name": "deploy-baba",
+  "image": "mcr.microsoft.com/devcontainers/rust:1",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": { "version": "20" },
+    "ghcr.io/devcontainers/features/aws-cli:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "postCreateCommand": "curl --proto '=https' --tlsv1.2 -fsSL https://get.opentofu.org/install-opentofu.sh | sudo bash -s -- --install-method deb && cargo install just cargo-lambda && npm install -g pnpm && bash scripts/dev-doctor.sh && cargo build --workspace",
+  "forwardPorts": [3000, 5173],
+  "portsAttributes": {
+    "3000": { "label": "Lambda (local API)" },
+    "5173": { "label": "Vite dev server (SPA)" }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "bradlc.vscode-tailwindcss",
+        "dbaeumer.vscode-eslint",
+        "tamasfe.even-better-toml",
+        "ms-azuretools.vscode-docker"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "rust-analyzer.cargo.buildScripts.enable": true
+      }
+    }
+  }
+}

@@ -185,12 +185,14 @@ Entry point: `plans/INDEX.md` — lists all modules, ADRs, cross-cutting concern
 **The plan system is the single source of truth for project state.** Keep it updated.
 
 Structure under `plans/`:
-- `modules/` — per-component plans (21 modules incl. secrets-manager)
-- `adr/` — architecture decision records (ADR-001 through ADR-009)
-- `cross-cutting/` — 5 shared concern files
+- `modules/` — per-component plans (30 modules incl. ai-dlc, ci, web, dev-environment)
+- `adr/` — architecture decision records (ADR-001 through ADR-022)
+- `cross-cutting/` — 10 shared concern files (incl. ai-dlc.md, initial-setup.md)
 - `drift/` — drift logs (format: `DRL-YYYY-MM-DD-topic`)
 
-Current status: ~93% complete. Remaining work listed in P1–P3 sections of `plans/INDEX.md`.
+AI-DLC session lifecycle: `plans/cross-cutting/ai-dlc.md` — covers the 6 stages (Startup → Planning → Implementation → Verification → Maintenance → Commit). Run `/plan-sync` at the end of any implementation session to sync module Status fields, INDEX.md, and ADR back-references.
+
+Current status: ~93% complete. Remaining work listed in P0.1–P3 sections of `plans/INDEX.md`.
 
 ### Cross-Session Memory
 

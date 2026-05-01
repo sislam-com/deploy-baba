@@ -1,6 +1,11 @@
 use anyhow::Result;
+use base64::Engine as _;
+use lambda_runtime::{service_fn, LambdaEvent};
 use rag_sqlite::RagStore;
+use serde_json::{json, Value};
+use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
+use tower::ServiceExt as _;
 
 mod auth;
 mod db;
@@ -9,6 +14,7 @@ mod openapi;
 mod router;
 mod routes;
 mod state;
+mod sync;
 mod tailor;
 
 // ─── Anthropic API key ────────────────────────────────────────────────────────
@@ -29,7 +35,20 @@ async fn init_anthropic_key() {
         let config = aws_config::load_from_env().await;
         let client = aws_sdk_secretsmanager::Client::new(&config);
         match client.get_secret_value().secret_id(&arn).send().await {
-            Ok(resp) => resp.secret_string().map(|s| s.to_string()),
+            Ok(resp) => resp.secret_string().map(|s| {
+                let s = s.trim().to_string();
+                // AWS console stores secrets as JSON by default ({"KEY":"value"}).
+                // Extract the first string value if the secret is JSON-wrapped.
+                if s.starts_with('{') {
+                    if let Ok(Value::Object(map)) = serde_json::from_str(&s) {
+                        if let Some(v) = map.values().next().and_then(|v| v.as_str()) {
+                            tracing::info!("→ ANTHROPIC_API_KEY unwrapped from JSON secret");
+                            return v.to_string();
+                        }
+                    }
+                }
+                s
+            }),
             Err(e) => {
                 tracing::error!("Failed to fetch ANTHROPIC_API_KEY from Secrets Manager: {e}");
                 None
@@ -54,7 +73,6 @@ async fn main() -> Result<()> {
     let db = Arc::new(db::Db::open(&db_path)?);
     tracing::info!("→ Database ready at {}", db_path);
 
-    // Open a separate connection for the RAG store (WAL mode allows concurrent readers).
     let rag_conn = rusqlite::Connection::open(&db_path)?;
     let rag = Arc::new(RagStore::new(rag_conn).map_err(|e| anyhow::anyhow!("{e}"))?);
     tracing::info!("→ RAG store ready");
@@ -75,20 +93,37 @@ async fn main() -> Result<()> {
         anthropic_api_key.is_some()
     );
 
+    // Lambda sets SPA_ROOT=/mnt/spa/active via env var.
+    // Local default is web/dist — run `just web-build` first.
+    let spa_root =
+        PathBuf::from(std::env::var("SPA_ROOT").unwrap_or_else(|_| "web/dist".to_owned()));
+    let spa_bucket = std::env::var("SPA_BUCKET").unwrap_or_default();
+    tracing::info!("→ SPA root: {:?}", spa_root);
+
+    let sdk_config = aws_config::load_from_env().await;
+    let s3 = aws_sdk_s3::Client::new(&sdk_config);
+
     let app_state = state::AppState {
         db,
         auth: auth_config,
         anthropic_api_key,
         rag,
+        spa_root,
+        spa_bucket,
+        s3,
     };
 
-    let app = router::build(app_state);
+    let app = router::build(app_state.clone());
 
     if std::env::var("AWS_LAMBDA_FUNCTION_NAME").is_ok() {
         tracing::info!("→ Starting as AWS Lambda function");
-        lambda_http::run(app)
-            .await
-            .map_err(|e| anyhow::anyhow!("{}", e))?;
+        lambda_runtime::run(service_fn(move |event: LambdaEvent<Value>| {
+            let state = app_state.clone();
+            let app = app.clone();
+            async move { dispatch(event, app, state).await }
+        }))
+        .await
+        .map_err(|e| anyhow::anyhow!("{}", e))?;
     } else {
         let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
         tracing::info!("→ http://localhost:3000");
@@ -100,4 +135,107 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+async fn dispatch(
+    event: LambdaEvent<Value>,
+    app: axum::Router,
+    state: state::AppState,
+) -> Result<Value, lambda_runtime::Error> {
+    let payload = event.payload;
+
+    // Lambda Function URL / API GW v2 HTTP events always have requestContext.http
+    if payload
+        .get("requestContext")
+        .and_then(|rc| rc.get("http"))
+        .is_some()
+    {
+        return handle_http(payload, app).await;
+    }
+
+    match payload.get("action").and_then(|v| v.as_str()) {
+        Some("sync-spa") => {
+            let sp: sync::SyncPayload = serde_json::from_value(payload)
+                .map_err(|e| format!("invalid sync payload: {e}"))?;
+            let resp = sync::handle(sp, &state.s3, &state.spa_bucket)
+                .await
+                .map_err(|e| e.to_string())?;
+            Ok(serde_json::to_value(resp)?)
+        }
+        Some("prune") => {
+            let keep = payload.get("keep").and_then(|v| v.as_u64()).unwrap_or(3) as usize;
+            let removed = sync::prune(keep).await.map_err(|e| e.to_string())?;
+            Ok(json!({"status": "ok", "removed": removed}))
+        }
+        _ => Err(format!("unknown event: {payload:?}").into()),
+    }
+}
+
+async fn handle_http(payload: Value, app: axum::Router) -> Result<Value, lambda_runtime::Error> {
+    let method = payload["requestContext"]["http"]["method"]
+        .as_str()
+        .unwrap_or("GET");
+    let path = payload["rawPath"].as_str().unwrap_or("/");
+    let qs = payload["rawQueryString"].as_str().unwrap_or("");
+    let uri = if qs.is_empty() {
+        path.to_string()
+    } else {
+        format!("{path}?{qs}")
+    };
+
+    let mut builder = axum::http::Request::builder().method(method).uri(&uri);
+
+    if let Some(hdrs) = payload["headers"].as_object() {
+        for (k, v) in hdrs {
+            if let Some(v_str) = v.as_str() {
+                builder = builder.header(k.as_str(), v_str);
+            }
+        }
+    }
+
+    let body_bytes: Vec<u8> = match payload.get("body") {
+        Some(Value::String(s)) if !s.is_empty() => {
+            if payload["isBase64Encoded"].as_bool().unwrap_or(false) {
+                base64::engine::general_purpose::STANDARD
+                    .decode(s)
+                    .unwrap_or_default()
+            } else {
+                s.as_bytes().to_vec()
+            }
+        }
+        _ => vec![],
+    };
+
+    let req = builder
+        .body(axum::body::Body::from(body_bytes))
+        .map_err(|e| format!("build request: {e}"))?;
+
+    let resp = app.oneshot(req).await.map_err(|e| format!("axum: {e}"))?;
+
+    let status = resp.status().as_u16();
+    let mut headers_out = serde_json::Map::new();
+    for (k, v) in resp.headers() {
+        if let Ok(v_str) = v.to_str() {
+            headers_out.insert(k.as_str().to_string(), Value::String(v_str.to_string()));
+        }
+    }
+
+    let out_bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+        .await
+        .map_err(|e| format!("collect body: {e}"))?;
+
+    let (body_str, is_b64) = match std::str::from_utf8(&out_bytes) {
+        Ok(s) => (s.to_string(), false),
+        Err(_) => (
+            base64::engine::general_purpose::STANDARD.encode(&out_bytes),
+            true,
+        ),
+    };
+
+    Ok(json!({
+        "statusCode": status,
+        "headers": headers_out,
+        "body": body_str,
+        "isBase64Encoded": is_b64,
+    }))
 }

@@ -3,6 +3,10 @@
 
 set dotenv-load := false
 
+# Default AWS profile — pinned to stack.toml `aws.profile`.
+# Recipes with a `PROFILE` parameter shadow this; argless recipes (sso-login, ui, dev-stack) use it directly.
+PROFILE := "deploy-baba"
+
 # ── Meta ──────────────────────────────────────────────────────────────────────
 
 # List all available commands
@@ -99,12 +103,27 @@ infra-verify DOMAIN="sislam.com":
 
 # ── UI / Portfolio Site ──────────────────────────────────────────────────────
 
-# Run the portfolio site locally (Axum TCP server + cargo-watch hot reload)
+# Run the portfolio site locally on :3000, serving the pre-built SPA from web/dist/.
+# Run `just web-build` first if web/dist/ is missing or stale.
+# For hot-reloading frontend dev, use `just dev-stack` instead (Vite on :5173 + API on :3000).
 ui:
-    cargo watch -x 'run --package deploy-baba-ui'
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ ! -f web/dist/index.html ]; then
+        echo "web/dist/ missing — building SPA first..."
+        just web-build
+    fi
+    eval "$(just dev-env)"
+    env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN \
+        cargo watch -x 'run --package deploy-baba-ui'
 
 # Run the portfolio site once (no hot reload)
 ui-run:
+    #!/usr/bin/env bash
+    if [ ! -f web/dist/index.html ]; then
+        echo "web/dist/ missing — building SPA first..."
+        just web-build
+    fi
     cargo run --package deploy-baba-ui
 
 # Build the UI binary only (fast check)
@@ -147,11 +166,78 @@ aws-setup:
 aws-whoami PROFILE="default":
     aws sts get-caller-identity --profile {{PROFILE}}
 
+# Log in to AWS SSO. Populates ~/.aws/sso/cache — run once per workday before dev-stack/infra-plan/lambda-deploy.
+sso-login:
+    aws sso login --profile {{PROFILE}}
+
+# ── Developer Environment ─────────────────────────────────────────────────────
+
+# Print `export X=Y` lines for all env vars the local Rust binary needs.
+# Fetches Cognito config from SSM (/deploy-baba/prod/cognito-*) and JWKS from the
+# public Cognito endpoint. Consumed via `eval "$(just dev-env)"` in `just ui`.
+# Requires a valid SSO session — run `just sso-login` first.
+dev-env:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    AWS="env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN AWS_PROFILE={{PROFILE}} aws"
+    pool_id=$($AWS ssm get-parameter --name /deploy-baba/prod/cognito-pool-id    --query Parameter.Value --output text)
+    client_id=$($AWS ssm get-parameter --name /deploy-baba/prod/cognito-client-id --query Parameter.Value --output text)
+    domain=$($AWS    ssm get-parameter --name /deploy-baba/prod/cognito-domain    --query Parameter.Value --output text)
+    jwks=$(curl -fsSL "https://cognito-idp.us-east-1.amazonaws.com/${pool_id}/.well-known/jwks.json")
+    echo "export AWS_PROFILE={{PROFILE}}"
+    echo "export ANTHROPIC_API_KEY_ARN=root-anthropic-access-key"
+    echo "export RAG_PUBLIC_ENABLED=1"
+    echo "export COGNITO_POOL_ID=${pool_id}"
+    echo "export COGNITO_CLIENT_ID=${client_id}"
+    echo "export COGNITO_DOMAIN=${domain}"
+    echo "export COGNITO_REGION=us-east-1"
+    echo "export APP_DOMAIN=http://localhost:3000"
+    printf 'export COGNITO_JWKS=%q\n' "${jwks}"
+
+# Verify all prerequisites (rustup, cargo-lambda, node≥20, pnpm, tofu, AWS SSO, cache)
+dev-doctor:
+    bash scripts/dev-doctor.sh
+
+# ── Web / SPA (Vite + React) ──────────────────────────────────────────────────
+
+# Start Vite dev server on :5173 with /api proxy to :3000
+web:
+    pnpm --dir web dev
+
+# Build SPA to web/dist/
+web-build:
+    pnpm --dir web run build
+
+# Run Vitest unit tests
+web-test:
+    pnpm --dir web run test
+
+# TypeScript type check (no emit)
+web-typecheck:
+    pnpm --dir web run typecheck
+
+# ESLint
+web-lint:
+    pnpm --dir web run lint
+
+# Regenerate src/api/types.gen.ts from the running local server (requires just ui on :3000)
+web-types:
+    pnpm --dir web run types
+
+# Start both the Rust API server (:3000) and Vite dev server (:5173) in parallel
+dev-stack:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    trap 'kill 0' SIGINT SIGTERM EXIT
+    env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN just ui &
+    just web &
+    wait
+
 # ── Infrastructure (OpenTofu) ────────────────────────────────────────────────
 
-# Bootstrap: create S3 state bucket + write sentinel SSM param (first run only)
+# Bootstrap: create S3 state bucket + DynamoDB lock table (idempotent, run once per account)
 infra-bootstrap PROFILE="default" REGION="us-east-1":
-    cargo xtask infra bootstrap --profile {{PROFILE}} --region {{REGION}}
+    bash scripts/bootstrap-tfstate.sh
 
 # Preview infrastructure changes
 infra-plan PROFILE="default":
@@ -192,6 +278,24 @@ deploy-fast PROFILE="default":
 # Dry run: build + validate, no push
 deploy-dry PROFILE="default":
     just aws-check {{PROFILE}} && cargo xtask deploy docker
+
+# Wait for Lambda to settle after a code update (step 2 of full pipeline)
+lambda-wait PROFILE="default":
+    just aws-check {{PROFILE}} && cargo xtask deploy wait --profile {{PROFILE}}
+
+# SPA-only deploy: build → S3 sync → sync-spa invoke → /health (steps 3–6)
+# Requires: SPA_BUCKET, UI_FN_NAME, FN_URL env vars (or set via infra outputs)
+spa-deploy PROFILE="default":
+    just aws-check {{PROFILE}} && cargo xtask deploy spa --profile {{PROFILE}} --sha "$(git rev-parse HEAD)"
+
+# Full pipeline: quality → Lambda → wait → SPA build → S3 sync → sync-spa → /health
+# Pass TAG=1 to also create a dev-vX.Y.Z git tag (mirrors deploy-dev.yml)
+deploy-full PROFILE="default" TAG="":
+    just quality
+    just lambda-deploy {{PROFILE}}
+    just lambda-wait {{PROFILE}}
+    just spa-deploy {{PROFILE}}
+    {{ if TAG != "" { "just release-tag dev push" } else { "echo 'Skipping dev tag — pass TAG=1 to enable'" } }}
 
 # ── Database (SQLite + S3) ───────────────────────────────────────────────────
 
@@ -287,3 +391,17 @@ cache-refresh:
 # Delete the cache to force a full re-scan next session
 cache-clear:
     cargo xtask cache clear
+
+# ── Release Management ────────────────────────────────────────────────────────
+
+# Dry-run: print the next version derived from conventional commits since the last dev-v* tag
+release-next:
+    cargo xtask release next
+
+# Create a dev-vX.Y.Z annotated tag at HEAD (CI runs this automatically after a successful deploy)
+release-tag KIND="dev" PUSH="":
+    cargo xtask release tag --kind {{KIND}} {{ if PUSH != "" { "--push" } else { "" } }}
+
+# Promote the latest dev-v* tag to vX.Y.Z, triggering deploy-prod.yml (with manual approval)
+release-promote PUSH="":
+    cargo xtask release promote {{ if PUSH != "" { "--push" } else { "" } }}

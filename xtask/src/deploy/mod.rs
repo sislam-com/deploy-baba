@@ -8,6 +8,7 @@ pub mod docker;
 pub mod ecr;
 pub mod ecs;
 pub mod lambda;
+pub mod spa;
 
 #[derive(Subcommand)]
 pub enum DeployAction {
@@ -48,6 +49,27 @@ pub enum DeployAction {
         #[arg(long)]
         profile: Option<String>,
     },
+    /// Wait for Lambda function to become active after a code update
+    Wait {
+        /// AWS profile
+        #[arg(long)]
+        profile: Option<String>,
+        /// Lambda function name (reads UI_FN_NAME env var if omitted)
+        #[arg(long)]
+        function: Option<String>,
+    },
+    /// Build SPA, sync to S3, invoke sync-spa handler, and smoke /health (steps 3–6)
+    Spa {
+        /// AWS profile
+        #[arg(long)]
+        profile: Option<String>,
+        /// Git SHA to use as the S3 key prefix (defaults to HEAD)
+        #[arg(long)]
+        sha: Option<String>,
+        /// Skip the Lambda wait step (useful when Lambda is already settled)
+        #[arg(long)]
+        skip_wait: bool,
+    },
 }
 
 pub async fn execute(action: DeployAction) -> anyhow::Result<()> {
@@ -56,5 +78,30 @@ pub async fn execute(action: DeployAction) -> anyhow::Result<()> {
         DeployAction::Ecs { cluster, service } => ecs::deploy(cluster, service).await,
         DeployAction::Docker { platform, tag } => docker::build(&platform, tag).await,
         DeployAction::Push { image, profile } => ecr::push(&image, profile).await,
+        DeployAction::Wait { profile, function } => {
+            let fn_name = function
+                .or_else(|| std::env::var("UI_FN_NAME").ok())
+                .ok_or_else(|| anyhow::anyhow!("Lambda function name required: pass --function or set UI_FN_NAME"))?;
+            let aws_config = crate::aws::create_aws_config(profile).await?;
+            let client = aws_sdk_lambda::Client::new(&aws_config);
+            spa::wait_lambda_active(&client, &fn_name).await
+        }
+        DeployAction::Spa { profile, sha, skip_wait } => {
+            let sha = sha
+                .or_else(|| git_head_sha().ok())
+                .ok_or_else(|| anyhow::anyhow!("Could not determine git SHA; pass --sha explicitly"))?;
+            let env_cfg = spa::SpaEnvConfig::from_env()?;
+            spa::deploy_spa(profile, env_cfg, &sha, skip_wait).await
+        }
     }
+}
+
+fn git_head_sha() -> anyhow::Result<String> {
+    let out = std::process::Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .output()?;
+    if !out.status.success() {
+        return Err(anyhow::anyhow!("git rev-parse HEAD failed"));
+    }
+    Ok(String::from_utf8(out.stdout)?.trim().to_string())
 }

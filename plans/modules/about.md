@@ -1,5 +1,5 @@
 # W-ABT: About Section
-**Path:** `services/ui/src/routes/about.rs`, `services/ui/templates/about_me.html`, `services/ui/templates/about_repo.html` | **Status:** DONE
+**Path:** `services/ui/src/routes/api/about.rs`, `services/ui/migrations/008-009` | **Status:** DONE (templates deleted D.5; data served via `/api/about/sections` JSON to React SPA)
 **Coverage floor:** N/A | **Depends on:** W-UI, W-RSM (pattern reference) | **Depended on by:** —
 **Migrations:** 008 (schema), 009 (seed) | **Admin API:** `POST/PUT/DELETE /api/admin/about` | **Dashboard:** `/dashboard/about`, `/dashboard/about/new`, `/dashboard/about/:slug`
 

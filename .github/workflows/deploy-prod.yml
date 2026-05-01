@@ -1,0 +1,100 @@
+name: Deploy Prod
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to prod
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ vars.CI_DEPLOY_PROD_ROLE_ARN }}
+          aws-region: us-east-1
+
+      # ── Build Lambda ──────────────────────────────────────────────────────────
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install cargo-lambda
+        run: pip install cargo-lambda
+
+      - name: Build Lambda binary
+        run: |
+          cargo lambda build --release --package deploy-baba-ui --target aarch64-unknown-linux-gnu
+          mkdir -p infra/build
+          zip -j infra/build/lambda.zip target/lambda/deploy-baba-ui/bootstrap
+
+      - name: Update Lambda code
+        run: |
+          aws lambda update-function-code \
+            --function-name ${{ vars.PROD_UI_FN_NAME }} \
+            --zip-file fileb://infra/build/lambda.zip \
+            --architectures arm64 \
+            --region us-east-1
+
+      - name: Wait for Lambda update
+        run: |
+          aws lambda wait function-updated \
+            --function-name ${{ vars.PROD_UI_FN_NAME }} \
+            --region us-east-1
+
+      # ── Build + deploy SPA ────────────────────────────────────────────────────
+
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 9
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install web deps
+        run: pnpm --dir web install --frozen-lockfile
+
+      - name: Build SPA
+        run: pnpm --dir web run build
+
+      - name: Sync SPA to S3
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          aws s3 sync web/dist/ "s3://${{ vars.PROD_SPA_BUCKET }}/${SHA}/" \
+            --delete \
+            --cache-control "public,max-age=31536000,immutable" \
+            --exclude "index.html"
+          aws s3 cp web/dist/index.html "s3://${{ vars.PROD_SPA_BUCKET }}/${SHA}/index.html" \
+            --cache-control "no-cache"
+
+      - name: Invoke sync handler
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          PAYLOAD=$(printf '{"action":"sync-spa","sha":"%s"}' "${SHA}" | base64)
+          aws lambda invoke \
+            --function-name ${{ vars.PROD_UI_FN_NAME }} \
+            --invocation-type RequestResponse \
+            --payload "${PAYLOAD}" \
+            /tmp/sync-resp.json
+          cat /tmp/sync-resp.json
+          grep -q '"status":"ok"' /tmp/sync-resp.json
+
+      # ── Smoke test ────────────────────────────────────────────────────────────
+
+      - name: Smoke test /health
+        run: |
+          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" "${{ vars.PROD_FN_URL }}health" || echo "000")
+          echo "Health check status: ${STATUS}"
+          [[ "${STATUS}" == "200" ]]

@@ -1,6 +1,6 @@
 # deploy-baba — Plan Index
-**GitHub:** `shantopagla/deploy-baba` | **Last updated:** 2026-04-15
-**Source repo:** `~/shanto` (Baba Toolchain, ~85K LOC) | **Status:** ~93% complete
+**GitHub:** `shantopagla/deploy-baba` | **Last updated:** 2026-05-01
+**Source repo:** `~/shanto` (Baba Toolchain, ~85K LOC) | **Status:** ~95% complete
 
 See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming rules.
 
@@ -20,15 +20,15 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | api-grpc | W-APIR | `crates/api-grpc/` | DONE | Per-crate README |
 | api-merger | W-APIM | `crates/api-merger/` | DONE | Per-crate README |
 | infra-types | W-INFR | `crates/infra-types/` | DONE | Per-crate README |
-| ui-service | W-UI | `services/ui/` | DONE | utoipa-rapidoc wiring (using inline HTML) |
-| resume | W-RSM | `services/ui/migrations/`, `routes/resume.rs`, `routes/api/jobs.rs`, `routes/api/competencies.rs` | DONE | 7 migrations (007 personal-projects seed added); xtask resume generate/upload done; Functional view grouping (W-RSM.8.1), print CSS (W-RSM.8.3) |
-| xtask | W-XT | `xtask/` | WIP | Resume generate + S3 upload done (W-XT.4.5); `EnvironmentInterpolator` unused (W-XT.4.2) |
+| ui-service | W-UI | `services/ui/` (API + asset server; no templates) | DONE | utoipa-rapidoc wiring (using inline HTML); sync.rs EFS swap handler added (D.4) |
+| resume | W-RSM | `services/ui/migrations/`, `routes/api/jobs.rs`, `routes/api/competencies.rs`, `routes/api/resume.rs` | DONE | 7 migrations; xtask resume generate/upload done; Functional view grouping (W-RSM.8.1), print CSS (W-RSM.8.3) |
+| xtask | W-XT | `xtask/` | WIP | release subcommand DONE; deploy spa.rs DONE; `EnvironmentInterpolator` unused (W-XT.4.2) |
 | terraform | W-TF | `infra/` | SUPERSEDED | Replaced by W-OTF (OpenTofu). W-TF.4.1 and W-TF.4.2 already fixed in code. |
 | opentofu | W-OTF | `infra/` + `xtask/src/infra/` | WIP | Install `tofu` binary (W-OTF.4.1 OPEN); smoke test (W-OTF.4.7 BLOCKED); docs (W-OTF.4.9 TODO) |
 | dx-justfile | W-DX | `justfile`, `docs/`, `examples/` | WIP | Per-crate READMEs, integration tests |
-| auth | W-AUTH | `services/ui/src/auth.rs`, `routes/auth.rs`, `routes/api/admin.rs`, `routes/dashboard.rs`, `infra/cognito.tf` | DONE | W-AUTH.POST-FIX (CloudFront OAC body hash) |
-| about | W-ABT | `services/ui/src/routes/about.rs`, `services/ui/templates/about_*.html`, `services/ui/migrations/008-009` | DONE | — |
-| social-links | W-SL | `services/ui/src/db.rs`, `services/ui/src/routes/dashboard.rs`, `services/ui/src/routes/api/admin.rs`, `services/ui/migrations/010-011` | DONE | — |
+| auth | W-AUTH | `services/ui/src/auth.rs`, `routes/auth.rs`, `routes/api/admin.rs`, `infra/cognito.tf` | DONE | W-AUTH.POST-FIX (CloudFront OAC body hash); dashboard now React (W-WEB) |
+| about | W-ABT | `services/ui/src/routes/api/about.rs`, `services/ui/migrations/008-009` | DONE | Templates deleted (D.5); data served via JSON API to SPA |
+| social-links | W-SL | `services/ui/src/db.rs`, `services/ui/src/routes/api/admin.rs`, `services/ui/migrations/010-011` | DONE | Templates deleted (D.5); nav loop now in React Layout.tsx |
 | contact-form | W-CTF | `services/email/`, `services/ui/src/routes/contact.rs`, `infra/ses.tf`, `infra/email-lambda.tf`, `infra/apigateway.tf` | WIP | e2e test (W-CTF.4.12) — deploy step pending |
 | secrets-manager | W-SEC | `xtask/src/secret.rs`, `infra/secrets.tf`, `infra/vpc-endpoints.tf`, `services/ui/src/routes/contact.rs` | DONE | Deploy: `just infra-apply` + `just secret-put pow-secret $(openssl rand -hex 32)` + `just lambda-deploy` |
 | dashboard-sync | W-SYNC | `plans/modules/dashboard-sync.md`, `services/ui/migrations/`, `services/ui/src/db.rs`, `services/ui/src/routes/api/admin.rs`, `.claude/skills/sync-dashboard-data/` | DONE | 4.1–4.5 complete; zero drift on first run 2026-04-08; .4.6/.4.7 deferred (on-demand) |
@@ -36,10 +36,31 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | resume-tailor | W-RST | `services/ui/src/tailor/`, `crates/api-openapi/src/models/tailor.rs`, `services/ui/migrations/016` | TODO | All items; BLOCKED-on-deploy for 4.3/4.4/4.5 until W-SEC deployed + `anthropic-api-key` in SM |
 | rag | W-RAG | `crates/rag-core/`, `crates/rag-sqlite/` | PROPOSED | P1 CLI → P2 deploy-failure diagnosis → P3 /api/ask; blocked on W-LLM for generation. |
 | gdrive-planning | W-GDR | `justfile`, `.claude/settings.json`, `.github/workflows/` | TODO | Drive MCP plan export/import (W-GDR.4.1–4.3); Stop hook quality gate (W-GDR.4.4); evaluated from Gemini proposal 2026-04-15 |
+| ai-dlc | W-AIL | `.claude/agents/`, `.claude/skills/` | DONE | plan-doctor + drift-detector subagents; /plan-sync, /cache-refresh, /memory-curate skills; weekly schedule |
+| ci | W-CI | `.github/workflows/` | WIP | Code complete (C.1 + C.2 DONE). Remaining: W-CI.4.5 (dev Lambda workspace, manual), W-CI.4.9 (GitHub Variables, manual), W-CI.4.10 (production env gate, manual) |
+| web (SPA) | W-WEB | `web/` | DONE | All 15 Askama templates replaced; Askama removed; EFS sync handler live; SEO prerender deferred to W-WEB.5 (P3) |
+| dev-environment | W-DEV | `scripts/`, `.devcontainer/` | DONE | bootstrap-tfstate.sh; dev-doctor.sh; devcontainer; initial-setup.md |
 
 ---
 
 ## Remaining Work — Priority Order
+
+### P0.1 — AI-DLC + Deployment Automation + Full SPA (branch: `feat/llm-core`)
+
+1. ~~**W-AIL.4.1–4.5**~~ **DONE** — Anti-rot agents + skills (Phase B complete).
+2. ~~**W-DEV.4.1–4.6**~~ **DONE** — Dev-environment scripts + devcontainer (Phase E complete).
+3. ~~**W-CI.4.1–4.4, 4.6–4.8**~~ **DONE** — xtask release subcommand + OIDC infra + workflows (Phase C.1).
+4. ~~**W-WEB.4.1–4.3**~~ **DONE** — SPA scaffold (`web/`) + missing JSON API endpoints (Phase D.1).
+5. ~~**W-CI.4.11–4.12**~~ **DONE** — Extended deploy-dev.yml + deploy-prod.yml with SPA sync steps (Phase C.2).
+6. ~~**W-WEB.4.4–4.5**~~ **DONE** — `/ask` + `/dashboard/*` ported to React (Phase D.2).
+7. ~~**W-WEB.4.6**~~ **DONE** — Marketing routes ported to React (Phase D.3).
+8. ~~**W-WEB.4.7–4.8**~~ **DONE** — Axum router flipped to SPA asset server + sync.rs + s3-spa.tf (Phase D.4).
+9. ~~**W-WEB.4.9**~~ **DONE** — Askama removed; 15 templates deleted (Phase D.5).
+10. ~~**Local deploy pipeline**~~ **DONE** — `xtask deploy spa`, `just deploy-full/spa-deploy/lambda-wait`, `/deploy --full` skill extended.
+11. **W-AIL.4.7** — Wire weekly schedule (`dbb-plan-sync`, `dbb-memory-curate`) via `/schedule`.
+12. **W-CI.4.5, 4.9, 4.10** — Manual one-time steps: dev Lambda workspace, GitHub Variables, `production` environment gate.
+
+---
 
 ### P0 — New Feature (in progress on `cognito-login` branch)
 1. ~~**W-AUTH.4.1–4.15**~~ — Cognito auth + admin dashboard — **DONE** (code compiles clean, Cognito infra deployed to `us-east-1_I7c15vLHE`)
@@ -110,6 +131,12 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | ADR-014 | Resume Professional Summary Sourced from DB (`about_sections.me-bio`) — hardcoded `SUMMARY` const deleted; generator loads + polishes bio at generation time; errors on missing row | W-RSM, W-XT, W-RST |
 | ADR-015 | LLM Provider Abstraction + Grounding Contract — `crates/llm-core` (vendor-agnostic trait) + `crates/llm-anthropic` (first impl); universal grounding contract at prompt-assembly layer; Claude as MVP provider; cargo feature-flag selection | W-LLM, W-RST, W-RAG, W-RSM, W-SEC, W-APIO, W-UI |
 | ADR-016 | RAG Architecture — SQLite + sqlite-vec + FTS5 hybrid retrieval; all embedding/generation via llm-core (ADR-015); per-corpus chunkers; `.claude/` cache local-CLI only | W-RAG |
+| ADR-017 | AI-Assisted Development Lifecycle (AI-DLC) — 6-stage session lifecycle; agent-cache startup protocol; quality gates; maintenance stage anti-rot | all |
+| ADR-018 | Anti-rot Agents — plan-doctor + drift-detector subagents; /plan-sync, /cache-refresh, /memory-curate skills; weekly schedule | W-AIL |
+| ADR-019 | React/Vite SPA Replaces Askama — full replacement; hybrid JSON API + asset server; phases D.1–D.5; SEO prerender P3 | W-WEB, W-UI, W-AUTH, W-ABT, W-SL, W-RSM, W-RAG, W-OTF, W-CI |
+| ADR-020 | GitHub Actions CI with OIDC — two IAM roles (dev/prod); no long-lived keys; deploy-dev.yml + deploy-prod.yml | W-CI, W-OTF, W-WEB |
+| ADR-021 | Automated Release Tagging via xtask — `dev-vX.Y.Z` on CI; `vX.Y.Z` via `just release-promote`; conventional-commits versioning | W-CI, W-XT |
+| ADR-022 | Developer First-Run Environment — scripts/bootstrap-tfstate.sh; scripts/dev-doctor.sh; .devcontainer/; initial-setup.md | W-DEV, W-DX |
 
 ---
 
@@ -143,6 +170,23 @@ llm-core     ←── llm-anthropic, services/ui (via W-RST tailor pipeline)
 Full dependency order: `plans/cross-cutting/dependency-graph.md`
 
 Implementation sequencing for W-LLM/W-RST/W-RAG/W-GDR: `plans/cross-cutting/execution-roadmap.md`
+
+---
+
+## Cross-Cutting Docs
+
+| Doc | Purpose |
+|-----|---------|
+| `aws-architecture.md` | AWS resource topology |
+| `aws-setup-spec.md` | IAM policy + profile bootstrapping |
+| `dependency-graph.md` | Crate dependency order |
+| `execution-roadmap.md` | W-LLM/W-RST/W-RAG/W-GDR sequencing |
+| `llm-policy.md` | LLM ops: provider registry, prompt versioning, cost caps, retry/fallback, PII |
+| `publishing.md` | crates.io release plan (W-PUB) |
+| `quality-gates.md` | Quality gate definitions (Rust + Web + OpenTofu) |
+| `integration-tests.md` | W-QA test infrastructure plan |
+| `ai-dlc.md` | AI Development Lifecycle — session protocol + quality gates + maintenance agents |
+| `initial-setup.md` | Developer first-run guide (prerequisites, bootstrap, local dev loop) |
 
 ---
 
@@ -195,4 +239,4 @@ shantopagla/deploy-baba/
 | 8 | Quality pass | TODO |
 | 9 | Publish | TODO |
 
-**Overall: ~90% complete**
+**Overall: ~95% complete**

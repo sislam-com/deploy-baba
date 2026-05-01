@@ -10,37 +10,45 @@ resource "aws_cloudwatch_log_group" "lambda" {
 
 # Lambda function for the Baba portfolio site
 resource "aws_lambda_function" "baba" {
-  filename            = var.lambda_code_path
-  function_name       = local.lambda_function_name
-  role                = aws_iam_role.lambda_execution.arn
-  handler             = "index.handler"
-  runtime             = "provided.al2023"
-  memory_size         = var.lambda_memory
-  timeout             = var.lambda_timeout
-  architectures       = ["arm64"]
-  source_code_hash    = fileexists(var.lambda_code_path) ? filebase64sha256(var.lambda_code_path) : null
+  filename         = var.lambda_code_path
+  function_name    = local.lambda_function_name
+  role             = aws_iam_role.lambda_execution.arn
+  handler          = "index.handler"
+  runtime          = "provided.al2023"
+  memory_size      = var.lambda_memory
+  timeout          = var.lambda_timeout
+  architectures    = ["arm64"]
+  source_code_hash = fileexists(var.lambda_code_path) ? filebase64sha256(var.lambda_code_path) : null
 
   # Environment variables passed to the Lambda function
   environment {
     variables = {
-      DB_PATH          = "/mnt/db/baba.db"
-      RUST_LOG         = "info"
-      COGNITO_POOL_ID   = aws_cognito_user_pool.baba.id
-      COGNITO_CLIENT_ID = aws_cognito_user_pool_client.baba_web.id
-      COGNITO_DOMAIN    = "${aws_cognito_user_pool_domain.baba.domain}.auth.${var.region}.amazoncognito.com"
-      COGNITO_REGION    = var.region
-      APP_DOMAIN        = "https://${var.domain_name}"
-      EMAIL_LAMBDA_NAME = aws_lambda_function.email.function_name
-      COGNITO_JWKS      = data.http.cognito_jwks.response_body
-      POW_SECRET_ARN          = aws_secretsmanager_secret.pow_secret.arn
-      ANTHROPIC_API_KEY_ARN   = aws_secretsmanager_secret.anthropic_api_key.arn
+      DB_PATH               = "/mnt/db/baba.db"
+      RUST_LOG              = "info"
+      COGNITO_POOL_ID       = aws_cognito_user_pool.baba.id
+      COGNITO_CLIENT_ID     = aws_cognito_user_pool_client.baba_web.id
+      COGNITO_DOMAIN        = "${aws_cognito_user_pool_domain.baba.domain}.auth.${var.region}.amazoncognito.com"
+      COGNITO_REGION        = var.region
+      APP_DOMAIN            = "https://${var.domain_name}"
+      EMAIL_LAMBDA_NAME     = aws_lambda_function.email.function_name
+      COGNITO_JWKS          = data.http.cognito_jwks.response_body
+      POW_SECRET_ARN        = aws_secretsmanager_secret.pow_secret.arn
+      ANTHROPIC_API_KEY_ARN = aws_secretsmanager_secret.anthropic_api_key.arn
+      SPA_ROOT              = "/mnt/spa/active"
+      SPA_BUCKET            = aws_s3_bucket.spa.id
     }
   }
 
-  # EFS mount configuration
+  # EFS mount — SQLite database
   file_system_config {
     arn              = aws_efs_access_point.db.arn
     local_mount_path = "/mnt/db"
+  }
+
+  # EFS mount — SPA assets (sync-spa writes here; ServeDir reads from /mnt/spa/active)
+  file_system_config {
+    arn              = aws_efs_access_point.spa.arn
+    local_mount_path = "/mnt/spa"
   }
 
   # VPC configuration for EFS access
@@ -56,6 +64,7 @@ resource "aws_lambda_function" "baba" {
     aws_iam_role_policy_attachment.lambda_vpc,
     aws_iam_role_policy.lambda_efs,
     aws_iam_role_policy.lambda_s3,
+    aws_iam_role_policy.lambda_s3_spa,
     aws_iam_role_policy.lambda_ssm,
     aws_iam_role_policy.lambda_invoke_email,
     aws_iam_role_policy.lambda_secretsmanager,

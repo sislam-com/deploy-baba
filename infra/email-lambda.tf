@@ -6,14 +6,14 @@
 # VPC-bound UI Lambda reach the Lambda API internally.
 
 resource "aws_lambda_function" "email" {
-  filename         = var.email_lambda_code_path
-  function_name    = "${var.project_name}-email"
-  role             = aws_iam_role.email_lambda_execution.arn
-  handler          = "bootstrap"
-  runtime          = "provided.al2023"
-  memory_size      = 128
-  timeout          = 10
-  architectures    = ["arm64"]
+  filename      = var.email_lambda_code_path
+  function_name = "${var.project_name}-email"
+  role          = aws_iam_role.email_lambda_execution.arn
+  handler       = "bootstrap"
+  runtime       = "provided.al2023"
+  memory_size   = 128
+  timeout       = 10
+  architectures = ["arm64"]
 
   # Hard cap on concurrent invocations — limits cost exposure and prevents
   # a flood of submissions from exhausting account Lambda concurrency.
@@ -21,12 +21,12 @@ resource "aws_lambda_function" "email" {
 
   environment {
     variables = {
-      RUST_LOG             = "info"
-      SES_FROM_EMAIL       = "noreply@${local.ses_domain}"
-      SES_ACK_FROM_EMAIL   = "it@sislam.com"
-      CONTACT_TO_EMAIL     = var.contact_email
-      AWS_SES_REGION       = var.region
-      ALLOWED_ORIGIN       = "https://${var.domain_name}"
+      RUST_LOG           = "info"
+      SES_FROM_EMAIL     = "noreply@${local.ses_domain}"
+      SES_ACK_FROM_EMAIL = "it@sislam.com"
+      CONTACT_TO_EMAIL   = var.contact_email
+      AWS_SES_REGION     = var.region
+      ALLOWED_ORIGIN     = "https://${var.domain_name}"
     }
   }
 

@@ -15,6 +15,8 @@ toml = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 flate2 = { workspace = true }
+regex = "1"
+semver = "1"
 
 # Database
 rusqlite = { workspace = true }
@@ -38,3 +40,7 @@ aws-sdk-ecr = { workspace = true }
 aws-sdk-efs = { workspace = true }
 aws-sdk-dynamodb = { workspace = true }
 aws-sdk-secretsmanager = { workspace = true }
+
+# HTTP client + file walking (for SPA deploy)
+reqwest = { workspace = true }
+walkdir = { workspace = true }

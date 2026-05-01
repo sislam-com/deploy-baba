@@ -1,7 +1,6 @@
-use askama::Template;
 use aws_sdk_lambda::primitives::Blob;
 use axum::{
-    extract::{Json, State},
+    extract::Json,
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
 };
@@ -10,11 +9,9 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
     collections::HashMap,
-    sync::{Arc, Mutex, OnceLock},
+    sync::{Mutex, OnceLock},
     time::{Duration, Instant},
 };
-
-use crate::db::{load_social_links, Db, SocialLink};
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -188,12 +185,6 @@ fn verify_pow(nonce: &str, timestamp: i64, solution: u64, signature: &str) -> Re
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-#[derive(Template)]
-#[template(path = "contact.html")]
-struct ContactTemplate {
-    social_links: Vec<SocialLink>,
-}
-
 #[derive(Serialize)]
 struct ChallengeResponse {
     nonce: String,
@@ -233,12 +224,6 @@ struct ContactResponse {
 }
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
-
-pub async fn contact_page(State(db): State<Arc<Db>>) -> impl IntoResponse {
-    let conn = db.conn.lock().unwrap();
-    let social_links = load_social_links(&conn);
-    ContactTemplate { social_links }
-}
 
 pub async fn challenge_issue() -> impl IntoResponse {
     use rand::RngCore;

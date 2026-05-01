@@ -33,11 +33,13 @@ pub const fn _assert_model<T: ApiModel>() {}
 pub mod about;
 pub mod admin;
 pub mod ask;
+pub mod auth;
 pub mod common;
 pub mod contact;
 pub mod crates;
 pub mod demo;
 pub mod health;
+pub mod portfolio;
 pub mod resume;
 pub mod social;
 pub mod stack; // empty — stack returns serde_json::Value directly
@@ -51,8 +53,10 @@ pub use health::*;
 pub use about::*;
 pub use admin::*;
 pub use ask::*;
+pub use auth::*;
 pub use contact::*;
 pub use demo::*;
+pub use portfolio::*;
 pub use resume::*;
 pub use social::*;
 pub use tailor::*;

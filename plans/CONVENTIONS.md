@@ -42,16 +42,20 @@ Example: `DRL-2026-03-18-terraform.md`
 | `OTF` | opentofu | `infra/` + `xtask/src/infra/` |
 | `DX` | justfile + docs + examples | `justfile`, `docs/`, `examples/` |
 | `PUB` | Publishing | crates.io release |
-| `AUTH` | auth | `services/ui/src/auth.rs`, `routes/auth.rs`, `routes/api/admin.rs`, `routes/dashboard.rs` |
-| `ABT` | about | `services/ui/src/routes/about.rs`, `services/ui/templates/about_*.html` |
-| `SL` | social-links | `services/ui/src/db.rs`, `services/ui/src/routes/dashboard.rs`, `services/ui/migrations/010-011` |
-| `RSM` | resume | `services/ui/src/routes/resume.rs`, `services/ui/migrations/001-007` |
+| `AUTH` | auth | `services/ui/src/auth.rs`, `routes/auth.rs`, `routes/api/admin.rs`, `infra/cognito.tf` (dashboard → React W-WEB) |
+| `ABT` | about | `services/ui/src/routes/api/about.rs`, `services/ui/migrations/008-009` (templates deleted D.5) |
+| `SL` | social-links | `services/ui/src/db.rs`, `services/ui/src/routes/api/admin.rs`, `services/ui/migrations/010-011` (templates deleted D.5) |
+| `RSM` | resume | `services/ui/src/routes/api/{jobs,competencies,resume}.rs`, `services/ui/migrations/001-007` (route file deleted D.5) |
 | `CTF` | contact-form | `services/email/` + `services/ui/src/routes/contact.rs` + `infra/ses.tf` + `infra/email-lambda.tf` |
 | `SYNC` | dashboard-sync | `services/ui/migrations/`, `services/ui/src/db.rs`, `.claude/skills/` |
 | `LLM` | llm-core + adapters | `crates/llm-core/`, `crates/llm-anthropic/` — pluggable LLM provider abstraction (trait crate + vendor adapter crates) |
 | `RST` | resume-tailor | `services/ui/src/tailor/`, `crates/api-openapi/src/models/tailor.rs` — JD-driven AI resume tailoring pipeline, consumer of W-LLM; distinct from W-RSM static generator |
 | `RAG` | rag (retrieval-augmented generation) | `crates/rag-core/`, `crates/rag-sqlite/` |
 | `GDR` | gdrive-planning | `justfile`, `.claude/settings.json`, `.github/workflows/` |
+| `AIL` | AI Development Lifecycle | `.claude/agents/`, `.claude/skills/`, `plans/cross-cutting/ai-dlc.md`, `.agent-cache/` |
+| `CI` | CI/CD pipeline | `.github/workflows/`, `infra/ci-oidc.tf`, `xtask/src/release/` |
+| `WEB` | Vite SPA (React 18 + TypeScript) | `web/` |
+| `DEV` | Developer environment | `scripts/`, `.devcontainer/`, `plans/cross-cutting/initial-setup.md` |
 
 ---
 
