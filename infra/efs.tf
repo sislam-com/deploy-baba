@@ -18,9 +18,9 @@ data "aws_availability_zones" "available" {
 
 # EFS File System for SQLite database storage
 resource "aws_efs_file_system" "baba_db" {
-  encrypted           = true
-  performance_mode    = "generalPurpose"
-  throughput_mode     = "bursting"
+  encrypted        = true
+  performance_mode = "generalPurpose"
+  throughput_mode  = "bursting"
 
   tags = {
     Name = "${local.lambda_function_name}-efs"
@@ -29,9 +29,9 @@ resource "aws_efs_file_system" "baba_db" {
 
 # EFS Mount Targets in default VPC (one per availability zone)
 resource "aws_efs_mount_target" "baba_db" {
-  count          = length(data.aws_availability_zones.available.names)
-  file_system_id = aws_efs_file_system.baba_db.id
-  subnet_id      = data.aws_subnets.default.ids[count.index]
+  count           = length(data.aws_availability_zones.available.names)
+  file_system_id  = aws_efs_file_system.baba_db.id
+  subnet_id       = data.aws_subnets.default.ids[count.index]
   security_groups = [aws_security_group.efs.id]
 }
 
@@ -55,6 +55,31 @@ resource "aws_efs_access_point" "db" {
 
   tags = {
     Name = "${local.lambda_function_name}-access-point"
+  }
+
+  depends_on = [aws_efs_mount_target.baba_db]
+}
+
+# EFS Access Point for SPA assets (served from /mnt/spa/active symlink)
+resource "aws_efs_access_point" "spa" {
+  file_system_id = aws_efs_file_system.baba_db.id
+  root_directory {
+    path = "/mnt/spa"
+
+    creation_info {
+      owner_gid   = 1000
+      owner_uid   = 1000
+      permissions = "0755"
+    }
+  }
+
+  posix_user {
+    gid = 1000
+    uid = 1000
+  }
+
+  tags = {
+    Name = "${local.lambda_function_name}-spa-access-point"
   }
 
   depends_on = [aws_efs_mount_target.baba_db]
