@@ -99,12 +99,24 @@ infra-verify DOMAIN="sislam.com":
 
 # ── UI / Portfolio Site ──────────────────────────────────────────────────────
 
-# Run the portfolio site locally (Axum TCP server + cargo-watch hot reload)
+# Run the portfolio site locally on :3000, serving the pre-built SPA from web/dist/.
+# Run `just web-build` first if web/dist/ is missing or stale.
+# For hot-reloading frontend dev, use `just dev-stack` instead (Vite on :5173 + API on :3000).
 ui:
+    #!/usr/bin/env bash
+    if [ ! -f web/dist/index.html ]; then
+        echo "web/dist/ missing — building SPA first..."
+        just web-build
+    fi
     cargo watch -x 'run --package deploy-baba-ui'
 
 # Run the portfolio site once (no hot reload)
 ui-run:
+    #!/usr/bin/env bash
+    if [ ! -f web/dist/index.html ]; then
+        echo "web/dist/ missing — building SPA first..."
+        just web-build
+    fi
     cargo run --package deploy-baba-ui
 
 # Build the UI binary only (fast check)
@@ -233,6 +245,24 @@ deploy-fast PROFILE="default":
 # Dry run: build + validate, no push
 deploy-dry PROFILE="default":
     just aws-check {{PROFILE}} && cargo xtask deploy docker
+
+# Wait for Lambda to settle after a code update (step 2 of full pipeline)
+lambda-wait PROFILE="default":
+    just aws-check {{PROFILE}} && cargo xtask deploy wait --profile {{PROFILE}}
+
+# SPA-only deploy: build → S3 sync → sync-spa invoke → /health (steps 3–6)
+# Requires: SPA_BUCKET, UI_FN_NAME, FN_URL env vars (or set via infra outputs)
+spa-deploy PROFILE="default":
+    just aws-check {{PROFILE}} && cargo xtask deploy spa --profile {{PROFILE}} --sha "$(git rev-parse HEAD)"
+
+# Full pipeline: quality → Lambda → wait → SPA build → S3 sync → sync-spa → /health
+# Pass TAG=1 to also create a dev-vX.Y.Z git tag (mirrors deploy-dev.yml)
+deploy-full PROFILE="default" TAG="":
+    just quality
+    just lambda-deploy {{PROFILE}}
+    just lambda-wait {{PROFILE}}
+    just spa-deploy {{PROFILE}}
+    {{ if TAG != "" { "just release-tag dev push" } else { "echo 'Skipping dev tag — pass TAG=1 to enable'" } }}
 
 # ── Database (SQLite + S3) ───────────────────────────────────────────────────
 

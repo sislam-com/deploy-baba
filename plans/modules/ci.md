@@ -89,8 +89,9 @@ Requires `permissions: contents: write` and `fetch-depth: 0` checkout.
 | W-CI.4.8 | New `.github/workflows/deploy-prod.yml` | DONE | `production` env gate (manual approval) + same deploy flow |
 | W-CI.4.9 | Set GitHub Variables (manual, one-time) | TODO | CI_DEPLOY_*_ROLE_ARN, *_UI_FN_NAME, *_SPA_BUCKET, *_FN_URL |
 | W-CI.4.10 | Create GitHub `production` environment + Required Reviewers | TODO | Repo Settings → Environments → production |
-| W-CI.4.11 | Extend deploy-dev.yml with SPA sync (C.2) | TODO | Blocked on W-WEB.4.1 (web/ scaffold exists) and W-CI.4.4 (s3-spa.tf applied) |
-| W-CI.4.12 | Extend deploy-prod.yml with SPA sync (C.2) | TODO | Paired with W-CI.4.11 |
+| W-CI.4.11 | Extend deploy-dev.yml with SPA sync (C.2) | DONE | pnpm build → s3 sync → lambda invoke sync-spa → assert ok; worktree-clean guard before tag |
+| W-CI.4.12 | Extend deploy-prod.yml with SPA sync (C.2) | DONE | Same as dev; no tag step (prod triggered by tag push) |
+| W-CI.4.13 | Local deploy pipeline: `xtask deploy spa`, `just deploy-full/spa-deploy/lambda-wait`, `/deploy --full` skill | DONE | Steps 2–6 in Rust; opt-in `--tag`; prod confirmation gate in skill |
 
 ## W-CI.5 Test Strategy
 

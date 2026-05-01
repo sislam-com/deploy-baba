@@ -80,8 +80,10 @@ async fn main() -> Result<()> {
         anthropic_api_key.is_some()
     );
 
+    // Lambda sets SPA_ROOT=/mnt/spa/active via env var.
+    // Local default is web/dist — run `just web-build` first.
     let spa_root =
-        PathBuf::from(std::env::var("SPA_ROOT").unwrap_or_else(|_| "/mnt/spa/active".to_owned()));
+        PathBuf::from(std::env::var("SPA_ROOT").unwrap_or_else(|_| "web/dist".to_owned()));
     let spa_bucket = std::env::var("SPA_BUCKET").unwrap_or_default();
     tracing::info!("→ SPA root: {:?}", spa_root);
 

@@ -1,6 +1,6 @@
 # deploy-baba — Plan Index
-**GitHub:** `shantopagla/deploy-baba` | **Last updated:** 2026-04-30
-**Source repo:** `~/shanto` (Baba Toolchain, ~85K LOC) | **Status:** ~93% complete
+**GitHub:** `shantopagla/deploy-baba` | **Last updated:** 2026-05-01
+**Source repo:** `~/shanto` (Baba Toolchain, ~85K LOC) | **Status:** ~95% complete
 
 See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming rules.
 
@@ -20,15 +20,15 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | api-grpc | W-APIR | `crates/api-grpc/` | DONE | Per-crate README |
 | api-merger | W-APIM | `crates/api-merger/` | DONE | Per-crate README |
 | infra-types | W-INFR | `crates/infra-types/` | DONE | Per-crate README |
-| ui-service | W-UI | `services/ui/` | DONE | utoipa-rapidoc wiring (using inline HTML) |
-| resume | W-RSM | `services/ui/migrations/`, `routes/resume.rs`, `routes/api/jobs.rs`, `routes/api/competencies.rs` | DONE | 7 migrations (007 personal-projects seed added); xtask resume generate/upload done; Functional view grouping (W-RSM.8.1), print CSS (W-RSM.8.3) |
-| xtask | W-XT | `xtask/` | WIP | Resume generate + S3 upload done (W-XT.4.5); `EnvironmentInterpolator` unused (W-XT.4.2) |
+| ui-service | W-UI | `services/ui/` (API + asset server; no templates) | DONE | utoipa-rapidoc wiring (using inline HTML); sync.rs EFS swap handler added (D.4) |
+| resume | W-RSM | `services/ui/migrations/`, `routes/api/jobs.rs`, `routes/api/competencies.rs`, `routes/api/resume.rs` | DONE | 7 migrations; xtask resume generate/upload done; Functional view grouping (W-RSM.8.1), print CSS (W-RSM.8.3) |
+| xtask | W-XT | `xtask/` | WIP | release subcommand DONE; deploy spa.rs DONE; `EnvironmentInterpolator` unused (W-XT.4.2) |
 | terraform | W-TF | `infra/` | SUPERSEDED | Replaced by W-OTF (OpenTofu). W-TF.4.1 and W-TF.4.2 already fixed in code. |
 | opentofu | W-OTF | `infra/` + `xtask/src/infra/` | WIP | Install `tofu` binary (W-OTF.4.1 OPEN); smoke test (W-OTF.4.7 BLOCKED); docs (W-OTF.4.9 TODO) |
 | dx-justfile | W-DX | `justfile`, `docs/`, `examples/` | WIP | Per-crate READMEs, integration tests |
-| auth | W-AUTH | `services/ui/src/auth.rs`, `routes/auth.rs`, `routes/api/admin.rs`, `routes/dashboard.rs`, `infra/cognito.tf` | DONE | W-AUTH.POST-FIX (CloudFront OAC body hash) |
-| about | W-ABT | `services/ui/src/routes/about.rs`, `services/ui/templates/about_*.html`, `services/ui/migrations/008-009` | DONE | — |
-| social-links | W-SL | `services/ui/src/db.rs`, `services/ui/src/routes/dashboard.rs`, `services/ui/src/routes/api/admin.rs`, `services/ui/migrations/010-011` | DONE | — |
+| auth | W-AUTH | `services/ui/src/auth.rs`, `routes/auth.rs`, `routes/api/admin.rs`, `infra/cognito.tf` | DONE | W-AUTH.POST-FIX (CloudFront OAC body hash); dashboard now React (W-WEB) |
+| about | W-ABT | `services/ui/src/routes/api/about.rs`, `services/ui/migrations/008-009` | DONE | Templates deleted (D.5); data served via JSON API to SPA |
+| social-links | W-SL | `services/ui/src/db.rs`, `services/ui/src/routes/api/admin.rs`, `services/ui/migrations/010-011` | DONE | Templates deleted (D.5); nav loop now in React Layout.tsx |
 | contact-form | W-CTF | `services/email/`, `services/ui/src/routes/contact.rs`, `infra/ses.tf`, `infra/email-lambda.tf`, `infra/apigateway.tf` | WIP | e2e test (W-CTF.4.12) — deploy step pending |
 | secrets-manager | W-SEC | `xtask/src/secret.rs`, `infra/secrets.tf`, `infra/vpc-endpoints.tf`, `services/ui/src/routes/contact.rs` | DONE | Deploy: `just infra-apply` + `just secret-put pow-secret $(openssl rand -hex 32)` + `just lambda-deploy` |
 | dashboard-sync | W-SYNC | `plans/modules/dashboard-sync.md`, `services/ui/migrations/`, `services/ui/src/db.rs`, `services/ui/src/routes/api/admin.rs`, `.claude/skills/sync-dashboard-data/` | DONE | 4.1–4.5 complete; zero drift on first run 2026-04-08; .4.6/.4.7 deferred (on-demand) |
@@ -37,26 +37,28 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | rag | W-RAG | `crates/rag-core/`, `crates/rag-sqlite/` | PROPOSED | P1 CLI → P2 deploy-failure diagnosis → P3 /api/ask; blocked on W-LLM for generation. |
 | gdrive-planning | W-GDR | `justfile`, `.claude/settings.json`, `.github/workflows/` | TODO | Drive MCP plan export/import (W-GDR.4.1–4.3); Stop hook quality gate (W-GDR.4.4); evaluated from Gemini proposal 2026-04-15 |
 | ai-dlc | W-AIL | `.claude/agents/`, `.claude/skills/` | DONE | plan-doctor + drift-detector subagents; /plan-sync, /cache-refresh, /memory-curate skills; weekly schedule |
-| ci | W-CI | `.github/workflows/` | WIP | GitHub OIDC roles; deploy-dev.yml + deploy-prod.yml; xtask release subcommand; SPA sync |
-| web (SPA) | W-WEB | `web/` | WIP | Vite 6 + React 18 SPA replacing all 15 Askama templates; openapi-fetch client; phases D.1–D.5 |
+| ci | W-CI | `.github/workflows/` | WIP | Code complete (C.1 + C.2 DONE). Remaining: W-CI.4.5 (dev Lambda workspace, manual), W-CI.4.9 (GitHub Variables, manual), W-CI.4.10 (production env gate, manual) |
+| web (SPA) | W-WEB | `web/` | DONE | All 15 Askama templates replaced; Askama removed; EFS sync handler live; SEO prerender deferred to W-WEB.5 (P3) |
 | dev-environment | W-DEV | `scripts/`, `.devcontainer/` | DONE | bootstrap-tfstate.sh; dev-doctor.sh; devcontainer; initial-setup.md |
 
 ---
 
 ## Remaining Work — Priority Order
 
-### P0.1 — AI-DLC + Deployment Automation + Full SPA (this import, branch: `feat/llm-core`)
+### P0.1 — AI-DLC + Deployment Automation + Full SPA (branch: `feat/llm-core`)
 
 1. ~~**W-AIL.4.1–4.5**~~ **DONE** — Anti-rot agents + skills (Phase B complete).
 2. ~~**W-DEV.4.1–4.6**~~ **DONE** — Dev-environment scripts + devcontainer (Phase E complete).
-3. ~~**W-CI.4.1–4.4, 4.6–4.8**~~ **DONE** — xtask release subcommand + OIDC infra + workflows (Phase C.1 code complete). Remaining: W-CI.4.5 (dev Lambda workspace, one-time manual), W-CI.4.9 (GitHub Variables), W-CI.4.10 (production environment).
-4. **W-WEB.4.1–4.3** — SPA scaffold (`web/`) + missing JSON API endpoints. Phase D.1.
-5. **W-CI.4.11–4.12** — Extend workflows with SPA sync steps. Phase C.2 (after D.1).
-6. **W-WEB.4.4–4.5** — Port `/ask` + `/dashboard/*` to React. Phase D.2.
-7. **W-WEB.4.6** — Port marketing routes. Phase D.3.
-8. **W-WEB.4.7–4.8** — Flip Axum router + SPA sync handler + s3-spa.tf. Phase D.4.
-9. **W-WEB.4.9** — Remove Askama. Phase D.5.
-10. **W-AIL.4.7** — Wire weekly schedule (`dbb-plan-sync`, `dbb-memory-curate`) via `/schedule`.
+3. ~~**W-CI.4.1–4.4, 4.6–4.8**~~ **DONE** — xtask release subcommand + OIDC infra + workflows (Phase C.1).
+4. ~~**W-WEB.4.1–4.3**~~ **DONE** — SPA scaffold (`web/`) + missing JSON API endpoints (Phase D.1).
+5. ~~**W-CI.4.11–4.12**~~ **DONE** — Extended deploy-dev.yml + deploy-prod.yml with SPA sync steps (Phase C.2).
+6. ~~**W-WEB.4.4–4.5**~~ **DONE** — `/ask` + `/dashboard/*` ported to React (Phase D.2).
+7. ~~**W-WEB.4.6**~~ **DONE** — Marketing routes ported to React (Phase D.3).
+8. ~~**W-WEB.4.7–4.8**~~ **DONE** — Axum router flipped to SPA asset server + sync.rs + s3-spa.tf (Phase D.4).
+9. ~~**W-WEB.4.9**~~ **DONE** — Askama removed; 15 templates deleted (Phase D.5).
+10. ~~**Local deploy pipeline**~~ **DONE** — `xtask deploy spa`, `just deploy-full/spa-deploy/lambda-wait`, `/deploy --full` skill extended.
+11. **W-AIL.4.7** — Wire weekly schedule (`dbb-plan-sync`, `dbb-memory-curate`) via `/schedule`.
+12. **W-CI.4.5, 4.9, 4.10** — Manual one-time steps: dev Lambda workspace, GitHub Variables, `production` environment gate.
 
 ---
 
@@ -237,4 +239,4 @@ shantopagla/deploy-baba/
 | 8 | Quality pass | TODO |
 | 9 | Publish | TODO |
 
-**Overall: ~90% complete**
+**Overall: ~95% complete**

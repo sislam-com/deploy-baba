@@ -40,3 +40,7 @@ aws-sdk-ecr = { workspace = true }
 aws-sdk-efs = { workspace = true }
 aws-sdk-dynamodb = { workspace = true }
 aws-sdk-secretsmanager = { workspace = true }
+
+# HTTP client + file walking (for SPA deploy)
+reqwest = { workspace = true }
+walkdir = { workspace = true }

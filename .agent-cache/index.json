@@ -37,7 +37,7 @@
         "default",
         "validation"
       ],
-      "git_sha_at_scan": "2699dc40836f5b7de87680dfce565834edbc2918",
+      "git_sha_at_scan": "4aaae2dee1ac4391d52174481b12383799b78545",
       "key_files": [
         "src/lib.rs"
       ],
@@ -58,7 +58,7 @@
       ],
       "description": "GraphQL schema generator implementing api-core traits",
       "features": [],
-      "git_sha_at_scan": "2699dc40836f5b7de87680dfce565834edbc2918",
+      "git_sha_at_scan": "4aaae2dee1ac4391d52174481b12383799b78545",
       "key_files": [
         "src/lib.rs"
       ],
@@ -79,7 +79,7 @@
       ],
       "description": "gRPC/Protocol Buffer schema generator implementing api-core traits",
       "features": [],
-      "git_sha_at_scan": "2699dc40836f5b7de87680dfce565834edbc2918",
+      "git_sha_at_scan": "4aaae2dee1ac4391d52174481b12383799b78545",
       "key_files": [
         "src/lib.rs"
       ],
@@ -103,7 +103,7 @@
       ],
       "description": "Multi-format API specification merging with conflict resolution",
       "features": [],
-      "git_sha_at_scan": "2699dc40836f5b7de87680dfce565834edbc2918",
+      "git_sha_at_scan": "4aaae2dee1ac4391d52174481b12383799b78545",
       "key_files": [
         "src/lib.rs"
       ],
@@ -126,7 +126,7 @@
       ],
       "description": "OpenAPI 3.0 specification generator implementing api-core traits",
       "features": [],
-      "git_sha_at_scan": "2699dc40836f5b7de87680dfce565834edbc2918",
+      "git_sha_at_scan": "4aaae2dee1ac4391d52174481b12383799b78545",
       "key_files": [
         "src/lib.rs"
       ],
@@ -151,7 +151,7 @@
         "default",
         "validation"
       ],
-      "git_sha_at_scan": "2699dc40836f5b7de87680dfce565834edbc2918",
+      "git_sha_at_scan": "4aaae2dee1ac4391d52174481b12383799b78545",
       "key_files": [
         "src/lib.rs"
       ],
@@ -170,7 +170,7 @@
       "dependents": [],
       "description": "JSON implementation of config-core universal traits",
       "features": [],
-      "git_sha_at_scan": "2699dc40836f5b7de87680dfce565834edbc2918",
+      "git_sha_at_scan": "4aaae2dee1ac4391d52174481b12383799b78545",
       "key_files": [
         "src/lib.rs"
       ],
@@ -191,7 +191,7 @@
       ],
       "description": "TOML implementation of config-core universal traits",
       "features": [],
-      "git_sha_at_scan": "2699dc40836f5b7de87680dfce565834edbc2918",
+      "git_sha_at_scan": "4aaae2dee1ac4391d52174481b12383799b78545",
       "key_files": [
         "src/lib.rs"
       ],
@@ -210,7 +210,7 @@
       "dependents": [],
       "description": "YAML implementation of config-core universal traits",
       "features": [],
-      "git_sha_at_scan": "2699dc40836f5b7de87680dfce565834edbc2918",
+      "git_sha_at_scan": "4aaae2dee1ac4391d52174481b12383799b78545",
       "key_files": [
         "src/lib.rs"
       ],
@@ -233,7 +233,7 @@
         "default",
         "config (optional: config-core)"
       ],
-      "git_sha_at_scan": "2699dc40836f5b7de87680dfce565834edbc2918",
+      "git_sha_at_scan": "4aaae2dee1ac4391d52174481b12383799b78545",
       "key_files": [
         "src/lib.rs"
       ],
@@ -247,7 +247,7 @@
     "backup": "S3 via EventBridge schedule",
     "engine": "SQLite (rusqlite 0.32 bundled)",
     "file": "deploy-baba.db",
-    "git_sha_at_scan": "2699dc40836f5b7de87680dfce565834edbc2918",
+    "git_sha_at_scan": "4aaae2dee1ac4391d52174481b12383799b78545",
     "latest_migrations": [
       "012_update_about_sections (W-ABT — superseded split convention; ADR-010 upsert applies to new migrations)",
       "013_align_linkedin_profile (W-LINK — ADR-010 upsert to update LinkedIn URL)",
@@ -260,14 +260,14 @@
   },
   "git": {
     "branch": "feat/llm-core",
-    "last_commit": "Summary of what's done across all phases this session:   - D.2 — Dashboard: useAuth hook + 9 dashboard React components (Jobs, Competencies, About,    SocialLinks + their Detail forms + index with stat tiles)   - D.3 — Marketing: Layout shell, Home (timeline + capabilities), AboutMe, AboutRepo,   Contact (PoW proof-of-work)   - D.4 — Axum router flipped to SPA asset server + API; sync.rs handler (S3→EFS atomic   swap); infra/s3-spa.tf + EFS spa access point + Lambda env wiring   - D.5 — Askama deleted: 15 templates, Askama.toml, 4 route files, deps from Cargo.toml;   apidoc.rs fixed with AuthMe/ResumeData; coverage test ALLOWED_LOCAL updated",
+    "last_commit": "chore: merge main → feat/llm-core; keep D.5 template deletions",
     "remote": "git@github.com:shantopagla/deploy-baba.git",
-    "sha": "2699dc40836f5b7de87680dfce565834edbc2918",
-    "short_sha": "2699dc4"
+    "sha": "4aaae2dee1ac4391d52174481b12383799b78545",
+    "short_sha": "4aaae2d"
   },
   "infra": {
     "aws_region": "us-east-1",
-    "git_sha_at_scan": "2699dc40836f5b7de87680dfce565834edbc2918",
+    "git_sha_at_scan": "4aaae2dee1ac4391d52174481b12383799b78545",
     "key_resources": [
       "Lambda Function URL (ADR-003, no API Gateway)",
       "EFS for SQLite persistence (ADR-002)",
@@ -384,7 +384,7 @@
       "database": "rusqlite on EFS (ADR-002)",
       "description": "Portfolio site and live API demo — the Lambda binary",
       "framework": "axum 0.7",
-      "git_sha_at_scan": "2699dc40836f5b7de87680dfce565834edbc2918",
+      "git_sha_at_scan": "4aaae2dee1ac4391d52174481b12383799b78545",
       "key_files": [
         "src/main.rs",
         "src/router.rs",
@@ -427,7 +427,7 @@
   },
   "xtask": {
     "description": "Internal CLI plumbing — NEVER invoke directly, use `just` (ADR-001)",
-    "git_sha_at_scan": "2699dc40836f5b7de87680dfce565834edbc2918",
+    "git_sha_at_scan": "4aaae2dee1ac4391d52174481b12383799b78545",
     "open_issues": [
       "W-XT.4.2: Remove or wire up EnvironmentInterpolator (dead code)",
       "W-XT.4.3: Implement just infra-bootstrap (creates S3 + DynamoDB + SSM)"

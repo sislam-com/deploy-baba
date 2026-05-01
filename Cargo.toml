@@ -94,6 +94,7 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 # Auth
 jsonwebtoken = "9"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+walkdir = "2"
 
 # Crypto (PoW)
 sha2 = "0.10"
