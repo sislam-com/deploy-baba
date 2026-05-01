@@ -3,6 +3,10 @@
 
 set dotenv-load := false
 
+# Default AWS profile — pinned to stack.toml `aws.profile`.
+# Recipes with a `PROFILE` parameter shadow this; argless recipes (sso-login, ui, dev-stack) use it directly.
+PROFILE := "deploy-baba"
+
 # ── Meta ──────────────────────────────────────────────────────────────────────
 
 # List all available commands
@@ -104,11 +108,14 @@ infra-verify DOMAIN="sislam.com":
 # For hot-reloading frontend dev, use `just dev-stack` instead (Vite on :5173 + API on :3000).
 ui:
     #!/usr/bin/env bash
+    set -euo pipefail
     if [ ! -f web/dist/index.html ]; then
         echo "web/dist/ missing — building SPA first..."
         just web-build
     fi
-    cargo watch -x 'run --package deploy-baba-ui'
+    eval "$(just dev-env)"
+    env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN \
+        cargo watch -x 'run --package deploy-baba-ui'
 
 # Run the portfolio site once (no hot reload)
 ui-run:
@@ -159,7 +166,33 @@ aws-setup:
 aws-whoami PROFILE="default":
     aws sts get-caller-identity --profile {{PROFILE}}
 
+# Log in to AWS SSO. Populates ~/.aws/sso/cache — run once per workday before dev-stack/infra-plan/lambda-deploy.
+sso-login:
+    aws sso login --profile {{PROFILE}}
+
 # ── Developer Environment ─────────────────────────────────────────────────────
+
+# Print `export X=Y` lines for all env vars the local Rust binary needs.
+# Fetches Cognito config from SSM (/deploy-baba/prod/cognito-*) and JWKS from the
+# public Cognito endpoint. Consumed via `eval "$(just dev-env)"` in `just ui`.
+# Requires a valid SSO session — run `just sso-login` first.
+dev-env:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    AWS="env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN AWS_PROFILE={{PROFILE}} aws"
+    pool_id=$($AWS ssm get-parameter --name /deploy-baba/prod/cognito-pool-id    --query Parameter.Value --output text)
+    client_id=$($AWS ssm get-parameter --name /deploy-baba/prod/cognito-client-id --query Parameter.Value --output text)
+    domain=$($AWS    ssm get-parameter --name /deploy-baba/prod/cognito-domain    --query Parameter.Value --output text)
+    jwks=$(curl -fsSL "https://cognito-idp.us-east-1.amazonaws.com/${pool_id}/.well-known/jwks.json")
+    echo "export AWS_PROFILE={{PROFILE}}"
+    echo "export ANTHROPIC_API_KEY_ARN=root-anthropic-access-key"
+    echo "export RAG_PUBLIC_ENABLED=1"
+    echo "export COGNITO_POOL_ID=${pool_id}"
+    echo "export COGNITO_CLIENT_ID=${client_id}"
+    echo "export COGNITO_DOMAIN=${domain}"
+    echo "export COGNITO_REGION=us-east-1"
+    echo "export APP_DOMAIN=http://localhost:3000"
+    printf 'export COGNITO_JWKS=%q\n' "${jwks}"
 
 # Verify all prerequisites (rustup, cargo-lambda, node≥20, pnpm, tofu, AWS SSO, cache)
 dev-doctor:
@@ -194,9 +227,9 @@ web-types:
 # Start both the Rust API server (:3000) and Vite dev server (:5173) in parallel
 dev-stack:
     #!/usr/bin/env bash
-    set -e
+    set -euo pipefail
     trap 'kill 0' SIGINT SIGTERM EXIT
-    just ui &
+    env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN just ui &
     just web &
     wait
 

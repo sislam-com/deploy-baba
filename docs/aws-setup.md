@@ -20,7 +20,22 @@ aws_access_key_id = YOUR_KEY
 aws_secret_access_key = YOUR_SECRET
 ```
 
-For SSO users, configure SSO fields in the profile section instead.
+For SSO users, run `aws configure sso` once and accept defaults for the `deploy-baba` profile (SSO start URL and account ID are in your AWS access portal). Then refresh credentials daily with:
+
+```bash
+just sso-login
+```
+
+This calls `aws sso login --profile deploy-baba`, opens the browser for authorization, and populates `~/.aws/sso/cache`. All `just` recipes that start the local binary (`just ui`, `just dev-stack`) strip stale static keys and set `AWS_PROFILE=deploy-baba`, so the SSO cache is picked up automatically.
+
+The new `just dev-env` recipe fetches all config needed by the local Rust binary and prints `export X=Y` lines. It is sourced at startup by `just ui` (and via cascade, `just dev-stack`):
+
+- **Cognito** — pool ID, client ID, and hosted-UI domain are fetched from SSM Parameter Store (`/deploy-baba/prod/cognito-pool-id`, `cognito-client-id`, `cognito-domain`). JWKS is fetched from the public Cognito endpoint (`https://cognito-idp.us-east-1.amazonaws.com/<pool_id>/.well-known/jwks.json`). With these set, the binary runs with real Cognito auth (no dev-mode bypass). The Cognito user pool client already whitelists `http://localhost:3000/auth/callback` so local login works.
+- **Anthropic key** — `ANTHROPIC_API_KEY_ARN=root-anthropic-access-key` (Secrets Manager bare name). Binary fetches value at cold start.
+- **RAG Q&A** — `RAG_PUBLIC_ENABLED=1` enables the `/api/ask` route locally.
+- **App domain** — `APP_DOMAIN=http://localhost:3000` for correct OAuth redirect URLs.
+
+If SSO has lapsed or the role lacks `ssm:GetParameter` access, `just dev-env` fails fast before the binary starts. Re-run `just sso-login` and retry.
 
 ## 2. Required IAM Permissions
 

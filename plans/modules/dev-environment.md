@@ -22,6 +22,8 @@ Motivated by the SPA work (ADR-019) adding `pnpm` + Node 20 as new prerequisites
 | `initial-setup.md` | `plans/cross-cutting/initial-setup.md` | Authoritative first-run guide |
 | `just dev-doctor` | `justfile` | `bash scripts/dev-doctor.sh` |
 | `just infra-bootstrap` | `justfile` | `bash scripts/bootstrap-tfstate.sh` |
+| `just sso-login` | `justfile` | `aws sso login --profile deploy-baba` — refreshes SSO session |
+| `just dev-env` | `justfile` | Prints `export X=Y` lines — fetches Cognito config from SSM, JWKS from Cognito endpoint, layers Anthropic ARN + RAG flag + APP_DOMAIN |
 
 ## W-DEV.3 Implementation Notes
 
@@ -93,6 +95,9 @@ OpenTofu is not installed as a devcontainer feature (no official feature exists)
 | W-DEV.4.4 | `plans/cross-cutting/initial-setup.md` | DONE | Created in Phase A |
 | W-DEV.4.5 | `just dev-doctor` recipe | DONE | `bash scripts/dev-doctor.sh` |
 | W-DEV.4.6 | `just infra-bootstrap` recipe | DONE | `bash scripts/bootstrap-tfstate.sh` (updated from xtask call) |
+| W-DEV.4.7 | `just sso-login` recipe + dev-stack env-strip | DONE | `aws sso login --profile deploy-baba`; `just ui` + `just dev-stack` strip stale static keys and set `AWS_PROFILE=deploy-baba` (mirrors njnewsroomproject pattern) |
+| W-DEV.4.8 | dev-stack ANTHROPIC_API_KEY_ARN wiring | DONE | `just ui` + `just dev-stack` set `ANTHROPIC_API_KEY_ARN=root-anthropic-access-key`; `init_anthropic_key()` (services/ui/src/main.rs:34) fetches it via `secretsmanager:GetSecretValue` at cold start, reusing the Lambda-side dual-mode loader |
+| W-DEV.4.9 | `just dev-env` recipe — unified dev env config | DONE | Fetches Cognito pool/client/domain from SSM + JWKS from public endpoint; layers Anthropic ARN + RAG_PUBLIC_ENABLED + APP_DOMAIN; sourced by `just ui`/`just dev-stack` via `eval "$(just dev-env)"`; eliminates dev-mode auth bypass |
 
 ## W-DEV.5 Test Strategy
 

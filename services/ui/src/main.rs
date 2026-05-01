@@ -35,7 +35,20 @@ async fn init_anthropic_key() {
         let config = aws_config::load_from_env().await;
         let client = aws_sdk_secretsmanager::Client::new(&config);
         match client.get_secret_value().secret_id(&arn).send().await {
-            Ok(resp) => resp.secret_string().map(|s| s.to_string()),
+            Ok(resp) => resp.secret_string().map(|s| {
+                let s = s.trim().to_string();
+                // AWS console stores secrets as JSON by default ({"KEY":"value"}).
+                // Extract the first string value if the secret is JSON-wrapped.
+                if s.starts_with('{') {
+                    if let Ok(Value::Object(map)) = serde_json::from_str(&s) {
+                        if let Some(v) = map.values().next().and_then(|v| v.as_str()) {
+                            tracing::info!("→ ANTHROPIC_API_KEY unwrapped from JSON secret");
+                            return v.to_string();
+                        }
+                    }
+                }
+                s
+            }),
             Err(e) => {
                 tracing::error!("Failed to fetch ANTHROPIC_API_KEY from Secrets Manager: {e}");
                 None
