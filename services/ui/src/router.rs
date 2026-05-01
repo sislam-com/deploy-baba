@@ -64,9 +64,7 @@ pub fn build(state: AppState) -> Router {
         // ── SPA hashed assets — long-lived cache (filenames contain content hash) ─
         .nest_service("/assets", ServeDir::new(&spa_assets_dir).precompressed_br())
         // ── SPA fallback — serve index.html for any unmatched path ───────────
-        .fallback_service(
-            ServeDir::new(&spa_root).fallback(ServeFile::new(&index_html)),
-        )
+        .fallback_service(ServeDir::new(&spa_root).fallback(ServeFile::new(&index_html)))
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
         .with_state(state)

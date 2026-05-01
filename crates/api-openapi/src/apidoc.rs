@@ -11,11 +11,11 @@
 /// function, so there is no hand-maintained `paths(...)` list anywhere.
 use crate::models::{
     AboutSectionInput, AboutSectionResponse, ApiError, AskCitation, AskRequest, AskResponse,
-    ChallengeResponse, Competency, CompetencyInput, CompetencyWithEvidence, ContactResponse,
-    ContactSubmitRequest, CrateInfo, Evidence, EvidenceInput, EvidenceItem, Field,
+    AuthMe, ChallengeResponse, Competency, CompetencyInput, CompetencyWithEvidence,
+    ContactResponse, ContactSubmitRequest, CrateInfo, Evidence, EvidenceInput, EvidenceItem, Field,
     GenerateSpecRequest, GenerateSpecResponse, HealthResponse, Job, JobDetail, JobDetailInput,
     JobInput, JobWithDetails, JobsQuery, MatchedBullet, ParseConfigRequest, ParseConfigResponse,
-    SocialLink, SocialLinkInput, SocialLinkResponse, TailorRequest, TailorResponse,
+    ResumeData, SocialLink, SocialLinkInput, SocialLinkResponse, TailorRequest, TailorResponse,
 };
 use utoipa::OpenApi;
 
@@ -55,6 +55,8 @@ use utoipa::OpenApi;
         AskRequest,
         AskCitation,
         AskResponse,
+        AuthMe,
+        ResumeData,
     )),
     tags(
         (name = "health", description = "Service health checks"),

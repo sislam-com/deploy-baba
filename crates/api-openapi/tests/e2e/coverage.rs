@@ -11,22 +11,7 @@ use std::path::Path;
 
 /// Names defined locally in services/ui that are not API models.
 const ALLOWED_LOCAL: &[&str] = &[
-    "ContactTemplate",
-    "ResumeTemplate",
-    "AboutMeTemplate",
-    "AboutRepoTemplate",
-    "DashboardTemplate",
-    "DashboardJobsTemplate",
-    "DashboardJobDetailTemplate",
-    "DashboardCompetenciesTemplate",
-    "DashboardCompetencyDetailTemplate",
-    "DashboardAboutTemplate",
-    "DashboardAboutDetailTemplate",
-    "DashboardAboutNewTemplate",
-    "DashboardSocialLinksTemplate",
-    "DashboardSocialLinkDetailTemplate",
-    "DashboardSocialLinkNewTemplate",
-    "EmailPayload", // internal Lambda payload
+    "EmailPayload", // internal Lambda payload, not part of public API
     "RateLimiter",
     "NonceTracker",
     "AppState",
@@ -35,6 +20,7 @@ const ALLOWED_LOCAL: &[&str] = &[
     "JwksKey",
     "JwksResponse",
     "SetSessionQuery", // Cognito callback query params
+    "AboutQuery",      // query-parameter extractor, not a response model
 ];
 
 fn is_model_reexport(name: &str) -> bool {

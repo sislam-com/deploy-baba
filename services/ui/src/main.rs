@@ -156,10 +156,7 @@ async fn dispatch(
     }
 }
 
-async fn handle_http(
-    payload: Value,
-    app: axum::Router,
-) -> Result<Value, lambda_runtime::Error> {
+async fn handle_http(payload: Value, app: axum::Router) -> Result<Value, lambda_runtime::Error> {
     let method = payload["requestContext"]["http"]["method"]
         .as_str()
         .unwrap_or("GET");
@@ -198,10 +195,7 @@ async fn handle_http(
         .body(axum::body::Body::from(body_bytes))
         .map_err(|e| format!("build request: {e}"))?;
 
-    let resp = app
-        .oneshot(req)
-        .await
-        .map_err(|e| format!("axum: {e}"))?;
+    let resp = app.oneshot(req).await.map_err(|e| format!("axum: {e}"))?;
 
     let status = resp.status().as_u16();
     let mut headers_out = serde_json::Map::new();
