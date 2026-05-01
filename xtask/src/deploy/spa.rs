@@ -1,7 +1,7 @@
-use aws_sdk_lambda::Client as LambdaClient;
 use aws_sdk_lambda::primitives::Blob;
-use aws_sdk_s3::Client as S3Client;
+use aws_sdk_lambda::Client as LambdaClient;
 use aws_sdk_s3::primitives::ByteStream;
+use aws_sdk_s3::Client as S3Client;
 use std::path::Path;
 use std::process::Command;
 use std::time::{Duration, Instant};
@@ -18,21 +18,23 @@ pub struct SpaEnvConfig {
 
 impl SpaEnvConfig {
     pub fn from_env() -> anyhow::Result<Self> {
-        let spa_bucket = std::env::var("SPA_BUCKET")
-            .map_err(|_| anyhow::anyhow!("SPA_BUCKET env var not set (run: just infra-output or set manually)"))?;
+        let spa_bucket = std::env::var("SPA_BUCKET").map_err(|_| {
+            anyhow::anyhow!("SPA_BUCKET env var not set (run: just infra-output or set manually)")
+        })?;
         let fn_name = std::env::var("UI_FN_NAME")
             .map_err(|_| anyhow::anyhow!("UI_FN_NAME env var not set"))?;
         let fn_url = std::env::var("FN_URL")
             .map_err(|_| anyhow::anyhow!("FN_URL env var not set (include trailing slash)"))?;
-        Ok(Self { spa_bucket, fn_name, fn_url })
+        Ok(Self {
+            spa_bucket,
+            fn_name,
+            fn_url,
+        })
     }
 }
 
 /// Step 2: poll until Lambda LastUpdateStatus == Successful.
-pub async fn wait_lambda_active(
-    client: &LambdaClient,
-    fn_name: &str,
-) -> anyhow::Result<()> {
+pub async fn wait_lambda_active(client: &LambdaClient, fn_name: &str) -> anyhow::Result<()> {
     println!("   Waiting for Lambda '{}' to become active...", fn_name);
     let deadline = Instant::now() + WAIT_TIMEOUT;
     loop {
@@ -51,13 +53,17 @@ pub async fn wait_lambda_active(
                     return Ok(());
                 }
                 Some(LastUpdateStatus::Failed) => {
-                    return Err(anyhow::anyhow!("Lambda update failed — check CloudWatch logs"));
+                    return Err(anyhow::anyhow!(
+                        "Lambda update failed — check CloudWatch logs"
+                    ));
                 }
                 _ => {}
             }
         }
         if Instant::now() >= deadline {
-            return Err(anyhow::anyhow!("Timed out waiting for Lambda to become active"));
+            return Err(anyhow::anyhow!(
+                "Timed out waiting for Lambda to become active"
+            ));
         }
         tokio::time::sleep(POLL_INTERVAL).await;
     }
@@ -85,14 +91,19 @@ pub async fn sync_to_s3(
 ) -> anyhow::Result<(usize, u64)> {
     let dist = Path::new("web/dist");
     if !dist.exists() {
-        return Err(anyhow::anyhow!("web/dist/ not found — run `just web-build` first"));
+        return Err(anyhow::anyhow!(
+            "web/dist/ not found — run `just web-build` first"
+        ));
     }
     println!("   Syncing web/dist/ → s3://{}/{}/", bucket, sha);
 
     let mut file_count = 0usize;
     let mut total_bytes = 0u64;
 
-    for entry in walkdir::WalkDir::new(dist).into_iter().filter_map(|e| e.ok()) {
+    for entry in walkdir::WalkDir::new(dist)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
         if !entry.file_type().is_file() {
             continue;
         }

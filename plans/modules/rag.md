@@ -164,7 +164,7 @@ injects this contract via `PromptBundle.system_prompt`.
 | W-RAG.5.1 | `xtask deploy` failure hook → RAG explain | TODO | Needs W-RAG.4.2 (DONE) |
 | W-RAG.6.1 | `services/ui/src/routes/api/ask.rs` + router wiring | DONE (2026-04-15) | POST /api/ask; Arc<RagStore> in AppState; WAL concurrent reader |
 | W-RAG.6.2 | Bundle `sqlite-vec` aarch64 SO into Lambda zip | TODO | P2; confirm binary size (~300 KB) |
-| W-RAG.6.3 | Rate-limit + `RAG_PUBLIC_ENABLED` feature flag | DONE (2026-04-15) | LazyLock<Mutex<HashMap>> 10/min per IP; RAG_PUBLIC_ENABLED=1 gate |
+| W-RAG.6.3 | Rate-limit + `RAG_PUBLIC_ENABLED` feature flag | DONE (updated 2026-05-01) | `ASK_RATE_LIMIT` env var (default 2/min); IP from `x-forwarded-for` first → `ConnectInfo` → `"unknown"` (Lambda fix — was 127.0.0.1 global bucket); `RAG_PUBLIC_ENABLED=1` gate |
 
 ## W-RAG.5 Test Strategy
 

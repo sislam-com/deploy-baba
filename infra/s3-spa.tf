@@ -1,5 +1,3 @@
-data "aws_caller_identity" "current" {}
-
 # S3 bucket for SPA build artifacts keyed by git SHA
 resource "aws_s3_bucket" "spa" {
   bucket = "deploy-baba-${var.environment}-spa-${data.aws_caller_identity.current.account_id}"
@@ -34,6 +32,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "spa" {
   rule {
     id     = "prune-old-sha-prefixes"
     status = "Enabled"
+
+    filter {}
 
     expiration {
       days = 14

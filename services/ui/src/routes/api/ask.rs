@@ -6,14 +6,15 @@
 //! 1. `RAG_PUBLIC_ENABLED=1` env var (gate for P3 rollout)
 //! 2. A live Anthropic API key in `AppState.anthropic_api_key`
 //!
-//! Missing either returns a 503. Rate-limited to 10 requests/minute per IP.
+//! Missing either returns a 503. Rate-limited per IP: default 2/min, overridable
+//! via `ASK_RATE_LIMIT` env var (useful for local dev).
 //!
 //! # Flow
 //!
 //! ```text
 //! POST /api/ask
 //!   → check RAG_PUBLIC_ENABLED + api key
-//!   → rate-limit check (per IP, 10/min)
+//!   → rate-limit check (per IP, ASK_RATE_LIMIT/min, default 2)
 //!   → RagStore::retrieve (FTS5 BM25, top_k)
 //!   → DefaultPromptAssembler::assemble
 //!   → AnthropicProvider::generate
@@ -22,42 +23,48 @@
 
 use std::{
     collections::HashMap,
-    net::IpAddr,
-    sync::{Arc, Mutex},
+    net::SocketAddr,
+    sync::{Arc, LazyLock, Mutex},
     time::Instant,
 };
 
 use axum::{
     extract::{ConnectInfo, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     Json,
 };
 use llm_anthropic::AnthropicProvider;
 use llm_core::{ChatMessage, GenerationConfig, LlmProvider, LlmRequest, MessageRole};
 use rag_core::{DefaultPromptAssembler, PromptAssembler, Retriever};
 use rag_sqlite::RagStore;
-use std::net::{Ipv4Addr, SocketAddr};
 
 use crate::state::AppState;
 pub use api_openapi::models::{AskCitation, AskRequest, AskResponse};
 
 // ── Rate limiter ──────────────────────────────────────────────────────────────
 
-const RATE_LIMIT: u32 = 10;
 const RATE_WINDOW_SECS: u64 = 60;
+
+static RATE_LIMIT: LazyLock<u32> = LazyLock::new(|| {
+    std::env::var("ASK_RATE_LIMIT")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(2)
+});
 
 struct RateEntry {
     count: u32,
     window_start: Instant,
 }
 
-static RATE_MAP: std::sync::LazyLock<Mutex<HashMap<IpAddr, RateEntry>>> =
-    std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
+static RATE_MAP: LazyLock<Mutex<HashMap<String, RateEntry>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
-fn check_rate_limit(ip: IpAddr) -> bool {
+fn check_rate_limit(ip: &str) -> bool {
+    let limit = *RATE_LIMIT;
     let mut map = RATE_MAP.lock().unwrap();
     let now = Instant::now();
-    let entry = map.entry(ip).or_insert(RateEntry {
+    let entry = map.entry(ip.to_string()).or_insert(RateEntry {
         count: 0,
         window_start: now,
     });
@@ -65,11 +72,30 @@ fn check_rate_limit(ip: IpAddr) -> bool {
         entry.count = 0;
         entry.window_start = now;
     }
-    if entry.count >= RATE_LIMIT {
+    if entry.count >= limit {
         return false;
     }
     entry.count += 1;
     true
+}
+
+fn extract_client_ip(
+    headers: &HeaderMap,
+    connect_info: Option<&ConnectInfo<SocketAddr>>,
+) -> String {
+    if let Some(ip) = headers
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.split(',').next())
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+    {
+        return ip.to_string();
+    }
+    if let Some(ci) = connect_info {
+        return ci.0.ip().to_string();
+    }
+    "unknown".to_string()
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -92,15 +118,13 @@ fn err(status: StatusCode, msg: &str) -> (StatusCode, Json<serde_json::Value>) {
     )
 )]
 pub async fn ask(
+    headers: HeaderMap,
     connect_info: Option<ConnectInfo<SocketAddr>>,
     State(state): State<AppState>,
     State(rag): State<Arc<RagStore>>,
     Json(req): Json<AskRequest>,
 ) -> ApiResult<AskResponse> {
-    // Fall back to loopback when ConnectInfo is absent (e.g. Lambda path).
-    let ip: IpAddr = connect_info
-        .map(|c| c.0.ip())
-        .unwrap_or(IpAddr::V4(Ipv4Addr::LOCALHOST));
+    let ip = extract_client_ip(&headers, connect_info.as_ref());
     // Gate 1: public enablement flag
     if std::env::var("RAG_PUBLIC_ENABLED").as_deref() != Ok("1") {
         return Err(err(StatusCode::SERVICE_UNAVAILABLE, "RAG Q&A not enabled"));
@@ -115,10 +139,10 @@ pub async fn ask(
         .to_owned();
 
     // Gate 3: rate limit
-    if !check_rate_limit(ip) {
+    if !check_rate_limit(&ip) {
         return Err(err(
             StatusCode::TOO_MANY_REQUESTS,
-            "Rate limit exceeded (10/min)",
+            &format!("Rate limit exceeded ({}/min)", *RATE_LIMIT),
         ));
     }
 
@@ -162,13 +186,10 @@ pub async fn ask(
         },
     };
 
-    let llm_resp = provider
-        .generate(llm_req)
-        .await
-        .map_err(|e| {
-            tracing::error!("Anthropic generate failed: {e}");
-            err(StatusCode::BAD_GATEWAY, &format!("LLM error: {e}"))
-        })?;
+    let llm_resp = provider.generate(llm_req).await.map_err(|e| {
+        tracing::error!("Anthropic generate failed: {e}");
+        err(StatusCode::BAD_GATEWAY, &format!("LLM error: {e}"))
+    })?;
 
     let citations: Vec<AskCitation> = bundle
         .citations

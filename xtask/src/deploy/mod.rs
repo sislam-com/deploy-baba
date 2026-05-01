@@ -81,15 +81,23 @@ pub async fn execute(action: DeployAction) -> anyhow::Result<()> {
         DeployAction::Wait { profile, function } => {
             let fn_name = function
                 .or_else(|| std::env::var("UI_FN_NAME").ok())
-                .ok_or_else(|| anyhow::anyhow!("Lambda function name required: pass --function or set UI_FN_NAME"))?;
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "Lambda function name required: pass --function or set UI_FN_NAME"
+                    )
+                })?;
             let aws_config = crate::aws::create_aws_config(profile).await?;
             let client = aws_sdk_lambda::Client::new(&aws_config);
             spa::wait_lambda_active(&client, &fn_name).await
         }
-        DeployAction::Spa { profile, sha, skip_wait } => {
-            let sha = sha
-                .or_else(|| git_head_sha().ok())
-                .ok_or_else(|| anyhow::anyhow!("Could not determine git SHA; pass --sha explicitly"))?;
+        DeployAction::Spa {
+            profile,
+            sha,
+            skip_wait,
+        } => {
+            let sha = sha.or_else(|| git_head_sha().ok()).ok_or_else(|| {
+                anyhow::anyhow!("Could not determine git SHA; pass --sha explicitly")
+            })?;
             let env_cfg = spa::SpaEnvConfig::from_env()?;
             spa::deploy_spa(profile, env_cfg, &sha, skip_wait).await
         }

@@ -24,7 +24,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | resume | W-RSM | `services/ui/migrations/`, `routes/api/jobs.rs`, `routes/api/competencies.rs`, `routes/api/resume.rs` | DONE | 7 migrations; xtask resume generate/upload done; Functional view grouping (W-RSM.8.1), print CSS (W-RSM.8.3) |
 | xtask | W-XT | `xtask/` | WIP | release subcommand DONE; deploy spa.rs DONE; `EnvironmentInterpolator` unused (W-XT.4.2) |
 | terraform | W-TF | `infra/` | SUPERSEDED | Replaced by W-OTF (OpenTofu). W-TF.4.1 and W-TF.4.2 already fixed in code. |
-| opentofu | W-OTF | `infra/` + `xtask/src/infra/` | WIP | Install `tofu` binary (W-OTF.4.1 OPEN); smoke test (W-OTF.4.7 BLOCKED); docs (W-OTF.4.9 TODO) |
+| opentofu | W-OTF | `infra/` + `xtask/src/infra/` | DONE | `tofu` v1.11.5 installed; plan runs clean (W-OTF.4.7 DONE 2026-05-01). `acm.tf` added; `cdn.tf` updated for `dev.sislam.com` + wildcard cert. |
 | dx-justfile | W-DX | `justfile`, `docs/`, `examples/` | WIP | Per-crate READMEs, integration tests |
 | auth | W-AUTH | `services/ui/src/auth.rs`, `routes/auth.rs`, `routes/api/admin.rs`, `infra/cognito.tf` | DONE | W-AUTH.POST-FIX (CloudFront OAC body hash); dashboard now React (W-WEB) |
 | about | W-ABT | `services/ui/src/routes/api/about.rs`, `services/ui/migrations/008-009` | DONE | Templates deleted (D.5); data served via JSON API to SPA |
@@ -78,7 +78,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 3. ~~**W-TF.4.1**~~ — `infra/eventbridge.tf`: already uses `state = "ENABLED"` — **RESOLVED** (see DRL-2026-03-25-opentofu)
 3. ~~**W-TF.4.2**~~ — `infra/s3.tf`: `filter {}` already present — **RESOLVED** (see DRL-2026-03-25-opentofu)
 4. **W-XT.4.2** — Remove or wire up `EnvironmentInterpolator` (dead code)
-5. **W-OTF.4.1–4.7** — Migrate infrastructure tooling from Terraform → OpenTofu (see `plans/modules/opentofu.md`)
+5. ~~**W-OTF.4.1–4.7**~~ — **DONE 2026-05-01** — `tofu` v1.11.5 installed; `just infra-plan deploy-baba` clean. HCL fixes: duplicate `aws_caller_identity`, duplicate `file_system_config`, lifecycle `filter {}`. See DRL-2026-05-01-infra-plan-blockers.
 
 ### P2 — Quality Gate
 5. **W-DX.3** — Per-crate README files (10 library crates)
@@ -153,6 +153,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | DRL-2026-04-03-secrets-manager | 2026-04-03 | W-SEC/W-CTF: POW_SECRET + cognito_temp_password migrated from Lambda env vars to AWS Secrets Manager | Code complete; deploy: `just infra-apply` + `just secret-put pow-secret` + `just lambda-deploy` |
 | DRL-2026-04-07-ses-sandbox-ack | 2026-04-07 | SES sandbox blocks ack emails to unverified recipients | **RESOLVED 2026-04-08** — production access granted; W-CTF.4.13 DONE; SES_ACK_FROM_EMAIL restored |
 | DRL-2026-04-08-api-openapi-orphan | 2026-04-08 | api-openapi was orphaned from services/ui (W-APIO SSOT) | **RESOLVED 2026-04-08** — SSOT refactor complete; 29 models, dual-spec, 84 tests |
+| DRL-2026-05-01-infra-plan-blockers | 2026-05-01 | Three HCL bugs blocked `just infra-plan` (duplicate caller_identity, duplicate file_system_config, missing lifecycle filter) | **RESOLVED 2026-05-01** — all fixed; plan clean |
 
 ---
 
