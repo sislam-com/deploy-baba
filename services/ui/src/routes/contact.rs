@@ -225,6 +225,14 @@ struct ContactResponse {
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
 
+#[utoipa::path(
+    get,
+    path = "/api/contact/challenge",
+    tag = "contact",
+    responses(
+        (status = 200, description = "PoW challenge issued", body = api_openapi::models::ChallengeResponse),
+    )
+)]
 pub async fn challenge_issue() -> impl IntoResponse {
     use rand::RngCore;
     let mut nonce_bytes = [0u8; 16];
@@ -246,6 +254,16 @@ pub async fn challenge_issue() -> impl IntoResponse {
     })
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/contact",
+    tag = "contact",
+    request_body = api_openapi::models::ContactSubmitRequest,
+    responses(
+        (status = 200, description = "Message submitted", body = api_openapi::models::ContactResponse),
+        (status = 400, description = "Invalid PoW or validation error", body = api_openapi::models::ContactResponse),
+    )
+)]
 pub async fn contact_submit(
     headers: HeaderMap,
     Json(req): Json<ContactSubmitRequest>,

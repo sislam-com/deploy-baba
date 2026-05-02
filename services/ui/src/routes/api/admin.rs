@@ -705,6 +705,17 @@ fn row_to_social_link(row: &rusqlite::Row<'_>) -> rusqlite::Result<SocialLinkRes
 }
 
 /// Create a new social link.
+#[utoipa::path(
+    post,
+    path = "/api/admin/social-links",
+    tag = "admin",
+    request_body = SocialLinkInput,
+    responses(
+        (status = 201, description = "Social link created", body = SocialLinkResponse),
+        (status = 401, description = "Unauthorized"),
+    ),
+    security(("cookieAuth" = []), ("bearerAuth" = [])),
+)]
 pub async fn create_social_link(
     State(db): State<Arc<Db>>,
     Json(input): Json<SocialLinkInput>,
@@ -738,6 +749,19 @@ pub async fn create_social_link(
 }
 
 /// Update an existing social link.
+#[utoipa::path(
+    put,
+    path = "/api/admin/social-links/{id}",
+    tag = "admin",
+    params(("id" = i64, Path, description = "Social link ID")),
+    request_body = SocialLinkInput,
+    responses(
+        (status = 200, description = "Social link updated", body = SocialLinkResponse),
+        (status = 404, description = "Social link not found"),
+        (status = 401, description = "Unauthorized"),
+    ),
+    security(("cookieAuth" = []), ("bearerAuth" = [])),
+)]
 pub async fn update_social_link(
     State(db): State<Arc<Db>>,
     Path(id): Path<i64>,
@@ -777,6 +801,18 @@ pub async fn update_social_link(
 }
 
 /// Delete a social link.
+#[utoipa::path(
+    delete,
+    path = "/api/admin/social-links/{id}",
+    tag = "admin",
+    params(("id" = i64, Path, description = "Social link ID")),
+    responses(
+        (status = 204, description = "Social link deleted"),
+        (status = 404, description = "Social link not found"),
+        (status = 401, description = "Unauthorized"),
+    ),
+    security(("cookieAuth" = []), ("bearerAuth" = [])),
+)]
 pub async fn delete_social_link(
     State(db): State<Arc<Db>>,
     Path(id): Path<i64>,

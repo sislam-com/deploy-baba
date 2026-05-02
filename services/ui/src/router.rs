@@ -13,11 +13,11 @@ use crate::routes;
 use crate::state::AppState;
 
 pub fn build(state: AppState) -> Router {
-    let full_spec = ApiDoc::openapi();
-    let public_spec = api_openapi::filter::public_view(&full_spec);
-
-    let public_spec_clone = public_spec.clone();
-    let full_spec_clone = full_spec.clone();
+    // Single unified spec — public and admin paths together.
+    // Admin paths carry `security` annotations so RapiDoc renders lock icons;
+    // the actual require_auth middleware on /api/admin/* is unchanged.
+    let spec = ApiDoc::openapi();
+    let spec_clone = spec.clone();
 
     let admin_routes = routes::api::admin::router().route_layer(
         axum::middleware::from_fn_with_state(state.clone(), crate::middleware::require_auth),
@@ -44,23 +44,19 @@ pub fn build(state: AppState) -> Router {
         .nest("/api/admin", admin_routes)
         // ── Auth routes (server-side Cognito redirects) ─────────────────────
         .nest("/auth", routes::auth::router())
-        // ── OpenAPI specs ────────────────────────────────────────────────────
+        // ── OpenAPI spec ─────────────────────────────────────────────────────
+        // Full combined spec — served unauthenticated so /docs shows all routes.
+        // /api/openapi-admin.json kept as an alias for backward compatibility.
         .route(
             "/api/openapi.json",
-            get(move || async move { axum::Json(public_spec_clone) }),
+            get(move || async move { axum::Json(spec_clone) }),
         )
         .route(
             "/api/openapi-admin.json",
-            get(move || async move { axum::Json(full_spec_clone) }).route_layer(
-                axum::middleware::from_fn_with_state(
-                    state.clone(),
-                    crate::middleware::require_auth,
-                ),
-            ),
+            get(move || async move { axum::Json(spec.clone()) }),
         )
         // ── API Docs (RapiDoc) ───────────────────────────────────────────────
         .route("/docs", get(docs_handler))
-        .route("/docs/admin", get(docs_admin_handler))
         // ── SPA hashed assets — long-lived cache (filenames contain content hash) ─
         .nest_service("/assets", ServeDir::new(&spa_assets_dir).precompressed_br())
         // ── SPA fallback — serve index.html for any unmatched path ───────────
@@ -77,18 +73,6 @@ async fn docs_handler() -> Html<&'static str> {
 <script type="module" src="https://unpkg.com/rapidoc/dist/rapidoc-min.js"></script>
 </head><body>
 <rapi-doc spec-url="/api/openapi.json" theme="dark" render-style="read"
-  show-header="false" allow-try="true"></rapi-doc>
-</body></html>"#,
-    )
-}
-
-async fn docs_admin_handler() -> Html<&'static str> {
-    Html(
-        r#"<!doctype html>
-<html><head><meta charset="utf-8"><title>deploy-baba Admin API Docs</title>
-<script type="module" src="https://unpkg.com/rapidoc/dist/rapidoc-min.js"></script>
-</head><body>
-<rapi-doc spec-url="/api/openapi-admin.json" theme="dark" render-style="read"
   show-header="false" allow-try="true"></rapi-doc>
 </body></html>"#,
     )

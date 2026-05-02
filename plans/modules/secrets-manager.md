@@ -105,3 +105,4 @@ fetch eagerly at Lambda cold start in `main.rs`.
 → W-CTF.4.11 (blocked on W-SEC)
 → ADR-009 (API Gateway + PoW — uses POW_SECRET)
 → ADR-007 (OpenTofu manages SM resource)
+→ ADR-015 (LLM provider abstraction — `anthropic-api-key` secret supports W-RST/W-LLM)

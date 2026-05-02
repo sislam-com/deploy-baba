@@ -54,4 +54,6 @@ Seeded with LinkedIn (sort_order=0) and GitHub (sort_order=1).
 ## Cross-References
 
 - → ADR-010 (upsert re-seed convention — social_links has UNIQUE(platform))
+- → ADR-013 (React SPA — social links rendered in SPA nav)
+- → ADR-019 (SPA deploy pipeline — social links surfaced in deployed SPA)
 - → W-SYNC (dashboard → migrations sync workflow)

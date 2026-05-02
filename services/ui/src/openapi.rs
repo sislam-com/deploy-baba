@@ -31,11 +31,18 @@ impl Modify for SecurityAddon {
     }
 }
 
-/// Full combined spec (public + admin schemas, all handler paths, security schemes).
+/// Full combined spec — all handler paths, all schemas, security schemes.
 ///
-/// `router.rs` builds two variants:
-///  * `/api/openapi.json`        — filtered public view (via `api_openapi::filter::public_view`)
-///  * `/api/openapi-admin.json`  — this full spec, auth-gated
+/// Served at `/api/openapi.json` (unauthenticated) so the public `/docs` page
+/// shows every endpoint including admin. Admin paths carry `security` annotations
+/// so RapiDoc renders lock icons; the actual `require_auth` middleware on those
+/// routes is unchanged.
+///
+/// `demo/config/parse` and `demo/spec/generate` are intentionally excluded —
+/// those endpoints are internal utilities, not public API surface.
+///
+/// The `tailor` tag is reserved for the upcoming W-RST pipeline (job description
+/// textbox → RAG + Anthropic → downloadable docx/pdf).
 #[derive(OpenApi)]
 #[openapi(
     info(
@@ -44,42 +51,55 @@ impl Modify for SecurityAddon {
         description = "Live demos and documentation for the deploy-baba ecosystem"
     ),
     paths(
+        // ── Health ───────────────────────────────────────────────────────────
         crate::routes::health::get_health,
+        // ── Crates ───────────────────────────────────────────────────────────
         crate::routes::api::crates::list_crates,
         crate::routes::api::crates::get_crate,
+        // ── Stack ────────────────────────────────────────────────────────────
         crate::routes::api::stack::get_stack,
-        crate::routes::api::demo::parse_config,
-        crate::routes::api::demo::generate_spec,
+        // ── Portfolio (public read) ──────────────────────────────────────────
         crate::routes::api::jobs::list_jobs,
         crate::routes::api::jobs::get_job,
         crate::routes::api::competencies::list_competencies,
         crate::routes::api::competencies::get_competency,
+        crate::routes::api::resume_data::get_resume_data,
+        crate::routes::api::about::list_about_sections,
+        crate::routes::api::social_links::list_social_links,
+        // ── Contact ──────────────────────────────────────────────────────────
+        crate::routes::contact::challenge_issue,
+        crate::routes::contact::contact_submit,
+        // ── Auth ─────────────────────────────────────────────────────────────
+        crate::routes::api::auth_me::auth_me,
+        // ── Ask (RAG) ────────────────────────────────────────────────────────
+        crate::routes::api::ask::ask,
+        // ── Admin — jobs ─────────────────────────────────────────────────────
         crate::routes::api::admin::create_job,
         crate::routes::api::admin::update_job,
         crate::routes::api::admin::delete_job,
         crate::routes::api::admin::create_job_detail,
         crate::routes::api::admin::update_job_detail,
         crate::routes::api::admin::delete_job_detail,
+        // ── Admin — competencies ─────────────────────────────────────────────
         crate::routes::api::admin::create_competency,
         crate::routes::api::admin::update_competency,
         crate::routes::api::admin::delete_competency,
         crate::routes::api::admin::create_evidence,
         crate::routes::api::admin::update_evidence,
         crate::routes::api::admin::delete_evidence,
+        // ── Admin — about ────────────────────────────────────────────────────
         crate::routes::api::admin::create_about_section,
         crate::routes::api::admin::update_about_section,
         crate::routes::api::admin::delete_about_section,
+        // ── Admin — social links ─────────────────────────────────────────────
+        crate::routes::api::admin::create_social_link,
+        crate::routes::api::admin::update_social_link,
+        crate::routes::api::admin::delete_social_link,
     ),
     components(schemas(
-        // All schemas from api_openapi::models — SSOT enforced by ApiModel trait
         api_openapi::models::ApiError,
         api_openapi::models::HealthResponse,
         api_openapi::models::CrateInfo,
-        api_openapi::models::ParseConfigRequest,
-        api_openapi::models::ParseConfigResponse,
-        api_openapi::models::Field,
-        api_openapi::models::GenerateSpecRequest,
-        api_openapi::models::GenerateSpecResponse,
         api_openapi::models::Job,
         api_openapi::models::JobDetail,
         api_openapi::models::JobWithDetails,
@@ -87,31 +107,41 @@ impl Modify for SecurityAddon {
         api_openapi::models::Competency,
         api_openapi::models::EvidenceItem,
         api_openapi::models::CompetencyWithEvidence,
-        api_openapi::models::AboutSectionInput,
         api_openapi::models::AboutSectionResponse,
         api_openapi::models::SocialLink,
-        api_openapi::models::SocialLinkInput,
-        api_openapi::models::SocialLinkResponse,
         api_openapi::models::ChallengeResponse,
         api_openapi::models::ContactSubmitRequest,
         api_openapi::models::ContactResponse,
+        api_openapi::models::AuthMe,
+        api_openapi::models::AskRequest,
+        api_openapi::models::AskCitation,
+        api_openapi::models::AskResponse,
+        api_openapi::models::ResumeData,
+        // Admin input types
         api_openapi::models::JobInput,
         api_openapi::models::JobDetailInput,
         api_openapi::models::CompetencyInput,
         api_openapi::models::EvidenceInput,
         api_openapi::models::Evidence,
+        api_openapi::models::AboutSectionInput,
+        api_openapi::models::SocialLinkInput,
+        api_openapi::models::SocialLinkResponse,
+        // W-RST: tailor pipeline (reserved — routes not yet implemented)
+        api_openapi::models::TailorRequest,
+        api_openapi::models::TailorResponse,
+        api_openapi::models::MatchedBullet,
     )),
     modifiers(&SecurityAddon),
     tags(
         (name = "health", description = "Service health checks"),
         (name = "crates", description = "deploy-baba crate information"),
         (name = "stack", description = "Stack configuration examples"),
-        (name = "demo", description = "Live API demonstrations"),
-        (name = "resume", description = "Career timeline and competency data"),
+        (name = "portfolio", description = "Resume, jobs, competencies, about, and social links"),
         (name = "contact", description = "Contact form and PoW challenge"),
-        (name = "about", description = "About page content"),
-        (name = "social", description = "Social links"),
+        (name = "auth", description = "Authentication and session"),
+        (name = "ask", description = "RAG Q&A over the deploy-baba codebase"),
         (name = "admin", description = "Protected admin CRUD (requires auth)"),
+        (name = "tailor", description = "JD-driven resume tailoring — docx/pdf download (requires auth, W-RST)"),
     ),
 )]
 pub struct ApiDoc;

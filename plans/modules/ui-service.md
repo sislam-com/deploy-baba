@@ -114,3 +114,12 @@ via static examples in the crate map section (keeps Lambda binary lean).
 - → W-APIO, W-APIM (spec generation in demo endpoint)
 - → W-INFR (stack.toml parsing)
 - → `plans/cross-cutting/aws-architecture.md`
+- → ADR-002 (SQLite on EFS — DB-backed routes)
+- → ADR-008 (Cognito auth — AppState refactor, admin routes)
+- → ADR-009 (API Gateway for POST /api/contact)
+- → ADR-010 (upsert re-seed convention — migration runner)
+- → ADR-011 (synchronous email Lambda invoke)
+- → ADR-012 (OpenAPI SSOT — spec assembly)
+- → ADR-013 (React SPA — frontend delivery)
+- → ADR-015 (LLM provider abstraction — W-RST consumer)
+- → ADR-019 (SPA deploy pipeline)

@@ -142,5 +142,9 @@ with `category = 'sub-engagement'`.
 - → W-UI (base route surface, router, state architecture)
 - → `plans/cross-cutting/aws-architecture.md` (EFS mount for SQLite on Lambda)
 - → ADR-010 (upsert re-seed convention — applies to jobs, job_details, competencies, competency_evidence)
+- → ADR-013 (React SPA — resume data served as JSON to SPA frontend)
+- → ADR-014 (Professional Summary sourced from DB — `about_sections.me-bio`)
+- → ADR-015 (LLM provider abstraction — `polish_bio_to_summary()` claimed by W-RST.4.3)
+- → ADR-019 (SPA deploy pipeline — resume content surfaced in deployed SPA)
 - → W-SYNC (dashboard → migrations sync workflow)
 - → **W-RST (resume-tailor)** — interactive JD-driven tailoring pipeline via the W-LLM provider abstraction; consumes the same `jobs` / `job_details` / `competencies` / `competency_evidence` SQLite tables but adds keyword matching, grounded LLM rewrites, and a separate admin route (`/dashboard/tailor`, `POST /api/admin/tailor`). W-RSM remains the **static-generation authority**; W-RST is its interactive tailoring complement. Note: `polish_bio_to_summary()` in `xtask/src/resume/generate.rs` (see ADR-014) is claimed by W-RST.4.3 — it will be upgraded to a real LLM call via the W-LLM provider abstraction.

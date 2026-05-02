@@ -45,11 +45,11 @@ coverage:
 
 # fmt + lint + test (the standard inner loop)
 dev:
-    just fmt && just lint && just test
+    just web-types-offline && just fmt && just lint && just test
 
 # Full quality gate (fmt + lint + test + coverage floors + audit)
 quality:
-    cargo xtask quality all
+    just web-types-offline && cargo xtask quality all
 
 # Build all crates (release)
 build:
@@ -220,9 +220,18 @@ web-typecheck:
 web-lint:
     pnpm --dir web run lint
 
-# Regenerate src/api/types.gen.ts from the running local server (requires just ui on :3000)
+# Regenerate src/api/types.gen.ts from the running local server (requires just ui on :3000).
+# Prefer web-types-offline for CI and offline use.
 web-types:
     pnpm --dir web run types
+
+# Emit public OpenAPI spec to web/openapi.json (offline; no server required)
+api-spec:
+    cargo run -q -p api-openapi --bin emit-spec > web/openapi.json
+
+# Derive web/src/api/types.gen.ts from the offline-emitted spec
+web-types-offline: api-spec
+    pnpm --dir web exec openapi-typescript openapi.json -o src/api/types.gen.ts
 
 # Start both the Rust API server (:3000) and Vite dev server (:5173) in parallel
 dev-stack:

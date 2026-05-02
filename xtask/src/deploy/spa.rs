@@ -83,7 +83,7 @@ pub fn build_spa() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Step 4: walk web/dist/, upload to s3://<bucket>/<sha>/ with correct Cache-Control.
+/// Step 4: walk web/dist/, upload to `s3://<bucket>/<sha>/` with correct Cache-Control.
 pub async fn sync_to_s3(
     client: &S3Client,
     bucket: &str,

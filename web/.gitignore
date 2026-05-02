@@ -2,3 +2,4 @@ dist/
 node_modules/
 coverage/
 src/api/types.gen.ts
+openapi.json

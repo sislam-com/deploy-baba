@@ -139,6 +139,9 @@ Note: `-chdir=<dir>` must come before the subcommand name.
 - → ADR-001 (justfile-only interface)
 - → ADR-002 (SQLite database backup)
 - → ADR-006 (EFS + S3 topology)
+- → ADR-007 (OpenTofu — xtask wraps `tofu` binary for infra commands)
+- → ADR-014 (Professional Summary sourced from DB — `generate.rs` reads `about_sections.me-bio`)
+- → ADR-021 (release pipeline — `xtask/src/release/` implements versioning and tagging)
 - → W-INFR (StackConfig/SqliteConfig types)
 - → W-DX (justfile recipes that call xtask)
 - → `plans/drift/DRL-2026-03-18-xtask.md` — all fixed items and open issues
