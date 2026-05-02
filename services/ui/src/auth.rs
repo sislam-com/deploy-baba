@@ -24,7 +24,7 @@ pub struct AuthConfig {
     /// Full FQDN, e.g. "deploy-baba-prod.auth.us-east-1.amazoncognito.com"
     pub cognito_domain: String,
     pub region: String,
-    /// App base URL, e.g. "https://sislam.com"
+    /// App base URL, e.g. "<https://sislam.com>"
     pub app_domain: String,
     /// JWKS JSON string, embedded at deploy time via COGNITO_JWKS env var.
     /// No network fetch required — Lambda has no outbound HTTPS (VPC without NAT).

@@ -15,5 +15,9 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 utoipa = { workspace = true }
 
+[[bin]]
+name = "emit-spec"
+path = "src/bin/emit_spec.rs"
+
 [dev-dependencies]
 jsonschema = "0.18"

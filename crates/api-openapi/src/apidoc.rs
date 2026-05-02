@@ -12,10 +12,10 @@
 use crate::models::{
     AboutSectionInput, AboutSectionResponse, ApiError, AskCitation, AskRequest, AskResponse,
     AuthMe, ChallengeResponse, Competency, CompetencyInput, CompetencyWithEvidence,
-    ContactResponse, ContactSubmitRequest, CrateInfo, Evidence, EvidenceInput, EvidenceItem, Field,
-    GenerateSpecRequest, GenerateSpecResponse, HealthResponse, Job, JobDetail, JobDetailInput,
-    JobInput, JobWithDetails, JobsQuery, MatchedBullet, ParseConfigRequest, ParseConfigResponse,
-    ResumeData, SocialLink, SocialLinkInput, SocialLinkResponse, TailorRequest, TailorResponse,
+    ContactResponse, ContactSubmitRequest, CrateInfo, Evidence, EvidenceInput, EvidenceItem,
+    HealthResponse, Job, JobDetail, JobDetailInput, JobInput, JobWithDetails, JobsQuery,
+    MatchedBullet, ResumeData, SocialLink, SocialLinkInput, SocialLinkResponse, TailorRequest,
+    TailorResponse,
 };
 use utoipa::OpenApi;
 
@@ -35,11 +35,6 @@ use utoipa::OpenApi;
         ApiError,
         HealthResponse,
         CrateInfo,
-        ParseConfigRequest,
-        ParseConfigResponse,
-        Field,
-        GenerateSpecRequest,
-        GenerateSpecResponse,
         Job,
         JobDetail,
         JobWithDetails,
@@ -62,11 +57,9 @@ use utoipa::OpenApi;
         (name = "health", description = "Service health checks"),
         (name = "crates", description = "deploy-baba crate information"),
         (name = "stack", description = "Stack configuration examples"),
-        (name = "demo", description = "Live API demonstrations"),
-        (name = "resume", description = "Career timeline and competency data"),
+        (name = "portfolio", description = "Resume, jobs, competencies, about, and social links"),
         (name = "contact", description = "Contact form and PoW challenge"),
-        (name = "about", description = "About page content"),
-        (name = "social", description = "Social links"),
+        (name = "auth", description = "Authentication and session"),
         (name = "ask", description = "RAG Q&A over the deploy-baba codebase"),
     ),
 )]
@@ -94,7 +87,7 @@ pub struct PublicApiDoc;
     )),
     tags(
         (name = "admin", description = "Protected admin CRUD (requires auth)"),
-        (name = "tailor", description = "JD-driven resume tailoring (admin only)"),
+        (name = "tailor", description = "JD-driven resume tailoring — docx/pdf download (requires auth, W-RST)"),
     ),
     modifiers(&SecurityAddon),
 )]
