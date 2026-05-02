@@ -56,7 +56,6 @@ jobs:
   web:
     name: Web / SPA
     runs-on: ubuntu-latest
-    if: hashFiles('web/package.json') != ''
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v5
