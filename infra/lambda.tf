@@ -45,12 +45,6 @@ resource "aws_lambda_function" "baba" {
     local_mount_path = "/mnt/db"
   }
 
-  # EFS mount — SPA assets (sync-spa writes here; ServeDir reads from /mnt/spa/active)
-  file_system_config {
-    arn              = aws_efs_access_point.spa.arn
-    local_mount_path = "/mnt/spa"
-  }
-
   # VPC configuration for EFS access
   vpc_config {
     subnet_ids         = data.aws_subnets.default.ids

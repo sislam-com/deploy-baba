@@ -35,7 +35,8 @@ Same 28 AWS resources, same file layout. No HCL resource blocks change.
 | `infra/iam.tf` | Execution role, 2 managed attachments, 3 inline policies | None |
 | `infra/ssm.tf` | 3 SSM parameters | None |
 | `infra/eventbridge.tf` | Scheduled rule, target, Lambda permission | None |
-| `infra/cdn.tf` | CloudFront distribution, OAC, 4 Route53 records | None |
+| `infra/cdn.tf` | CloudFront distribution, 2 OACs, 6 Route53 records, origin request policy | Added `dev.${var.domain_name}` alias; switched cert to `aws_acm_certificate_validation.wildcard`; removed `acm_certificate_arn` variable; added `dev_a`+`dev_aaaa` Route53 records |
+| `infra/acm.tf` | `aws_acm_certificate`, DNS validation records, `aws_acm_certificate_validation` | New file — manages `sislam.com + *.sislam.com` wildcard cert via DNS validation in Route53 |
 
 ---
 
@@ -181,13 +182,13 @@ curl -fsSL https://get.opentofu.org/install-opentofu.sh | sh -s -- --install-met
 
 | ID | Task | Status | Notes |
 |----|------|--------|-------|
-| W-OTF.4.1 | Install `tofu` binary locally | OPEN | `brew install opentofu`; verify `tofu version` — not yet installed |
+| W-OTF.4.1 | Install `tofu` binary locally | DONE | OpenTofu v1.11.5 confirmed via `tofu version` |
 | W-OTF.4.2 | Rename `xtask/src/infra/terraform.rs` → `tofu.rs` | DONE | `run_tofu_*` functions; `tofu` binary; `terraform.rs` deleted |
 | W-OTF.4.3 | Update `infra/main.tf` version constraint | DONE | `required_version = ">= 1.6"`; `ManagedBy = "OpenTofu"` |
 | W-OTF.4.4 | Update `xtask/src/infra/mod.rs` + `bootstrap.rs` | DONE | `mod tofu`; all call sites updated |
 | W-OTF.4.5 | Add `check_tofu_binary()` preflight | DONE | In `tofu.rs`; called at top of every `run_tofu_*` function |
 | W-OTF.4.6 | Delete `infra/.terraform.lock.hcl` if present | N/A | Lock file was never committed (DRL-2026-03-25-opentofu entry 6) |
-| W-OTF.4.7 | Run `just infra-bootstrap PROFILE` with tofu | BLOCKED | Needs W-OTF.4.1 (install tofu binary) |
+| W-OTF.4.7 | Run `just infra-bootstrap PROFILE` with tofu | DONE | `just infra-plan deploy-baba` runs clean (2026-05-01). Pre-existing HCL blockers fixed — see DRL-2026-05-01-infra-plan-blockers. |
 | W-OTF.4.8 | Mark W-TF as superseded in INDEX.md | DONE | Done in plans/modules/terraform.md and INDEX.md |
 | W-OTF.4.9 | Update docs — `terraform` → `tofu`/`OpenTofu` in prose | DONE | 9 files updated; see W-OTF.4.9 Detail below |
 

@@ -5,11 +5,6 @@ variable "domain_name" {
   default     = "sislam.com"
 }
 
-variable "acm_certificate_arn" {
-  description = "ACM certificate ARN (must cover domain_name and *.domain_name, in us-east-1)"
-  type        = string
-  default     = "arn:aws:acm:us-east-1:062513063428:certificate/431fdf38-6e82-42a9-b693-31abb64aabbb"
-}
 
 # ─── Data sources ──────────────────────────────────────────────────────────────
 
@@ -85,7 +80,7 @@ resource "aws_cloudfront_distribution" "main" {
   enabled         = true
   is_ipv6_enabled = true
   price_class     = "PriceClass_100"
-  aliases         = [var.domain_name, "www.${var.domain_name}"]
+  aliases         = [var.domain_name, "www.${var.domain_name}", "dev.${var.domain_name}"]
   comment         = "Portfolio site — ${var.domain_name}"
 
   origin {
@@ -169,7 +164,7 @@ resource "aws_cloudfront_distribution" "main" {
   }
 
   viewer_certificate {
-    acm_certificate_arn      = var.acm_certificate_arn
+    acm_certificate_arn      = aws_acm_certificate_validation.wildcard.certificate_arn
     ssl_support_method       = "sni-only"
     minimum_protocol_version = "TLSv1.2_2021"
   }
@@ -223,6 +218,32 @@ resource "aws_route53_record" "www_a" {
 resource "aws_route53_record" "www_aaaa" {
   zone_id         = data.aws_route53_zone.main.zone_id
   name            = "www.${var.domain_name}"
+  type            = "AAAA"
+  allow_overwrite = true
+
+  alias {
+    name                   = aws_cloudfront_distribution.main.domain_name
+    zone_id                = aws_cloudfront_distribution.main.hosted_zone_id
+    evaluate_target_health = false
+  }
+}
+
+resource "aws_route53_record" "dev_a" {
+  zone_id         = data.aws_route53_zone.main.zone_id
+  name            = "dev.${var.domain_name}"
+  type            = "A"
+  allow_overwrite = true
+
+  alias {
+    name                   = aws_cloudfront_distribution.main.domain_name
+    zone_id                = aws_cloudfront_distribution.main.hosted_zone_id
+    evaluate_target_health = false
+  }
+}
+
+resource "aws_route53_record" "dev_aaaa" {
+  zone_id         = data.aws_route53_zone.main.zone_id
+  name            = "dev.${var.domain_name}"
   type            = "AAAA"
   allow_overwrite = true
 
