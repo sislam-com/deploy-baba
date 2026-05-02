@@ -90,6 +90,7 @@ Falls back to `"dev-secret-change-me"` locally when `POW_SECRET_ARN` not set.
 → ADR-003 (Lambda Function URL — POST exception via API Gateway, see ADR-009)
 → ADR-004 (Dual-mode entry point)
 → ADR-009 (API Gateway HTTP API for POST /api/contact — DRL-FUA-3 workaround)
+→ ADR-010 (upsert re-seed convention — nonce tracker and stateless PoW design)
 → ADR-011 (Synchronous email Lambda invoke with typed ContactResponse propagation)
 → W-SEC (Secrets Manager integration for POW_SECRET)
 → DRL-2026-04-03-contact-form (contact form implementation log)

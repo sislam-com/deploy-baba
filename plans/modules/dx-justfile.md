@@ -250,3 +250,5 @@ by the xtask quality gate and CI.
 - → W-XT (xtask implementation behind every recipe)
 - → `plans/cross-cutting/aws-setup-spec.md` — IAM policy for docs
 - → `plans/drift/DRL-2026-03-18-xtask.md` — added lambda-build, lambda-deploy, infra-verify
+- → ADR-015 (LLM provider abstraction — `just test-llm PROFILE` recipe for live LLM integration tests)
+- → ADR-022 (dev-stack environment — `just dev-stack` and related recipes)

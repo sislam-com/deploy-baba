@@ -77,14 +77,15 @@ pub fn next(base: &str, bump: BumpKind) -> anyhow::Result<String> {
 }
 
 pub fn floor_from_cargo() -> anyhow::Result<String> {
-    let candidates = ["xtask/Cargo.toml", "../xtask/Cargo.toml"];
-    let manifest = candidates
+    // Try xtask/Cargo.toml for an explicit version first.
+    let xtask_candidates = ["xtask/Cargo.toml", "../xtask/Cargo.toml"];
+    let xtask_manifest = xtask_candidates
         .iter()
         .find_map(|p| std::fs::read_to_string(p).ok())
         .ok_or_else(|| anyhow::anyhow!("cannot find xtask/Cargo.toml"))?;
 
     let mut in_package = false;
-    for line in manifest.lines() {
+    for line in xtask_manifest.lines() {
         let line = line.trim();
         if line.starts_with('[') {
             in_package = line == "[package]";
@@ -94,6 +95,10 @@ pub fn floor_from_cargo() -> anyhow::Result<String> {
             continue;
         }
         if let Some(rest) = line.strip_prefix("version") {
+            // Skip workspace inheritance: `version.workspace = true`
+            if rest.starts_with('.') {
+                continue;
+            }
             let ver = rest
                 .trim_start_matches(|c: char| c.is_whitespace() || c == '=')
                 .trim_matches('"');
@@ -102,7 +107,38 @@ pub fn floor_from_cargo() -> anyhow::Result<String> {
             }
         }
     }
-    anyhow::bail!("version not found in [package] section of xtask/Cargo.toml")
+
+    // Fallback: xtask uses `version.workspace = true` — read from [workspace.package].
+    let ws_candidates = ["Cargo.toml", "../Cargo.toml"];
+    let ws_manifest = ws_candidates
+        .iter()
+        .find_map(|p| std::fs::read_to_string(p).ok())
+        .ok_or_else(|| anyhow::anyhow!("cannot find workspace Cargo.toml"))?;
+
+    let mut in_ws_package = false;
+    for line in ws_manifest.lines() {
+        let line = line.trim();
+        if line.starts_with('[') {
+            in_ws_package = line == "[workspace.package]";
+            continue;
+        }
+        if !in_ws_package {
+            continue;
+        }
+        if let Some(rest) = line.strip_prefix("version") {
+            if rest.starts_with('.') {
+                continue;
+            }
+            let ver = rest
+                .trim_start_matches(|c: char| c.is_whitespace() || c == '=')
+                .trim_matches('"');
+            if Version::parse(ver).is_ok() {
+                return Ok(ver.to_string());
+            }
+        }
+    }
+
+    anyhow::bail!("version not found in xtask/Cargo.toml or workspace [workspace.package]")
 }
 
 #[cfg(test)]

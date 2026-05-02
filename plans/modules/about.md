@@ -108,4 +108,6 @@ render their respective Askama template.
 - → W-RSM (resume pattern reference for DB queries + Askama templates)
 - → ADR-002 (SQLite on EFS)
 - → ADR-010 (upsert re-seed convention — about_sections already has UNIQUE(slug))
+- → ADR-013 (React SPA — about page content served via JSON to SPA)
+- → ADR-019 (SPA deploy pipeline — about content surfaced in deployed SPA)
 - → W-SYNC (dashboard → migrations sync workflow)

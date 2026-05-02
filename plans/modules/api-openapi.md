@@ -129,3 +129,4 @@ directly (not the filtered view) since `api-openapi` only stores schemas, not ha
 - → `plans/cross-cutting/dependency-graph.md`
 - → `plans/drift/DRL-2026-04-08-api-openapi-orphan.md` (orphan finding)
 - → `plans/adr/ADR-012-openapi-ssot.md` (ADR for this refactor)
+- → ADR-015 (LLM provider abstraction — LLM request/response models may extend api-openapi)

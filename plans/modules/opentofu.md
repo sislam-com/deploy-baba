@@ -260,3 +260,7 @@ No coverage floor (internal tooling), consistent with W-XT strategy.
 - → `plans/drift/DRL-2026-03-25-opentofu.md` — observed drift and already-fixed items
 - → `plans/cross-cutting/aws-architecture.md` — topology unchanged
 - → `plans/cross-cutting/aws-setup-spec.md` — IAM permissions unchanged
+- → ADR-008 (Cognito infra resources managed by OpenTofu)
+- → ADR-009 (API Gateway infra managed by OpenTofu)
+- → ADR-019 (SPA deploy pipeline — S3 + CloudFront infra managed by OpenTofu)
+- → ADR-020 (wildcard ACM cert — managed by OpenTofu)

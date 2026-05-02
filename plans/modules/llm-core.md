@@ -178,6 +178,7 @@ is injected at startup in `main.rs`.
 ## W-LLM.6 Cross-References
 
 - → ADR-015 (structural decision — pluggable framework + grounding contract)
+- → ADR-012 (OpenAPI SSOT — LlmRequest/LlmResponse may surface via OpenAPI models)
 - → W-RST (primary consumer of `LlmProvider` trait)
 - → W-SEC (secret `deploy-baba/prod/anthropic-api-key`)
 - → W-DX.3 (per-crate README coverage)

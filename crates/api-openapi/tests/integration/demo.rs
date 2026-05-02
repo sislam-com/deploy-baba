@@ -1,32 +1,11 @@
-/// Integration tests for the demo API
-/// (`POST /api/demo/parse-config`, `POST /api/demo/generate-spec`).
-use api_openapi::{
-    apidoc::full_spec,
-    models::{
-        ApiModel, Field, GenerateSpecRequest, GenerateSpecResponse, ParseConfigRequest,
-        ParseConfigResponse,
-    },
+/// Integration tests for the demo API model types.
+/// Note: ParseConfigRequest/Response, GenerateSpecRequest/Response, and Field are
+/// implementation types for the demo handlers but are intentionally excluded from
+/// the public OpenAPI spec (removed 2026-05-02).
+use api_openapi::models::{
+    ApiModel, Field, GenerateSpecRequest, GenerateSpecResponse, ParseConfigRequest,
+    ParseConfigResponse,
 };
-
-#[test]
-fn demo_schemas_present_in_spec() {
-    let spec = full_spec();
-    let schemas = &spec.components.as_ref().expect("components").schemas;
-
-    for name in &[
-        "ParseConfigRequest",
-        "ParseConfigResponse",
-        "GenerateSpecRequest",
-        "GenerateSpecResponse",
-        "Field",
-    ] {
-        assert!(
-            schemas.contains_key(*name),
-            "Demo schema '{}' missing from full_spec()",
-            name
-        );
-    }
-}
 
 #[test]
 fn parse_config_request_example_has_content() {
@@ -73,29 +52,3 @@ fn generate_spec_response_example_has_spec() {
     );
 }
 
-#[test]
-fn demo_schemas_are_in_public_api_doc() {
-    use api_openapi::apidoc::PublicApiDoc;
-    use utoipa::OpenApi;
-    let spec = PublicApiDoc::openapi();
-    let schemas = &spec
-        .components
-        .as_ref()
-        .expect("PublicApiDoc components")
-        .schemas;
-
-    // Demo schemas belong in PublicApiDoc
-    for name in &[
-        "ParseConfigRequest",
-        "ParseConfigResponse",
-        "GenerateSpecRequest",
-        "GenerateSpecResponse",
-        "Field",
-    ] {
-        assert!(
-            schemas.contains_key(*name),
-            "Demo schema '{}' missing from PublicApiDoc",
-            name
-        );
-    }
-}

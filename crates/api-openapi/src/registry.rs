@@ -33,22 +33,6 @@ pub const ALL_MODELS: &[(&str, ModelFactory)] = &[
     ("CrateInfo", || {
         serde_json::to_value(CrateInfo::example()).expect("CrateInfo example")
     }),
-    // demo
-    ("ParseConfigRequest", || {
-        serde_json::to_value(ParseConfigRequest::example()).expect("ParseConfigRequest example")
-    }),
-    ("ParseConfigResponse", || {
-        serde_json::to_value(ParseConfigResponse::example()).expect("ParseConfigResponse example")
-    }),
-    ("Field", || {
-        serde_json::to_value(Field::example()).expect("Field example")
-    }),
-    ("GenerateSpecRequest", || {
-        serde_json::to_value(GenerateSpecRequest::example()).expect("GenerateSpecRequest example")
-    }),
-    ("GenerateSpecResponse", || {
-        serde_json::to_value(GenerateSpecResponse::example()).expect("GenerateSpecResponse example")
-    }),
     // resume
     ("Job", || {
         serde_json::to_value(Job::example()).expect("Job example")
