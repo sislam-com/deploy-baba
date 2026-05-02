@@ -1,5 +1,5 @@
 # deploy-baba — Plan Index
-**GitHub:** `shantopagla/deploy-baba` | **Last updated:** 2026-05-01
+**GitHub:** `shantopagla/deploy-baba` | **Last updated:** 2026-05-02
 **Source repo:** `~/shanto` (Baba Toolchain, ~85K LOC) | **Status:** ~95% complete
 
 See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming rules.
@@ -154,6 +154,10 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | DRL-2026-04-07-ses-sandbox-ack | 2026-04-07 | SES sandbox blocks ack emails to unverified recipients | **RESOLVED 2026-04-08** — production access granted; W-CTF.4.13 DONE; SES_ACK_FROM_EMAIL restored |
 | DRL-2026-04-08-api-openapi-orphan | 2026-04-08 | api-openapi was orphaned from services/ui (W-APIO SSOT) | **RESOLVED 2026-04-08** — SSOT refactor complete; 29 models, dual-spec, 84 tests |
 | DRL-2026-05-01-infra-plan-blockers | 2026-05-01 | Three HCL bugs blocked `just infra-plan` (duplicate caller_identity, duplicate file_system_config, missing lifecycle filter) | **RESOLVED 2026-05-01** — all fixed; plan clean |
+| DRL-2026-05-02-bootstrap-terraform-docstring | 2026-05-02 | `bootstrap.rs` doc comment still says "terraform init"; LOCK_TABLE named "terraform-lock" | Open — doc-only, low priority |
+| DRL-2026-05-02-contact-response-dual-definition | 2026-05-02 | `contact.rs` defines local ChallengeResponse/ContactSubmitRequest/ContactResponse shadowing ADR-012 SSOT models | Open — fix: import api_openapi::models in contact.rs |
+| DRL-2026-05-02-openapi-full-spec-public-endpoint | 2026-05-02 | `/api/openapi.json` now serves full spec unauthenticated (intentional); ADR-012 rules 3–5 superseded | Open — update ADR-012 to reflect intentional change |
+| DRL-2026-05-02-askama-workspace-orphan | 2026-05-02 | `askama`/`askama_axum` still in workspace deps with no consumers; tsconfig strict claim points to wrong file | Open — remove orphaned deps; update ADR-019 claim |
 
 ---
 
