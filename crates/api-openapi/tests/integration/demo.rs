@@ -51,4 +51,3 @@ fn generate_spec_response_example_has_spec() {
         "GenerateSpecResponse.spec should not be null"
     );
 }
-
