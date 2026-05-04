@@ -87,7 +87,7 @@ Requires `permissions: contents: write` and `fetch-depth: 0` checkout.
 | W-CI.4.6 | Update `.github/workflows/ci.yml` — add web + tofu jobs | DONE | web job conditional on `web/package.json`; tofu fmt+validate |
 | W-CI.4.7 | New `.github/workflows/deploy-dev.yml` (C.1 — Lambda only) | DONE | OIDC + lambda-build + lambda-update + health check + release tag |
 | W-CI.4.8 | New `.github/workflows/deploy-prod.yml` | DONE | `production` env gate (manual approval) + same deploy flow |
-| W-CI.4.9 | Set GitHub Variables (manual, one-time) | TODO | CI_DEPLOY_*_ROLE_ARN, *_UI_FN_NAME, *_SPA_BUCKET, *_FN_URL |
+| W-CI.4.9 | Set GitHub Variables (manual, one-time) | DONE | GH Variables replaced by SM fetch (RESOLVED 2026-05-04) |
 | W-CI.4.10 | Create GitHub `production` environment + Required Reviewers | TODO | Repo Settings → Environments → production |
 | W-CI.4.11 | Extend deploy-dev.yml with SPA sync (C.2) | DONE | pnpm build → s3 sync → lambda invoke sync-spa → assert ok; worktree-clean guard before tag |
 | W-CI.4.12 | Extend deploy-prod.yml with SPA sync (C.2) | DONE | Same as dev; no tag step (prod triggered by tag push) |

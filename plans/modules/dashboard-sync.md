@@ -1,5 +1,5 @@
 # W-SYNC: Dashboard → Migrations Sync
-**Path:** `services/ui/migrations/`, `services/ui/src/db.rs`, `.claude/skills/` | **Status:** TODO
+**Path:** `services/ui/migrations/`, `services/ui/src/db.rs`, `.claude/skills/` | **Status:** DONE
 **Coverage floor:** N/A | **Depends on:** W-UI, W-RSM, W-ABT, W-SL, ADR-010 | **Depended on by:** —
 
 ---

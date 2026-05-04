@@ -1,5 +1,5 @@
 # W-OTF: opentofu
-**Path:** `infra/` (HCL), `xtask/src/infra/` (wrapper) | **Status:** TODO
+**Path:** `infra/` (HCL), `xtask/src/infra/` (wrapper) | **Status:** DONE
 **Replaces:** W-TF (Terraform) | **Depends on:** W-XT | **Depended on by:** W-DX
 → ADR-007 (OpenTofu over Terraform)
 
