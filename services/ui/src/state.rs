@@ -9,15 +9,11 @@ use rag_sqlite::RagStore;
 /// `FromRef` implementations allow handlers to extract sub-states directly:
 /// - `State(db): State<Arc<Db>>` — existing handlers, unchanged
 /// - `State(auth): State<Arc<AuthConfig>>` — auth-aware handlers
-/// - `State(llm): State<Option<Arc<String>>>` — Anthropic API key (None in local dev without key)
 /// - `State(rag): State<Arc<RagStore>>` — RAG FTS retriever
 #[derive(Clone)]
 pub struct AppState {
     pub db: Arc<Db>,
     pub auth: Arc<AuthConfig>,
-    /// Anthropic API key loaded from Secrets Manager (or ANTHROPIC_API_KEY env var in dev).
-    /// `None` when neither source is available — LLM-dependent routes return 503 in that case.
-    pub anthropic_api_key: Option<Arc<String>>,
     /// RAG store (FTS5 retrieval backed by same SQLite file as `db`).
     pub rag: Arc<RagStore>,
 }

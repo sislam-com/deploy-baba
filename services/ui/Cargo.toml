@@ -19,8 +19,6 @@ api-core = { workspace = true }
 api-openapi = { workspace = true }
 api-merger = { workspace = true }
 infra-types = { workspace = true }
-llm-anthropic = { workspace = true }
-llm-core = { workspace = true }
 rag-core = { workspace = true }
 rag-sqlite = { workspace = true }
 

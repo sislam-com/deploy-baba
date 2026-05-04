@@ -4,7 +4,7 @@
 //!
 //! The route requires:
 //! 1. `RAG_PUBLIC_ENABLED=1` env var (gate for P3 rollout)
-//! 2. A live Anthropic API key in `AppState.anthropic_api_key`
+//! 2. `LLM_PROXY_LAMBDA_NAME` env var pointing to the non-VPC LLM-proxy Lambda
 //!
 //! Missing either returns a 503. Rate-limited per IP: default 2/min, overridable
 //! via `ASK_RATE_LIMIT` env var (useful for local dev).
@@ -13,11 +13,11 @@
 //!
 //! ```text
 //! POST /api/ask
-//!   → check RAG_PUBLIC_ENABLED + api key
+//!   → check RAG_PUBLIC_ENABLED + LLM_PROXY_LAMBDA_NAME
 //!   → rate-limit check (per IP, ASK_RATE_LIMIT/min, default 2)
 //!   → RagStore::retrieve (FTS5 BM25, top_k)
 //!   → DefaultPromptAssembler::assemble
-//!   → AnthropicProvider::generate
+//!   → invoke llm-proxy Lambda (non-VPC, reaches api.anthropic.com)
 //!   → AskResponse { answer, citations, model, tokens }
 //! ```
 
@@ -28,18 +28,18 @@ use std::{
     time::Instant,
 };
 
+use aws_sdk_lambda::primitives::Blob;
 use axum::{
     extract::{ConnectInfo, State},
     http::{HeaderMap, StatusCode},
     Json,
 };
-use llm_anthropic::AnthropicProvider;
-use llm_core::{ChatMessage, GenerationConfig, LlmProvider, LlmRequest, MessageRole};
 use rag_core::{DefaultPromptAssembler, PromptAssembler, Retriever};
 use rag_sqlite::RagStore;
 
-use crate::state::AppState;
-pub use api_openapi::models::{AskCitation, AskRequest, AskResponse};
+pub use api_openapi::models::{
+    AskCitation, AskProxyRequest, AskProxyResponse, AskRequest, AskResponse,
+};
 
 // ── Rate limiter ──────────────────────────────────────────────────────────────
 
@@ -114,29 +114,25 @@ fn err(status: StatusCode, msg: &str) -> (StatusCode, Json<serde_json::Value>) {
     responses(
         (status = 200, description = "Grounded answer with citations", body = AskResponse),
         (status = 429, description = "Rate limit exceeded"),
-        (status = 503, description = "RAG not enabled or API key not configured"),
+        (status = 503, description = "RAG not enabled or LLM proxy not configured"),
     )
 )]
 pub async fn ask(
     headers: HeaderMap,
     connect_info: Option<ConnectInfo<SocketAddr>>,
-    State(state): State<AppState>,
     State(rag): State<Arc<RagStore>>,
     Json(req): Json<AskRequest>,
 ) -> ApiResult<AskResponse> {
     let ip = extract_client_ip(&headers, connect_info.as_ref());
+
     // Gate 1: public enablement flag
     if std::env::var("RAG_PUBLIC_ENABLED").as_deref() != Ok("1") {
         return Err(err(StatusCode::SERVICE_UNAVAILABLE, "RAG Q&A not enabled"));
     }
 
-    // Gate 2: API key presence
-    let api_key = state
-        .anthropic_api_key
-        .as_ref()
-        .ok_or_else(|| err(StatusCode::SERVICE_UNAVAILABLE, "LLM not configured"))?
-        .as_str()
-        .to_owned();
+    // Gate 2: LLM proxy configured
+    let proxy_fn_name = std::env::var("LLM_PROXY_LAMBDA_NAME")
+        .map_err(|_| err(StatusCode::SERVICE_UNAVAILABLE, "LLM proxy not configured"))?;
 
     // Gate 3: rate limit
     if !check_rate_limit(&ip) {
@@ -168,50 +164,62 @@ pub async fn ask(
     let assembler = DefaultPromptAssembler;
     let bundle = assembler.assemble(&req.query, &chunks);
 
-    // Generate via Anthropic
-    let provider = AnthropicProvider::new(api_key);
-    let llm_req = LlmRequest {
-        model: provider.default_model().to_owned(),
-        messages: vec![ChatMessage {
-            role: MessageRole::User,
-            content: bundle.user_message,
-        }],
-        system: Some(bundle.system_prompt),
-        tools: vec![],
-        grounding: None,
-        config: GenerationConfig {
-            max_tokens: 1024,
-            temperature: 0.2,
-            prompt_version: "ask-v1",
-        },
-    };
-
-    let llm_resp = provider.generate(llm_req).await.map_err(|e| {
-        tracing::error!("Anthropic generate failed: {e}");
-        err(StatusCode::BAD_GATEWAY, &format!("LLM error: {e}"))
-    })?;
-
+    // Build citations from retrieval results (before moving bundle into proxy request)
     let citations: Vec<AskCitation> = bundle
         .citations
-        .into_iter()
+        .iter()
         .map(|c| AskCitation {
-            kind: c.kind,
-            path: c.path,
-            sha: c.sha,
+            kind: c.kind.clone(),
+            path: c.path.clone(),
+            sha: c.sha.clone(),
             ord: c.ord,
         })
         .collect();
 
+    // Invoke the non-VPC LLM-proxy Lambda (reaches api.anthropic.com)
+    let proxy_req = AskProxyRequest {
+        system_prompt: bundle.system_prompt,
+        user_message: bundle.user_message,
+        max_tokens: 1024,
+        temperature: 0.2,
+    };
+
+    let payload_bytes = serde_json::to_vec(&proxy_req).map_err(|e| {
+        err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &format!("serialization failed: {e}"),
+        )
+    })?;
+
+    let config = aws_config::load_from_env().await;
+    let lambda_client = aws_sdk_lambda::Client::new(&config);
+
+    let invoke_resp = lambda_client
+        .invoke()
+        .function_name(&proxy_fn_name)
+        .payload(Blob::new(payload_bytes))
+        .send()
+        .await
+        .map_err(|e| {
+            tracing::error!("llm-proxy Lambda invocation failed: {e}");
+            err(StatusCode::BAD_GATEWAY, "LLM proxy invocation failed")
+        })?;
+
+    let proxy_resp = invoke_resp
+        .payload()
+        .and_then(|blob| serde_json::from_slice::<AskProxyResponse>(blob.as_ref()).ok())
+        .ok_or_else(|| err(StatusCode::BAD_GATEWAY, "Invalid response from LLM proxy"))?;
+
     Ok(Json(AskResponse {
-        answer: llm_resp.content,
+        answer: proxy_resp.content,
         citations,
-        model: llm_resp.model,
-        input_tokens: llm_resp.input_tokens,
-        output_tokens: llm_resp.output_tokens,
+        model: proxy_resp.model,
+        input_tokens: proxy_resp.input_tokens,
+        output_tokens: proxy_resp.output_tokens,
     }))
 }
 
-pub fn router() -> axum::Router<AppState> {
+pub fn router() -> axum::Router<crate::state::AppState> {
     use axum::routing::post;
     axum::Router::new().route("/ask", post(ask))
 }

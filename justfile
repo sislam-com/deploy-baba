@@ -93,6 +93,19 @@ email-deploy PROFILE="default":
         --zip-file fileb://infra/build/email-lambda.zip \
         --profile {{PROFILE}}
 
+# Build the LLM-proxy Lambda zip for aarch64 (non-VPC Lambda, reaches api.anthropic.com)
+llm-proxy-build:
+    PATH="$HOME/.cargo/bin:$PATH" cargo lambda build --release --package llm-proxy --target aarch64-unknown-linux-gnu
+    mkdir -p infra/build
+    zip -j infra/build/llm-proxy-lambda.zip target/lambda/llm-proxy/bootstrap
+
+# Build LLM-proxy Lambda zip + update the deployed function
+llm-proxy-deploy PROFILE="default":
+    just aws-check {{PROFILE}} && just llm-proxy-build && aws lambda update-function-code \
+        --function-name deploy-baba-llm-proxy \
+        --zip-file fileb://infra/build/llm-proxy-lambda.zip \
+        --profile {{PROFILE}}
+
 # Verify the live deployment (curl apex + www health checks)
 infra-verify DOMAIN="sislam.com":
     @echo "=== Verifying {{DOMAIN}} ==="

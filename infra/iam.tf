@@ -95,6 +95,22 @@ resource "aws_iam_role_policy" "lambda_invoke_email" {
   })
 }
 
+# Inline policy: invoke LLM-proxy Lambda (non-VPC, reaches api.anthropic.com)
+resource "aws_iam_role_policy" "lambda_invoke_llm_proxy" {
+  name = "${local.lambda_function_name}-invoke-llm-proxy-policy"
+  role = aws_iam_role.lambda_execution.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid      = "InvokeLlmProxyLambda"
+      Effect   = "Allow"
+      Action   = "lambda:InvokeFunction"
+      Resource = aws_lambda_function.llm_proxy.arn
+    }]
+  })
+}
+
 # Inline policy: SSM parameter read access
 resource "aws_iam_role_policy" "lambda_ssm" {
   name = "${local.lambda_function_name}-ssm-policy"

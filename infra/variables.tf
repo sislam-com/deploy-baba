@@ -95,3 +95,9 @@ variable "email_lambda_code_path" {
   default     = "./build/email-lambda.zip"
 }
 
+variable "llm_proxy_lambda_code_path" {
+  description = "Path to the LLM-proxy Lambda zip file (built by just llm-proxy-build)"
+  type        = string
+  default     = "./build/llm-proxy-lambda.zip"
+}
+

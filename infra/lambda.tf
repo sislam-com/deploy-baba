@@ -31,9 +31,10 @@ resource "aws_lambda_function" "baba" {
       COGNITO_REGION        = var.region
       APP_DOMAIN            = "https://${var.domain_name}"
       EMAIL_LAMBDA_NAME     = aws_lambda_function.email.function_name
-      COGNITO_JWKS          = data.http.cognito_jwks.response_body
-      POW_SECRET_ARN        = aws_secretsmanager_secret.pow_secret.arn
-      ANTHROPIC_API_KEY_ARN = aws_secretsmanager_secret.anthropic_api_key.arn
+      COGNITO_JWKS            = data.http.cognito_jwks.response_body
+      POW_SECRET_ARN          = aws_secretsmanager_secret.pow_secret.arn
+      LLM_PROXY_LAMBDA_NAME   = aws_lambda_function.llm_proxy.function_name
+      RAG_PUBLIC_ENABLED      = "1"
     }
   }
 
@@ -58,6 +59,7 @@ resource "aws_lambda_function" "baba" {
     aws_iam_role_policy.lambda_s3,
     aws_iam_role_policy.lambda_ssm,
     aws_iam_role_policy.lambda_invoke_email,
+    aws_iam_role_policy.lambda_invoke_llm_proxy,
     aws_iam_role_policy.lambda_secretsmanager,
   ]
 
