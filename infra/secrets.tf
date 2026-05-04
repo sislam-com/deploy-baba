@@ -86,7 +86,7 @@ resource "aws_iam_role_policy" "lambda_secretsmanager" {
       Resource = [
         aws_secretsmanager_secret.pow_secret.arn,
         aws_secretsmanager_secret.cognito_temp_password.arn,
-        aws_secretsmanager_secret.anthropic_api_key.arn,
+        # anthropic_api_key is now read by the llm-proxy Lambda, not the UI Lambda
       ]
     }]
   })

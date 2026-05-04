@@ -17,6 +17,7 @@ members = [
     "crates/infra-types",
     "services/ui",
     "services/email",
+    "services/llm-proxy",
     "xtask",
     "examples/01_multi_format_config",
     "examples/02_api_spec_generation",

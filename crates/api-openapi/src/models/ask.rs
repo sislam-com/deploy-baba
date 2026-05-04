@@ -90,6 +90,27 @@ impl ApiModel for AskResponse {
     }
 }
 
+// ── Internal Lambda-to-Lambda contract ───────────────────────────────────────
+// Not part of the public OpenAPI spec. No `ApiModel` impl needed.
+
+/// Payload sent from the UI Lambda to the LLM-proxy Lambda.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AskProxyRequest {
+    pub system_prompt: String,
+    pub user_message: String,
+    pub max_tokens: u32,
+    pub temperature: f32,
+}
+
+/// Response from the LLM-proxy Lambda.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AskProxyResponse {
+    pub content: String,
+    pub model: String,
+    pub input_tokens: u32,
+    pub output_tokens: u32,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -99,5 +120,28 @@ mod tests {
         // trigger default_top_k via serde deserialization with missing field
         let req: AskRequest = serde_json::from_str(r#"{"query": "how does auth work?"}"#).unwrap();
         assert_eq!(req.top_k, 10);
+    }
+
+    #[test]
+    fn test_ask_proxy_roundtrip() {
+        let req = AskProxyRequest {
+            system_prompt: "You are a helpful assistant.".into(),
+            user_message: "How does auth work?".into(),
+            max_tokens: 1024,
+            temperature: 0.2,
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        let back: AskProxyRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.max_tokens, 1024);
+
+        let resp = AskProxyResponse {
+            content: "Auth uses Cognito.".into(),
+            model: "claude-haiku-4-5".into(),
+            input_tokens: 10,
+            output_tokens: 5,
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        let back: AskProxyResponse = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.output_tokens, 5);
     }
 }

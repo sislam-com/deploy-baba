@@ -19,8 +19,6 @@ api-core = { workspace = true }
 api-openapi = { workspace = true }
 api-merger = { workspace = true }
 infra-types = { workspace = true }
-llm-anthropic = { workspace = true }
-llm-core = { workspace = true }
 rag-core = { workspace = true }
 rag-sqlite = { workspace = true }
 
@@ -48,7 +46,9 @@ tracing-subscriber = { workspace = true }
 # AWS
 aws-config = { workspace = true }
 aws-sdk-lambda = { workspace = true }
+aws-sdk-s3 = { workspace = true }
 aws-sdk-secretsmanager = { workspace = true }
+flate2 = { workspace = true }
 
 # SPA dispatch / HTTP adapter for Lambda runtime
 lambda_runtime = { workspace = true }

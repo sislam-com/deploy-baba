@@ -1268,6 +1268,7 @@ dependencies = [
  "api-openapi",
  "aws-config",
  "aws-sdk-lambda",
+ "aws-sdk-s3",
  "aws-sdk-secretsmanager",
  "axum",
  "base64",
@@ -1275,14 +1276,13 @@ dependencies = [
  "config-json",
  "config-toml",
  "config-yaml",
+ "flate2",
  "hex",
  "hmac 0.12.1",
  "infra-types",
  "jsonwebtoken",
  "lambda_http",
  "lambda_runtime",
- "llm-anthropic",
- "llm-core",
  "rag-core",
  "rag-sqlite",
  "rand 0.8.6",
@@ -2307,6 +2307,23 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tokio",
+]
+
+[[package]]
+name = "llm-proxy"
+version = "0.1.0"
+dependencies = [
+ "api-openapi",
+ "aws-config",
+ "aws-sdk-secretsmanager",
+ "lambda_runtime",
+ "llm-anthropic",
+ "llm-core",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

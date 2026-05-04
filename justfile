@@ -15,13 +15,15 @@ default:
 
 # ── Inner Loop (daily dev) ────────────────────────────────────────────────────
 
-# Format all code
+# Format all code (Rust + OpenTofu HCL)
 fmt:
     cargo xtask build format
+    tofu fmt -recursive infra/
 
-# Run clippy (warnings = errors)
+# Run clippy (warnings = errors) + verify HCL formatting
 lint:
     cargo xtask build lint
+    tofu fmt -check -recursive infra/
 
 # Fast compile check (no codegen)
 check:
@@ -47,9 +49,9 @@ coverage:
 dev:
     just web-types-offline && just fmt && just lint && just test
 
-# Full quality gate (fmt + lint + test + coverage floors + audit)
+# Full quality gate (fmt + lint + test + coverage floors + audit + HCL fmt check)
 quality:
-    just web-types-offline && cargo xtask quality all
+    just web-types-offline && cargo xtask quality all && tofu fmt -check -recursive infra/
 
 # Build all crates (release)
 build:
@@ -91,6 +93,19 @@ email-deploy PROFILE="default":
     just aws-check {{PROFILE}} && just email-build && aws lambda update-function-code \
         --function-name deploy-baba-email \
         --zip-file fileb://infra/build/email-lambda.zip \
+        --profile {{PROFILE}}
+
+# Build the LLM-proxy Lambda zip for aarch64 (non-VPC Lambda, reaches api.anthropic.com)
+llm-proxy-build:
+    PATH="$HOME/.cargo/bin:$PATH" cargo lambda build --release --package llm-proxy --target aarch64-unknown-linux-gnu
+    mkdir -p infra/build
+    zip -j infra/build/llm-proxy-lambda.zip target/lambda/llm-proxy/bootstrap
+
+# Build LLM-proxy Lambda zip + update the deployed function
+llm-proxy-deploy PROFILE="default":
+    just aws-check {{PROFILE}} && just llm-proxy-build && aws lambda update-function-code \
+        --function-name deploy-baba-llm-proxy \
+        --zip-file fileb://infra/build/llm-proxy-lambda.zip \
         --profile {{PROFILE}}
 
 # Verify the live deployment (curl apex + www health checks)
