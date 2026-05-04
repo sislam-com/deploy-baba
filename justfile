@@ -15,13 +15,15 @@ default:
 
 # ── Inner Loop (daily dev) ────────────────────────────────────────────────────
 
-# Format all code
+# Format all code (Rust + OpenTofu HCL)
 fmt:
     cargo xtask build format
+    tofu fmt -recursive infra/
 
-# Run clippy (warnings = errors)
+# Run clippy (warnings = errors) + verify HCL formatting
 lint:
     cargo xtask build lint
+    tofu fmt -check -recursive infra/
 
 # Fast compile check (no codegen)
 check:
@@ -47,9 +49,9 @@ coverage:
 dev:
     just web-types-offline && just fmt && just lint && just test
 
-# Full quality gate (fmt + lint + test + coverage floors + audit)
+# Full quality gate (fmt + lint + test + coverage floors + audit + HCL fmt check)
 quality:
-    just web-types-offline && cargo xtask quality all
+    just web-types-offline && cargo xtask quality all && tofu fmt -check -recursive infra/
 
 # Build all crates (release)
 build:
