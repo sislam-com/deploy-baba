@@ -203,6 +203,7 @@ Implementation sequencing for W-LLM/W-RST/W-RAG/W-GDR: `plans/cross-cutting/exec
 | `integration-tests.md` | W-QA test infrastructure plan |
 | `ai-dlc.md` | AI Development Lifecycle — session protocol + quality gates + maintenance agents |
 | `initial-setup.md` | Developer first-run guide (prerequisites, bootstrap, local dev loop) |
+| `agentic-execution-steps.md` | Stepped implementation plan for Phases 9–11 (extended corpora → agentic core) |
 
 ---
 
