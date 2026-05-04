@@ -38,7 +38,7 @@ resource "aws_iam_role" "ci_deploy_dev" {
         }
         StringLike = {
           # Allows any ref on any branch (workflow_run fires after CI passes on main)
-          "token.actions.githubusercontent.com:sub" = "repo:shantopagla/deploy-baba:*"
+          "token.actions.githubusercontent.com:sub" = "repo:sislam-com/deploy-baba:*"
         }
       }
     }]
@@ -102,7 +102,7 @@ resource "aws_iam_role" "ci_deploy_prod" {
         }
         StringLike = {
           # Only v* tags (release-promote output)
-          "token.actions.githubusercontent.com:sub" = "repo:shantopagla/deploy-baba:ref:refs/tags/v*"
+          "token.actions.githubusercontent.com:sub" = "repo:sislam-com/deploy-baba:ref:refs/tags/v*"
         }
       }
     }]
