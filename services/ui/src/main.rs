@@ -178,8 +178,7 @@ async fn handle_backup(state: &state::AppState) -> Result<Value, lambda_runtime:
     let bucket = std::env::var("S3_BACKUP_BUCKET")
         .map_err(|_| "S3_BACKUP_BUCKET env var not set".to_string())?;
 
-    let data = std::fs::read(&db_path)
-        .map_err(|e| format!("read {db_path}: {e}"))?;
+    let data = std::fs::read(&db_path).map_err(|e| format!("read {db_path}: {e}"))?;
 
     let mut enc = GzEncoder::new(Vec::new(), Compression::default());
     enc.write_all(&data).map_err(|e| format!("compress: {e}"))?;
