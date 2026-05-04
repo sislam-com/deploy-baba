@@ -11,12 +11,17 @@
 
 pub mod chunk;
 pub mod error;
+pub mod hybrid;
+pub mod portfolio;
 pub mod types;
 
 pub use error::RagError;
+pub use hybrid::HybridRetriever;
+pub use portfolio::PortfolioDataProvider;
 pub use types::{Chunk, CitationRef, PromptBundle, RankedChunk, SourceKind};
 
 use async_trait::async_trait;
+use std::sync::Arc;
 
 // ── Traits ────────────────────────────────────────────────────────────────
 
@@ -53,6 +58,29 @@ pub trait Retriever: Send + Sync {
     ///
     /// Returns [`RagError::Database`] on SQLite failure.
     async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<RankedChunk>, RagError>;
+}
+
+#[async_trait]
+impl<T: Retriever> Retriever for Arc<T> {
+    async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<RankedChunk>, RagError> {
+        (**self).retrieve(query, top_k).await
+    }
+}
+
+#[async_trait]
+impl<T: PortfolioDataProvider> PortfolioDataProvider for Arc<T> {
+    async fn get_jobs_summary(&self) -> Result<Vec<serde_json::Value>, RagError> {
+        (**self).get_jobs_summary().await
+    }
+    async fn get_job_details(&self, slug: &str) -> Result<Option<serde_json::Value>, RagError> {
+        (**self).get_job_details(slug).await
+    }
+    async fn get_competencies_summary(&self) -> Result<Vec<serde_json::Value>, RagError> {
+        (**self).get_competencies_summary().await
+    }
+    async fn get_about_sections(&self) -> Result<Vec<serde_json::Value>, RagError> {
+        (**self).get_about_sections().await
+    }
 }
 
 /// Assembles a grounded prompt from retrieved chunks.

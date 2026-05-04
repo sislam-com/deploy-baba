@@ -1,4 +1,6 @@
 use anyhow::Result;
+use async_trait::async_trait;
+use rag_core::{PortfolioDataProvider, RagError};
 use rusqlite::Connection;
 use std::sync::Mutex;
 
@@ -144,5 +146,150 @@ impl Db {
         }
 
         Ok(())
+    }
+}
+
+#[async_trait]
+impl PortfolioDataProvider for Db {
+    async fn get_jobs_summary(&self) -> std::result::Result<Vec<serde_json::Value>, RagError> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn
+            .prepare(
+                "SELECT slug, company, title, location, start_date, end_date, summary, tech_stack
+                 FROM jobs ORDER BY sort_order ASC",
+            )
+            .map_err(|e| RagError::Database(e.to_string()))?;
+
+        let jobs = stmt
+            .query_map([], |row| {
+                let tech_raw: Option<String> = row.get(7)?;
+                Ok(serde_json::json!({
+                    "slug": row.get::<_, String>(0)?,
+                    "company": row.get::<_, String>(1)?,
+                    "title": row.get::<_, String>(2)?,
+                    "location": row.get::<_, Option<String>>(3)?,
+                    "start_date": row.get::<_, String>(4)?,
+                    "end_date": row.get::<_, Option<String>>(5)?,
+                    "summary": row.get::<_, Option<String>>(6)?,
+                    "tech_stack": tech_raw,
+                }))
+            })
+            .map_err(|e| RagError::Database(e.to_string()))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        Ok(jobs)
+    }
+
+    async fn get_job_details(
+        &self,
+        slug: &str,
+    ) -> std::result::Result<Option<serde_json::Value>, RagError> {
+        let conn = self.conn.lock().unwrap();
+
+        let job = conn
+            .query_row(
+                "SELECT id, slug, company, title, location, start_date, end_date, summary, tech_stack
+                 FROM jobs WHERE slug = ?1",
+                rusqlite::params![slug],
+                |row| {
+                    Ok((
+                        row.get::<_, i64>(0)?,
+                        serde_json::json!({
+                            "slug": row.get::<_, String>(1)?,
+                            "company": row.get::<_, String>(2)?,
+                            "title": row.get::<_, String>(3)?,
+                            "location": row.get::<_, Option<String>>(4)?,
+                            "start_date": row.get::<_, String>(5)?,
+                            "end_date": row.get::<_, Option<String>>(6)?,
+                            "summary": row.get::<_, Option<String>>(7)?,
+                            "tech_stack": row.get::<_, Option<String>>(8)?,
+                        }),
+                    ))
+                },
+            )
+            .ok();
+
+        let Some((job_id, mut job_val)) = job else {
+            return Ok(None);
+        };
+
+        let mut stmt = conn
+            .prepare(
+                "SELECT detail_text, category
+                 FROM job_details WHERE job_id = ?1 ORDER BY sort_order ASC",
+            )
+            .map_err(|e| RagError::Database(e.to_string()))?;
+
+        let details: Vec<serde_json::Value> = stmt
+            .query_map(rusqlite::params![job_id], |row| {
+                Ok(serde_json::json!({
+                    "detail_text": row.get::<_, String>(0)?,
+                    "category": row.get::<_, Option<String>>(1)?,
+                }))
+            })
+            .map_err(|e| RagError::Database(e.to_string()))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        job_val["details"] = serde_json::Value::Array(details);
+        Ok(Some(job_val))
+    }
+
+    async fn get_competencies_summary(
+        &self,
+    ) -> std::result::Result<Vec<serde_json::Value>, RagError> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn
+            .prepare(
+                "SELECT c.slug, c.name, c.description, c.icon,
+                        GROUP_CONCAT(ce.highlight_text, ' | ') as highlights
+                 FROM competencies c
+                 LEFT JOIN competency_evidence ce ON ce.competency_id = c.id
+                 GROUP BY c.id
+                 ORDER BY c.sort_order ASC",
+            )
+            .map_err(|e| RagError::Database(e.to_string()))?;
+
+        let competencies = stmt
+            .query_map([], |row| {
+                Ok(serde_json::json!({
+                    "slug": row.get::<_, String>(0)?,
+                    "name": row.get::<_, String>(1)?,
+                    "description": row.get::<_, Option<String>>(2)?,
+                    "icon": row.get::<_, Option<String>>(3)?,
+                    "highlights": row.get::<_, Option<String>>(4)?,
+                }))
+            })
+            .map_err(|e| RagError::Database(e.to_string()))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        Ok(competencies)
+    }
+
+    async fn get_about_sections(&self) -> std::result::Result<Vec<serde_json::Value>, RagError> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn
+            .prepare(
+                "SELECT page, slug, heading, body
+                 FROM about_sections ORDER BY sort_order ASC",
+            )
+            .map_err(|e| RagError::Database(e.to_string()))?;
+
+        let sections = stmt
+            .query_map([], |row| {
+                Ok(serde_json::json!({
+                    "page": row.get::<_, String>(0)?,
+                    "slug": row.get::<_, String>(1)?,
+                    "heading": row.get::<_, String>(2)?,
+                    "body": row.get::<_, String>(3)?,
+                }))
+            })
+            .map_err(|e| RagError::Database(e.to_string()))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        Ok(sections)
     }
 }

@@ -1,5 +1,5 @@
 # W-RAG: rag-core + rag-sqlite
-**Crate(s):** `crates/rag-core/`, `crates/rag-sqlite/` | **Status:** WIP (P1 DONE, P4 Phase 9 DONE, P2/P3/P5 TODO)
+**Crate(s):** `crates/rag-core/`, `crates/rag-sqlite/` | **Status:** WIP (P1 DONE, P4 Phase 9 DONE, P5 Phases 10–11 DONE, P2/P3 TODO)
 **Coverage floor:** 70% | **Depends on:** W-LLM, W-UI, W-OTF | **Depended on by:** (none yet)
 
 ## W-RAG.1 Purpose
@@ -212,16 +212,16 @@ injects this contract via `PromptBundle.system_prompt`.
 | W-RAG.7.5 | Extend `xtask rag ingest` to emit OpenAPI + portfolio corpora (6 total) | DONE | `xtask/src/rag.rs`; OpenAPI via `full_spec()`, portfolio via SQLite query |
 | W-RAG.8.1 | Enhance `DefaultPromptAssembler` for portfolio/API-aware system prompt | DONE | `crates/rag-core/src/lib.rs`; portfolio-aware preamble; 2 tests |
 | W-RAG.8.2 | Add `retrieve_filtered()` with optional `source_kind IN (...)` clause | DONE | `crates/rag-sqlite/src/lib.rs`; `source_kind IN` filter; 2 tests |
-| W-RAG.9.1 | `PortfolioDataProvider` trait in `rag-core` for live DB queries at ask-time | TODO | New file `crates/rag-core/src/portfolio.rs`; `serde_json::Value` return |
-| W-RAG.9.2 | Implement `PortfolioDataProvider` for `Db` (reuse existing SQL queries) | TODO | `services/ui/src/db.rs` or new `portfolio_data.rs` |
-| W-RAG.9.3 | `HybridRetriever` combining FTS + live portfolio virtual chunks | TODO | Merges indexed + live data; `source_kind="portfolio"`, `git_sha="live"` |
-| W-RAG.9.4 | Wire `HybridRetriever` into ask handler replacing raw `RagStore` | TODO | `services/ui/src/routes/api/ask.rs` |
-| W-RAG.10.1 | Define portfolio tools in llm-proxy (`list_jobs`, `get_job_details`, etc.) | TODO | New file `services/llm-proxy/src/tools.rs`; HTTP call-back to UI Lambda API |
-| W-RAG.10.2 | `PortfolioToolExecutor` implementing `ToolExecutor` via HTTP to UI Lambda | TODO | New file `services/llm-proxy/src/tool_executor.rs`; `PORTFOLIO_API_BASE_URL` env var |
-| W-RAG.10.3 | Wire agent loop into llm-proxy handler (when `tools` non-empty) | TODO | `services/llm-proxy/src/main.rs`; `max_turns=5`, `token_budget=4000` |
-| W-RAG.10.4 | Extend `AskProxyRequest`/`AskProxyResponse` with `tools`, `api_base_url`, `tools_used`, `turns` | TODO | `crates/api-openapi/src/models/ask.rs` |
-| W-RAG.10.5 | Update ask handler for agentic mode (include tool defs in proxy request) | TODO | `services/ui/src/routes/api/ask.rs` |
-| W-RAG.10.6 | Evolve system prompt for agentic portfolio assistant mode | TODO | `crates/rag-core/src/lib.rs`; codebase sources + live tools + grounding |
+| W-RAG.9.1 | `PortfolioDataProvider` trait in `rag-core` for live DB queries at ask-time | DONE | `crates/rag-core/src/portfolio.rs`; `serde_json::Value` return |
+| W-RAG.9.2 | Implement `PortfolioDataProvider` for `Db` (reuse existing SQL queries) | DONE | `services/ui/src/db.rs`; `#[async_trait] impl PortfolioDataProvider for Db` |
+| W-RAG.9.3 | `HybridRetriever` combining FTS + live portfolio virtual chunks | DONE | `crates/rag-core/src/hybrid.rs`; 3 tests; `source_kind="portfolio"`, `git_sha="live"` |
+| W-RAG.9.4 | Wire `HybridRetriever` into ask handler replacing raw `RagStore` | DONE | `services/ui/src/routes/api/ask.rs`; `Arc<RagStore>` + `Arc<Db>` → `HybridRetriever` |
+| W-RAG.10.1 | Define portfolio tools in llm-proxy (`list_jobs`, `get_job_details`, etc.) | DONE | `services/llm-proxy/src/tools.rs`; 4 tools mapping to portfolio API endpoints |
+| W-RAG.10.2 | `PortfolioToolExecutor` implementing `ToolExecutor` via HTTP to UI Lambda | DONE | `services/llm-proxy/src/tool_executor.rs`; `PORTFOLIO_API_BASE_URL` env var |
+| W-RAG.10.3 | Wire agent loop into llm-proxy handler (when `tools` non-empty) | DONE | `services/llm-proxy/src/main.rs`; `max_turns=5`, `token_budget=4000` |
+| W-RAG.10.4 | Extend `AskProxyRequest`/`AskProxyResponse` with `tools`, `api_base_url`, `tools_used`, `turns` | DONE | `crates/api-openapi/src/models/ask.rs`; backward-compatible `#[serde(default)]` |
+| W-RAG.10.5 | Update ask handler for agentic mode (include tool defs in proxy request) | DONE | `services/ui/src/routes/api/ask.rs`; `PORTFOLIO_API_BASE_URL` env var gating |
+| W-RAG.10.6 | Evolve system prompt for agentic portfolio assistant mode | DONE | `crates/rag-core/src/lib.rs`; portfolio-aware preamble (done in Phase 9.6) |
 
 ## W-RAG.5 Test Strategy
 
