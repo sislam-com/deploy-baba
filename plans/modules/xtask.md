@@ -110,6 +110,32 @@ cmd.arg(format!("-chdir={}", dir))  // BEFORE subcommand
 ```
 Note: `-chdir=<dir>` must come before the subcommand name.
 
+### `coverage.rs` — per-file line aggregation (fixed 2026-05-03)
+
+`cargo llvm-cov --package X --summary-only` instruments all workspace crates compiled
+during X's tests. The `TOTAL` line aggregates *all* instrumented files — not just X —
+inflating or deflating numbers depending on dependency coverage.
+
+`get_crate_coverage` now filters per-file lines by path prefix `"{crate_name}/"` before
+summing `total_lines` / `missed_lines`:
+
+```rust
+let prefix = format!("{}/", crate_name);
+for line in stdout.lines() {
+    if !line.trim_start().starts_with(&prefix) { continue; }
+    let tokens: Vec<&str> = line.split_whitespace().collect();
+    if tokens.len() >= 10 {
+        total_lines  += tokens[7].parse::<u64>().unwrap_or(0);
+        missed_lines += tokens[8].parse::<u64>().unwrap_or(0);
+    }
+}
+```
+
+Column indices: 7 = lines total, 8 = lines missed (llvm-cov summary layout:
+`filename regions(total/missed/%) functions(total/missed/%) lines(total/missed/%)`).
+
+See `plans/drift/DRL-2026-05-03-coverage-floors.md` for full root-cause analysis.
+
 ---
 
 ## W-XT.4 Work Items
@@ -123,6 +149,7 @@ Note: `-chdir=<dir>` must come before the subcommand name.
 | W-XT.4.5 | Resume generate + S3 upload | DONE | `xtask/src/resume/` — reads DB, builds resume artifact, uploads to S3, returns presigned download URL |
 | W-XT.4.6 | release subcommand | DONE | `xtask/src/release/{mod,git,version,changelog}.rs`; `just release-next/tag/promote`; 23 unit tests |
 | W-XT.4.7 | deploy spa subcommand | DONE | `xtask/src/deploy/spa.rs`; wait_lambda_active + build_spa + sync_to_s3 + invoke_sync_handler + smoke_test; `just deploy-full/spa-deploy/lambda-wait` |
+| W-XT.4.8 | Fix `get_crate_coverage` TOTAL line pollution | DONE | Per-file aggregation using `"{crate_name}/"` prefix filter; eliminates dependency code from measurement. See `DRL-2026-05-03-coverage-floors`. |
 
 ---
 

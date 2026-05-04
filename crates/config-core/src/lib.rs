@@ -549,4 +549,130 @@ mod tests {
         ];
         assert_eq!(errors.len(), 2);
     }
+
+    #[test]
+    fn test_parse_and_validate_validation_failure() {
+        let config = TestConfig {
+            name: "test".to_string(),
+            port: 0,
+        };
+        let errors = MockParser::validate(&config).unwrap_err();
+        assert!(errors.iter().any(|e| e.field == "port"));
+
+        let result = MockParser::parse_and_validate("valid config");
+        assert!(result.is_ok());
+
+        struct ZeroPortParser;
+        impl ConfigParser<TestConfig> for ZeroPortParser {
+            type Error = ConfigError;
+            fn parse(_: &str) -> Result<TestConfig, Self::Error> {
+                Ok(TestConfig {
+                    name: "x".to_string(),
+                    port: 0,
+                })
+            }
+            fn validate(config: &TestConfig) -> Result<(), Vec<ValidationError>> {
+                if config.port == 0 {
+                    Err(vec![ValidationError::new("port", "zero")])
+                } else {
+                    Ok(())
+                }
+            }
+        }
+        let result = ZeroPortParser::parse_and_validate("anything");
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            ConfigParseError::Validation(_)
+        ));
+    }
+
+    #[test]
+    fn test_config_validator_is_valid() {
+        struct PortValidator;
+        impl ConfigValidator<TestConfig> for PortValidator {
+            fn validate(config: &TestConfig) -> Result<(), Vec<ValidationError>> {
+                if config.port == 0 {
+                    Err(vec![ValidationError::new("port", "zero")])
+                } else {
+                    Ok(())
+                }
+            }
+        }
+
+        let valid = TestConfig {
+            name: "x".to_string(),
+            port: 8080,
+        };
+        let invalid = TestConfig {
+            name: "x".to_string(),
+            port: 0,
+        };
+
+        assert!(PortValidator::is_valid(&valid));
+        assert!(!PortValidator::is_valid(&invalid));
+    }
+
+    #[test]
+    fn test_config_error_variants_display() {
+        let errors = vec![ValidationError::new("f", "m")];
+        let err = ConfigError::Validation(errors);
+        assert!(err.to_string().contains("Validation failed"));
+
+        let err = ConfigError::UnsupportedFormat("toml".to_string());
+        assert!(err.to_string().contains("Unsupported format"));
+
+        let err = ConfigError::Parse("bad input".to_string());
+        assert!(err.to_string().contains("Parse error"));
+    }
+
+    #[test]
+    fn test_config_merger_trait() {
+        #[derive(Debug)]
+        struct OverrideConfig {
+            value: Option<i32>,
+        }
+
+        struct Merger;
+        impl ConfigMerger<OverrideConfig> for Merger {
+            fn merge(
+                base: OverrideConfig,
+                other: OverrideConfig,
+            ) -> Result<OverrideConfig, ConfigError> {
+                Ok(OverrideConfig {
+                    value: other.value.or(base.value),
+                })
+            }
+        }
+
+        let base = OverrideConfig { value: Some(1) };
+        let other = OverrideConfig { value: Some(2) };
+        let merged = Merger::merge(base, other).unwrap();
+        assert_eq!(merged.value, Some(2));
+
+        let base2 = OverrideConfig { value: Some(1) };
+        let other2 = OverrideConfig { value: None };
+        let merged2 = Merger::merge(base2, other2).unwrap();
+        assert_eq!(merged2.value, Some(1));
+    }
+
+    #[test]
+    fn test_environment_interpolator_trait() {
+        struct Config {
+            url: String,
+        }
+        struct Interpolator;
+        impl EnvironmentInterpolator<Config> for Interpolator {
+            fn interpolate_env(config: &mut Config) -> Result<(), ConfigError> {
+                config.url = config.url.replace("${HOST}", "localhost");
+                Ok(())
+            }
+        }
+
+        let mut config = Config {
+            url: "${HOST}:8080".to_string(),
+        };
+        Interpolator::interpolate_env(&mut config).unwrap();
+        assert_eq!(config.url, "localhost:8080");
+    }
 }

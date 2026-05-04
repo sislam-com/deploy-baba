@@ -74,6 +74,15 @@ resource "aws_cloudfront_origin_access_control" "assets" {
   signing_protocol                  = "sigv4"
 }
 
+# ─── CloudFront OAC for S3 SPA bucket ─────────────────────────────────────────
+
+resource "aws_cloudfront_origin_access_control" "spa" {
+  name                              = "deploy-baba-spa-oac"
+  origin_access_control_origin_type = "s3"
+  signing_behavior                  = "always"
+  signing_protocol                  = "sigv4"
+}
+
 # ─── CloudFront Distribution ───────────────────────────────────────────────────
 
 resource "aws_cloudfront_distribution" "main" {
@@ -100,6 +109,12 @@ resource "aws_cloudfront_distribution" "main" {
     domain_name              = aws_s3_bucket.assets.bucket_regional_domain_name
     origin_id                = "s3-assets"
     origin_access_control_id = aws_cloudfront_origin_access_control.assets.id
+  }
+
+  origin {
+    domain_name              = aws_s3_bucket.spa.bucket_regional_domain_name
+    origin_id                = "s3-spa"
+    origin_access_control_id = aws_cloudfront_origin_access_control.spa.id
   }
 
   # API Gateway origin for POST /api/contact (no OAC — body hash works correctly)
@@ -141,20 +156,94 @@ resource "aws_cloudfront_distribution" "main" {
     origin_request_policy_id = data.aws_cloudfront_origin_request_policy.all_viewer_except_host.id
   }
 
-  default_cache_behavior {
+  # Cache behaviors for Lambda-served paths — API, auth, docs, health
+  ordered_cache_behavior {
+    path_pattern           = "/api/*"
     target_origin_id       = "lambda-function-url"
     viewer_protocol_policy = "redirect-to-https"
 
     allowed_methods = ["GET", "HEAD", "OPTIONS", "PUT", "PATCH", "POST", "DELETE"]
     cached_methods  = ["GET", "HEAD"]
 
-    # CachingDisabled — every request forwarded to origin (dynamic app)
-    cache_policy_id = data.aws_cloudfront_cache_policy.caching_disabled.id
-
-    # Custom policy: all viewer headers except Host and Content-Length.
-    # Excluding Content-Length fixes InvalidSignatureException on POST/PUT —
-    # CloudFront OAC signs Content-Length but then uses chunked encoding to Lambda.
+    cache_policy_id          = data.aws_cloudfront_cache_policy.caching_disabled.id
     origin_request_policy_id = aws_cloudfront_origin_request_policy.lambda_oac.id
+  }
+
+  ordered_cache_behavior {
+    path_pattern           = "/auth/*"
+    target_origin_id       = "lambda-function-url"
+    viewer_protocol_policy = "redirect-to-https"
+
+    allowed_methods = ["GET", "HEAD", "OPTIONS", "PUT", "PATCH", "POST", "DELETE"]
+    cached_methods  = ["GET", "HEAD"]
+
+    cache_policy_id          = data.aws_cloudfront_cache_policy.caching_disabled.id
+    origin_request_policy_id = aws_cloudfront_origin_request_policy.lambda_oac.id
+  }
+
+  ordered_cache_behavior {
+    path_pattern           = "/health"
+    target_origin_id       = "lambda-function-url"
+    viewer_protocol_policy = "redirect-to-https"
+
+    allowed_methods = ["GET", "HEAD"]
+    cached_methods  = ["GET", "HEAD"]
+
+    cache_policy_id          = data.aws_cloudfront_cache_policy.caching_disabled.id
+    origin_request_policy_id = aws_cloudfront_origin_request_policy.lambda_oac.id
+  }
+
+  ordered_cache_behavior {
+    path_pattern           = "/docs"
+    target_origin_id       = "lambda-function-url"
+    viewer_protocol_policy = "redirect-to-https"
+
+    allowed_methods = ["GET", "HEAD"]
+    cached_methods  = ["GET", "HEAD"]
+
+    cache_policy_id          = data.aws_cloudfront_cache_policy.caching_disabled.id
+    origin_request_policy_id = aws_cloudfront_origin_request_policy.lambda_oac.id
+  }
+
+  # SPA hashed assets — long-lived cache keyed by content hash in filename
+  ordered_cache_behavior {
+    path_pattern           = "/assets/*"
+    target_origin_id       = "s3-spa"
+    viewer_protocol_policy = "redirect-to-https"
+
+    allowed_methods = ["GET", "HEAD"]
+    cached_methods  = ["GET", "HEAD"]
+
+    cache_policy_id = data.aws_cloudfront_cache_policy.caching_optimized.id
+  }
+
+  # Default: serve SPA from S3. All unmatched paths (/, /about, /dashboard, etc.)
+  # hit S3 which returns 403 for non-existent keys → custom_error_response → /index.html.
+  default_cache_behavior {
+    target_origin_id       = "s3-spa"
+    viewer_protocol_policy = "redirect-to-https"
+
+    allowed_methods = ["GET", "HEAD"]
+    cached_methods  = ["GET", "HEAD"]
+
+    # CachingDisabled for index.html so deploys propagate immediately
+    cache_policy_id = data.aws_cloudfront_cache_policy.caching_disabled.id
+  }
+
+  # SPA history routing: S3 returns 403 for non-existent keys (private bucket).
+  # Map both 403 and 404 to /index.html so client-side routes resolve.
+  custom_error_response {
+    error_code            = 403
+    response_code         = 200
+    response_page_path    = "/index.html"
+    error_caching_min_ttl = 0
+  }
+
+  custom_error_response {
+    error_code            = 404
+    response_code         = 200
+    response_page_path    = "/index.html"
+    error_caching_min_ttl = 0
   }
 
   restrictions {

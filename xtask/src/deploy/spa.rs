@@ -1,7 +1,7 @@
-use aws_sdk_lambda::primitives::Blob;
 use aws_sdk_lambda::Client as LambdaClient;
 use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::Client as S3Client;
+use aws_sdk_secretsmanager::Client as SmClient;
 use std::path::Path;
 use std::process::Command;
 use std::time::{Duration, Instant};
@@ -9,26 +9,72 @@ use std::time::{Duration, Instant};
 const POLL_INTERVAL: Duration = Duration::from_secs(3);
 const WAIT_TIMEOUT: Duration = Duration::from_secs(120);
 
-/// Env-var or infra-output config for one environment.
+/// Deploy config for one environment.
+/// Reads from `deploy-baba/prod/deploy-config` in Secrets Manager.
+/// Falls back to env vars for local dev when SM is unavailable.
 pub struct SpaEnvConfig {
     pub spa_bucket: String,
     pub fn_name: String,
     pub fn_url: String,
+    pub cloudfront_id: String,
 }
 
 impl SpaEnvConfig {
+    /// Fetch config from `deploy-baba/{env}/deploy-config` in Secrets Manager.
+    pub async fn from_secrets_manager(profile: Option<&str>, env: &str) -> anyhow::Result<Self> {
+        let aws_config = crate::aws::create_aws_config(profile.map(str::to_owned)).await?;
+        let client = SmClient::new(&aws_config);
+        let secret_name = format!("deploy-baba/{env}/deploy-config");
+        let resp = client
+            .get_secret_value()
+            .secret_id(&secret_name)
+            .send()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to read {secret_name} from SM: {e}"))?;
+        let raw = resp
+            .secret_string()
+            .ok_or_else(|| anyhow::anyhow!("{secret_name} has no string value"))?;
+        let v: serde_json::Value = serde_json::from_str(raw)
+            .map_err(|e| anyhow::anyhow!("SM secret JSON invalid: {e}"))?;
+        Ok(Self {
+            spa_bucket: v["spa_bucket"]
+                .as_str()
+                .ok_or_else(|| anyhow::anyhow!("missing spa_bucket in SM secret"))?
+                .to_owned(),
+            fn_name: v["ui_fn_name"]
+                .as_str()
+                .ok_or_else(|| anyhow::anyhow!("missing ui_fn_name in SM secret"))?
+                .to_owned(),
+            fn_url: v["fn_url"]
+                .as_str()
+                .ok_or_else(|| anyhow::anyhow!("missing fn_url in SM secret"))?
+                .to_owned(),
+            cloudfront_id: v["cloudfront_id"]
+                .as_str()
+                .ok_or_else(|| anyhow::anyhow!("missing cloudfront_id in SM secret"))?
+                .to_owned(),
+        })
+    }
+
+    /// Fallback for local dev: read from env vars.
     pub fn from_env() -> anyhow::Result<Self> {
         let spa_bucket = std::env::var("SPA_BUCKET").map_err(|_| {
-            anyhow::anyhow!("SPA_BUCKET env var not set (run: just infra-output or set manually)")
+            anyhow::anyhow!(
+                "SPA_BUCKET env var not set — run: \
+                 export SPA_BUCKET=$(tofu -chdir=infra output -raw spa_bucket_name)"
+            )
         })?;
         let fn_name = std::env::var("UI_FN_NAME")
             .map_err(|_| anyhow::anyhow!("UI_FN_NAME env var not set"))?;
         let fn_url = std::env::var("FN_URL")
             .map_err(|_| anyhow::anyhow!("FN_URL env var not set (include trailing slash)"))?;
+        let cloudfront_id = std::env::var("CLOUDFRONT_ID")
+            .map_err(|_| anyhow::anyhow!("CLOUDFRONT_ID env var not set"))?;
         Ok(Self {
             spa_bucket,
             fn_name,
             fn_url,
+            cloudfront_id,
         })
     }
 }
@@ -83,19 +129,17 @@ pub fn build_spa() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Step 4: walk web/dist/, upload to `s3://<bucket>/<sha>/` with correct Cache-Control.
-pub async fn sync_to_s3(
-    client: &S3Client,
-    bucket: &str,
-    sha: &str,
-) -> anyhow::Result<(usize, u64)> {
+/// Step 4: walk web/dist/, upload to `s3://<bucket>/` (flat, no SHA prefix).
+/// SPA assets are served directly from the bucket root via CloudFront OAC.
+/// index.html: no-cache; all other assets: immutable (filenames contain content hash).
+pub async fn sync_to_s3(client: &S3Client, bucket: &str) -> anyhow::Result<(usize, u64)> {
     let dist = Path::new("web/dist");
     if !dist.exists() {
         return Err(anyhow::anyhow!(
             "web/dist/ not found — run `just web-build` first"
         ));
     }
-    println!("   Syncing web/dist/ → s3://{}/{}/", bucket, sha);
+    println!("   Syncing web/dist/ → s3://{}/", bucket);
 
     let mut file_count = 0usize;
     let mut total_bytes = 0u64;
@@ -111,7 +155,7 @@ pub async fn sync_to_s3(
         let rel = path
             .strip_prefix(dist)
             .map_err(|_| anyhow::anyhow!("path strip failed"))?;
-        let key = format!("{}/{}", sha, rel.to_string_lossy().replace('\\', "/"));
+        let key = rel.to_string_lossy().replace('\\', "/");
 
         let is_index = rel.to_string_lossy() == "index.html";
         let cache_control = if is_index {
@@ -143,43 +187,34 @@ pub async fn sync_to_s3(
     Ok((file_count, total_bytes))
 }
 
-/// Step 5: invoke Lambda sync-spa action and assert status == "ok".
-pub async fn invoke_sync_handler(
-    client: &LambdaClient,
-    fn_name: &str,
-    sha: &str,
-) -> anyhow::Result<serde_json::Value> {
-    println!("   Invoking sync-spa handler (sha={})...", sha);
-    let payload = serde_json::json!({ "action": "sync-spa", "sha": sha });
-    let resp = client
-        .invoke()
-        .function_name(fn_name)
-        .payload(Blob::new(serde_json::to_vec(&payload)?))
-        .send()
-        .await
-        .map_err(|e| anyhow::anyhow!("Lambda invoke failed: {e}"))?;
-
-    if let Some(err) = resp.function_error() {
-        return Err(anyhow::anyhow!("Lambda returned function error: {}", err));
+/// Step 5: invalidate CloudFront so /index.html and /assets/* get the new build.
+pub fn invalidate_cloudfront(distribution_id: &str) -> anyhow::Result<()> {
+    println!(
+        "   Invalidating CloudFront distribution {}...",
+        distribution_id
+    );
+    let status = Command::new("aws")
+        .args([
+            "cloudfront",
+            "create-invalidation",
+            "--distribution-id",
+            distribution_id,
+            "--paths",
+            "/index.html",
+            "/",
+        ])
+        .status()
+        .map_err(|e| anyhow::anyhow!("aws cloudfront failed: {e} (is AWS CLI installed?)"))?;
+    if !status.success() {
+        return Err(anyhow::anyhow!("aws cloudfront create-invalidation failed"));
     }
-
-    let body: serde_json::Value = resp
-        .payload()
-        .map(|b| serde_json::from_slice(b.as_ref()))
-        .transpose()
-        .map_err(|e| anyhow::anyhow!("Failed to parse sync-spa response: {e}"))?
-        .unwrap_or(serde_json::Value::Null);
-
-    if body.get("status").and_then(|v| v.as_str()) != Some("ok") {
-        return Err(anyhow::anyhow!("sync-spa returned non-ok status: {}", body));
-    }
-    println!("   sync-spa: {}", body);
-    Ok(body)
+    println!("   CloudFront invalidation submitted.");
+    Ok(())
 }
 
 /// Step 6: curl <fn_url>/health and assert HTTP 200.
 pub async fn smoke_test(fn_url: &str) -> anyhow::Result<()> {
-    let url = format!("{}health", fn_url.trim_end_matches('/'));
+    let url = format!("{}/health", fn_url.trim_end_matches('/'));
     println!("   Smoke testing {}...", url);
 
     let client = reqwest::Client::builder()
@@ -217,7 +252,7 @@ fn mime_guess(path: &Path) -> &'static str {
     }
 }
 
-/// Full SPA deploy: steps 2–6.
+/// Full SPA deploy: build → S3 sync → CloudFront invalidation → smoke test.
 pub async fn deploy_spa(
     profile: Option<String>,
     env_cfg: SpaEnvConfig,
@@ -232,8 +267,8 @@ pub async fn deploy_spa(
         wait_lambda_active(&lambda_client, &env_cfg.fn_name).await?;
     }
     build_spa()?;
-    sync_to_s3(&s3_client, &env_cfg.spa_bucket, sha).await?;
-    invoke_sync_handler(&lambda_client, &env_cfg.fn_name, sha).await?;
+    sync_to_s3(&s3_client, &env_cfg.spa_bucket).await?;
+    invalidate_cloudfront(&env_cfg.cloudfront_id)?;
     smoke_test(&env_cfg.fn_url).await?;
 
     println!("SPA deploy complete (sha={})", sha);

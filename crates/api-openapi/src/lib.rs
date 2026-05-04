@@ -565,4 +565,104 @@ mod tests {
             assert!(msg.contains("Duplicate path"));
         }
     }
+
+    #[test]
+    fn test_openapi_generator_default() {
+        let _gen = OpenApiGenerator::<TestApiDoc>::default();
+    }
+
+    #[test]
+    fn test_merge_specs_empty_returns_error() {
+        let result = OpenApiGenerator::<TestApiDoc>::merge_specs(vec![]);
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), SpecError::MergeError(_)));
+    }
+
+    #[test]
+    fn test_merge_specs_single_returns_ok() {
+        let schema = TestApiDoc::api_schema();
+        let spec = OpenApiGenerator::<TestApiDoc>::generate_spec(schema).unwrap();
+        let path_count = spec.metadata.path_count;
+        let result = OpenApiGenerator::<TestApiDoc>::merge_specs(vec![spec]);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().metadata.path_count, path_count);
+    }
+
+    #[test]
+    fn test_merge_openapi_specs_empty_list() {
+        let result = merge_openapi_specs(vec![]);
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), SpecError::MergeError(_)));
+    }
+
+    #[test]
+    fn test_merge_openapi_specs_schema_conflict() {
+        use utoipa::openapi::{
+            schema::ObjectBuilder, ComponentsBuilder, InfoBuilder, OpenApiBuilder, PathItem,
+            PathsBuilder,
+        };
+
+        let schema = ObjectBuilder::new().build();
+
+        let mut comp1 = ComponentsBuilder::new().build();
+        comp1.schemas.insert(
+            "SharedSchema".to_string(),
+            utoipa::openapi::RefOr::T(utoipa::openapi::Schema::Object(schema.clone())),
+        );
+        let spec1 = OpenApiBuilder::new()
+            .info(InfoBuilder::new().title("S1").version("1.0").build())
+            .paths(PathsBuilder::new().path("/a", PathItem::default()).build())
+            .components(Some(comp1))
+            .build();
+
+        let mut comp2 = ComponentsBuilder::new().build();
+        comp2.schemas.insert(
+            "SharedSchema".to_string(),
+            utoipa::openapi::RefOr::T(utoipa::openapi::Schema::Object(schema)),
+        );
+        let spec2 = OpenApiBuilder::new()
+            .info(InfoBuilder::new().title("S2").version("1.0").build())
+            .paths(PathsBuilder::new().path("/b", PathItem::default()).build())
+            .components(Some(comp2))
+            .build();
+
+        let result = merge_openapi_specs(vec![spec1, spec2]);
+        assert!(result.is_err());
+        if let Err(SpecError::MergeError(msg)) = result {
+            assert!(msg.contains("Duplicate schema"));
+        }
+    }
+
+    #[test]
+    fn test_openapi_validate_spec_path_no_slash() {
+        use utoipa::openapi::PathItem;
+        let mut schema = TestApiDoc::api_schema();
+        schema
+            .paths
+            .paths
+            .insert("noslash".to_string(), PathItem::default());
+        let spec = OpenApiGenerator::<TestApiDoc>::generate_spec(schema).unwrap();
+        let result = OpenApiGenerator::<TestApiDoc>::validate_spec(&spec);
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors
+            .iter()
+            .any(|e| e.message.contains("must start with '\\''")
+                || e.message.contains("must start with '/'")));
+    }
+
+    #[test]
+    fn test_openapi_spec_error_conversions() {
+        let err = OpenApiSpecError::Generation("gen failed".to_string());
+        let spec_err: SpecError = err.into();
+        assert!(matches!(spec_err, SpecError::GenerationFailed(_)));
+
+        let spec_err = SpecError::UnsupportedFormat("fmt".to_string());
+        let openapi_err: OpenApiSpecError = spec_err.into();
+        assert!(matches!(openapi_err, OpenApiSpecError::Generation(_)));
+
+        let spec_err = SpecError::MergeError("merge".to_string());
+        let openapi_err: OpenApiSpecError = spec_err.into();
+        assert!(matches!(openapi_err, OpenApiSpecError::Generation(_)));
+    }
 }

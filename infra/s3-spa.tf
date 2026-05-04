@@ -45,27 +45,61 @@ resource "aws_s3_bucket_lifecycle_configuration" "spa" {
   }
 }
 
-# IAM: allow the UI Lambda to read SPA assets from this bucket
-resource "aws_iam_role_policy" "lambda_s3_spa" {
-  name = "${local.lambda_function_name}-s3-spa-policy"
-  role = aws_iam_role.lambda_execution.id
+# Allow CloudFront OAC to read SPA assets from this bucket
+resource "aws_s3_bucket_policy" "spa_cloudfront" {
+  bucket = aws_s3_bucket.spa.id
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "S3SpaReadWrite"
+        Sid    = "AllowCloudFrontOAC"
         Effect = "Allow"
-        Action = [
-          "s3:GetObject",
-          "s3:PutObject",
-          "s3:DeleteObject",
-          "s3:ListBucket"
-        ]
-        Resource = [
-          aws_s3_bucket.spa.arn,
-          "${aws_s3_bucket.spa.arn}/*"
-        ]
+        Principal = {
+          Service = "cloudfront.amazonaws.com"
+        }
+        Action   = "s3:GetObject"
+        Resource = "${aws_s3_bucket.spa.arn}/*"
+        Condition = {
+          StringEquals = {
+            "AWS:SourceArn" = aws_cloudfront_distribution.main.arn
+          }
+        }
+      }
+    ]
+  })
+}
+
+# IAM: allow CI to upload SPA assets to this bucket
+resource "aws_iam_role_policy" "ci_s3_spa_dev" {
+  name = "${var.project_name}-ci-s3-spa-dev-policy"
+  role = aws_iam_role.ci_deploy_dev.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "S3SpaReadWrite"
+        Effect   = "Allow"
+        Action   = ["s3:PutObject", "s3:DeleteObject", "s3:ListBucket", "s3:GetObject"]
+        Resource = [aws_s3_bucket.spa.arn, "${aws_s3_bucket.spa.arn}/*"]
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "ci_s3_spa_prod" {
+  name = "${var.project_name}-ci-s3-spa-prod-policy"
+  role = aws_iam_role.ci_deploy_prod.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "S3SpaReadWrite"
+        Effect   = "Allow"
+        Action   = ["s3:PutObject", "s3:DeleteObject", "s3:ListBucket", "s3:GetObject"]
+        Resource = [aws_s3_bucket.spa.arn, "${aws_s3_bucket.spa.arn}/*"]
       }
     ]
   })

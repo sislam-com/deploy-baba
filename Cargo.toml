@@ -70,17 +70,19 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 
 # AWS SDK
+# default-features disabled to exclude the legacy `rustls` feature (-> rustls 0.21 / rustls-webpki 0.101),
+# keeping only the modern default-https-client path (-> rustls 0.23 / rustls-webpki 0.103).
 aws-config = { version = "1", features = ["behavior-version-latest"] }
-aws-sdk-sts = "1"
-aws-sdk-ssm = "1"
-aws-sdk-s3 = "1"
-aws-sdk-lambda = "1"
-aws-sdk-ecs = "1"
-aws-sdk-ecr = "1"
-aws-sdk-efs = "1"
-aws-sdk-dynamodb = "1"
-aws-sdk-sesv2 = { version = "1", features = ["behavior-version-latest"] }
-aws-sdk-secretsmanager = "1"
+aws-sdk-sts = { version = "1", default-features = false, features = ["sigv4a", "default-https-client", "rt-tokio"] }
+aws-sdk-ssm = { version = "1", default-features = false, features = ["default-https-client", "rt-tokio"] }
+aws-sdk-s3 = { version = "1", default-features = false, features = ["sigv4a", "http-1x", "default-https-client", "rt-tokio"] }
+aws-sdk-lambda = { version = "1", default-features = false, features = ["default-https-client", "rt-tokio"] }
+aws-sdk-ecs = { version = "1", default-features = false, features = ["default-https-client", "rt-tokio"] }
+aws-sdk-ecr = { version = "1", default-features = false, features = ["default-https-client", "rt-tokio"] }
+aws-sdk-efs = { version = "1", default-features = false, features = ["default-https-client", "rt-tokio"] }
+aws-sdk-dynamodb = { version = "1", default-features = false, features = ["default-https-client", "rt-tokio"] }
+aws-sdk-sesv2 = { version = "1", default-features = false, features = ["behavior-version-latest", "sigv4a", "default-https-client", "rt-tokio"] }
+aws-sdk-secretsmanager = { version = "1", default-features = false, features = ["default-https-client", "rt-tokio"] }
 
 # CLI
 clap = { version = "4", features = ["derive"] }

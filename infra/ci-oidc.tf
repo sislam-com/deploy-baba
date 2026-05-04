@@ -64,15 +64,22 @@ resource "aws_iam_role_policy" "ci_deploy_dev" {
           "lambda:UpdateFunctionCode",
           "lambda:InvokeFunction",
           "lambda:GetFunction",
-          "lambda:GetFunctionConfiguration"
+          "lambda:GetFunctionConfiguration",
+          "lambda:WaitFunctionActive"
         ]
-        Resource = "arn:aws:lambda:${var.region}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-dev"
+        Resource = "arn:aws:lambda:${var.region}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-prod"
       },
       {
-        Sid      = "WaitForUpdate"
+        Sid      = "ReadDeployConfig"
         Effect   = "Allow"
-        Action   = ["lambda:GetFunction"]
-        Resource = "arn:aws:lambda:${var.region}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-dev"
+        Action   = "secretsmanager:GetSecretValue"
+        Resource = "arn:aws:secretsmanager:${var.region}:${data.aws_caller_identity.current.account_id}:secret:${var.project_name}/${var.environment}/deploy-config*"
+      },
+      {
+        Sid      = "InvalidateCDN"
+        Effect   = "Allow"
+        Action   = "cloudfront:CreateInvalidation"
+        Resource = "arn:aws:cloudfront::${data.aws_caller_identity.current.account_id}:distribution/${aws_cloudfront_distribution.main.id}"
       }
     ]
   })
@@ -121,9 +128,22 @@ resource "aws_iam_role_policy" "ci_deploy_prod" {
           "lambda:UpdateFunctionCode",
           "lambda:InvokeFunction",
           "lambda:GetFunction",
-          "lambda:GetFunctionConfiguration"
+          "lambda:GetFunctionConfiguration",
+          "lambda:WaitFunctionActive"
         ]
         Resource = "arn:aws:lambda:${var.region}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-prod"
+      },
+      {
+        Sid      = "ReadDeployConfig"
+        Effect   = "Allow"
+        Action   = "secretsmanager:GetSecretValue"
+        Resource = "arn:aws:secretsmanager:${var.region}:${data.aws_caller_identity.current.account_id}:secret:${var.project_name}/${var.environment}/deploy-config*"
+      },
+      {
+        Sid      = "InvalidateCDN"
+        Effect   = "Allow"
+        Action   = "cloudfront:CreateInvalidation"
+        Resource = "arn:aws:cloudfront::${data.aws_caller_identity.current.account_id}:distribution/${aws_cloudfront_distribution.main.id}"
       }
     ]
   })

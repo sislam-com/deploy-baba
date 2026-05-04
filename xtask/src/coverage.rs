@@ -161,14 +161,51 @@ async fn get_crate_coverage(crate_name: &str) -> anyhow::Result<f64> {
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Aggregate coverage only from this crate's own source files.
+    // The TOTAL line includes workspace dependencies compiled into this
+    // crate's tests, which dilutes the metric. Summing per-file lines
+    // avoids that problem.
+    let prefix = format!("{}/", crate_name);
+    let mut total_lines = 0u64;
+    let mut missed_lines = 0u64;
+    let mut found_any = false;
+
+    for line in stdout.lines() {
+        let trimmed = line.trim_start();
+        if !trimmed.starts_with(&prefix) {
+            continue;
+        }
+        // Format per file: path  reg_total  reg_missed  reg_%  fn_total  fn_missed  fn_%  line_total  line_missed  line_%  ...
+        let tokens: Vec<&str> = trimmed.split_whitespace().collect();
+        if tokens.len() >= 10 {
+            if let (Ok(total), Ok(missed)) = (tokens[7].parse::<u64>(), tokens[8].parse::<u64>()) {
+                total_lines += total;
+                missed_lines += missed;
+                found_any = true;
+            }
+        }
+    }
+
+    if found_any && total_lines > 0 {
+        let coverage = (total_lines - missed_lines) as f64 / total_lines as f64 * 100.0;
+        return Ok(coverage);
+    }
+
+    // Fallback to TOTAL line if no per-file lines matched.
     parse_coverage(&stdout)
         .ok_or_else(|| anyhow::anyhow!("Could not parse coverage for {}", crate_name))
 }
 
 fn parse_coverage(output: &str) -> Option<f64> {
+    // The TOTAL line has multiple % columns; the last column (Branches) may be "-".
+    // Find the TOTAL line and return the last %-suffixed value on it.
     for line in output.lines() {
-        if let Some(percent_str) = line.split_whitespace().last() {
-            if let Some(num_str) = percent_str.strip_suffix('%') {
+        if !line.trim_start().starts_with("TOTAL") {
+            continue;
+        }
+        for token in line.split_whitespace().rev() {
+            if let Some(num_str) = token.strip_suffix('%') {
                 if let Ok(num) = num_str.parse::<f64>() {
                     return Some(num);
                 }

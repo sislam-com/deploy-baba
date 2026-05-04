@@ -23,6 +23,18 @@ jobs:
           role-to-assume: ${{ vars.CI_DEPLOY_PROD_ROLE_ARN }}
           aws-region: us-east-1
 
+      # ── Load deploy identifiers from Secrets Manager ──────────────────────────
+
+      - name: Load deploy config from Secrets Manager
+        run: |
+          SECRET=$(aws secretsmanager get-secret-value \
+            --secret-id deploy-baba/prod/deploy-config \
+            --query SecretString --output text)
+          echo "SPA_BUCKET=$(echo "$SECRET" | jq -r .spa_bucket)" >> "$GITHUB_ENV"
+          echo "CLOUDFRONT_ID=$(echo "$SECRET" | jq -r .cloudfront_id)" >> "$GITHUB_ENV"
+          echo "UI_FN_NAME=$(echo "$SECRET" | jq -r .ui_fn_name)" >> "$GITHUB_ENV"
+          echo "FN_URL=$(echo "$SECRET" | jq -r .fn_url)" >> "$GITHUB_ENV"
+
       # ── Build Lambda ──────────────────────────────────────────────────────────
 
       - uses: dtolnay/rust-toolchain@stable
@@ -39,7 +51,7 @@ jobs:
       - name: Update Lambda code
         run: |
           aws lambda update-function-code \
-            --function-name ${{ vars.PROD_UI_FN_NAME }} \
+            --function-name "$UI_FN_NAME" \
             --zip-file fileb://infra/build/lambda.zip \
             --architectures arm64 \
             --region us-east-1
@@ -47,7 +59,7 @@ jobs:
       - name: Wait for Lambda update
         run: |
           aws lambda wait function-updated \
-            --function-name ${{ vars.PROD_UI_FN_NAME }} \
+            --function-name "$UI_FN_NAME" \
             --region us-east-1
 
       # ── Build + deploy SPA ────────────────────────────────────────────────────
@@ -68,33 +80,24 @@ jobs:
         run: pnpm --dir web run build
 
       - name: Sync SPA to S3
-        env:
-          SHA: ${{ github.sha }}
         run: |
-          aws s3 sync web/dist/ "s3://${{ vars.PROD_SPA_BUCKET }}/${SHA}/" \
+          aws s3 sync web/dist/ "s3://${SPA_BUCKET}/" \
             --delete \
             --cache-control "public,max-age=31536000,immutable" \
             --exclude "index.html"
-          aws s3 cp web/dist/index.html "s3://${{ vars.PROD_SPA_BUCKET }}/${SHA}/index.html" \
-            --cache-control "no-cache"
+          aws s3 cp web/dist/index.html "s3://${SPA_BUCKET}/index.html" \
+            --cache-control "no-cache,no-store,must-revalidate"
 
-      - name: Invoke sync handler
-        env:
-          SHA: ${{ github.sha }}
+      - name: Invalidate CloudFront
         run: |
-          PAYLOAD=$(printf '{"action":"sync-spa","sha":"%s"}' "${SHA}" | base64)
-          aws lambda invoke \
-            --function-name ${{ vars.PROD_UI_FN_NAME }} \
-            --invocation-type RequestResponse \
-            --payload "${PAYLOAD}" \
-            /tmp/sync-resp.json
-          cat /tmp/sync-resp.json
-          grep -q '"status":"ok"' /tmp/sync-resp.json
+          aws cloudfront create-invalidation \
+            --distribution-id "$CLOUDFRONT_ID" \
+            --paths "/index.html" "/"
 
       # ── Smoke test ────────────────────────────────────────────────────────────
 
       - name: Smoke test /health
         run: |
-          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" "${{ vars.PROD_FN_URL }}health" || echo "000")
+          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" "${FN_URL}health" || echo "000")
           echo "Health check status: ${STATUS}"
           [[ "${STATUS}" == "200" ]]

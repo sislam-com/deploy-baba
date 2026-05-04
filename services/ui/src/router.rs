@@ -4,7 +4,7 @@ use axum::{
     Router,
 };
 use tower_http::cors::CorsLayer;
-use tower_http::services::{ServeDir, ServeFile};
+use tower_http::services::ServeDir;
 use tower_http::trace::TraceLayer;
 use utoipa::OpenApi;
 
@@ -23,10 +23,8 @@ pub fn build(state: AppState) -> Router {
         axum::middleware::from_fn_with_state(state.clone(), crate::middleware::require_auth),
     );
 
-    // SPA root — serves index.html as fallback for client-side routing
-    let spa_root = state.spa_root.clone();
-    let spa_assets_dir = spa_root.join("assets");
-    let index_html = spa_root.join("index.html");
+    // SPA assets (/, /about, /assets/*) are served directly from S3 via CloudFront OAC.
+    // Lambda handles only /api/*, /auth/*, /health, /docs, /resume/* (ADR-003 + cdn.tf behaviors).
 
     Router::new()
         // ── Health ───────────────────────────────────────────────────────────
@@ -57,10 +55,6 @@ pub fn build(state: AppState) -> Router {
         )
         // ── API Docs (RapiDoc) ───────────────────────────────────────────────
         .route("/docs", get(docs_handler))
-        // ── SPA hashed assets — long-lived cache (filenames contain content hash) ─
-        .nest_service("/assets", ServeDir::new(&spa_assets_dir).precompressed_br())
-        // ── SPA fallback — serve index.html for any unmatched path ───────────
-        .fallback_service(ServeDir::new(&spa_root).fallback(ServeFile::new(&index_html)))
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
         .with_state(state)
