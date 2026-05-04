@@ -79,9 +79,9 @@ resource "aws_iam_role_policy" "ci_s3_spa_dev" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "S3SpaReadWrite"
-        Effect = "Allow"
-        Action = ["s3:PutObject", "s3:DeleteObject", "s3:ListBucket", "s3:GetObject"]
+        Sid      = "S3SpaReadWrite"
+        Effect   = "Allow"
+        Action   = ["s3:PutObject", "s3:DeleteObject", "s3:ListBucket", "s3:GetObject"]
         Resource = [aws_s3_bucket.spa.arn, "${aws_s3_bucket.spa.arn}/*"]
       }
     ]
@@ -96,9 +96,9 @@ resource "aws_iam_role_policy" "ci_s3_spa_prod" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "S3SpaReadWrite"
-        Effect = "Allow"
-        Action = ["s3:PutObject", "s3:DeleteObject", "s3:ListBucket", "s3:GetObject"]
+        Sid      = "S3SpaReadWrite"
+        Effect   = "Allow"
+        Action   = ["s3:PutObject", "s3:DeleteObject", "s3:ListBucket", "s3:GetObject"]
         Resource = [aws_s3_bucket.spa.arn, "${aws_s3_bucket.spa.arn}/*"]
       }
     ]

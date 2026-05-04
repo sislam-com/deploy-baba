@@ -70,15 +70,15 @@ resource "aws_iam_role_policy" "ci_deploy_dev" {
         Resource = "arn:aws:lambda:${var.region}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-prod"
       },
       {
-        Sid    = "ReadDeployConfig"
-        Effect = "Allow"
-        Action = "secretsmanager:GetSecretValue"
+        Sid      = "ReadDeployConfig"
+        Effect   = "Allow"
+        Action   = "secretsmanager:GetSecretValue"
         Resource = "arn:aws:secretsmanager:${var.region}:${data.aws_caller_identity.current.account_id}:secret:${var.project_name}/${var.environment}/deploy-config*"
       },
       {
-        Sid    = "InvalidateCDN"
-        Effect = "Allow"
-        Action = "cloudfront:CreateInvalidation"
+        Sid      = "InvalidateCDN"
+        Effect   = "Allow"
+        Action   = "cloudfront:CreateInvalidation"
         Resource = "arn:aws:cloudfront::${data.aws_caller_identity.current.account_id}:distribution/${aws_cloudfront_distribution.main.id}"
       }
     ]
@@ -134,15 +134,15 @@ resource "aws_iam_role_policy" "ci_deploy_prod" {
         Resource = "arn:aws:lambda:${var.region}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-prod"
       },
       {
-        Sid    = "ReadDeployConfig"
-        Effect = "Allow"
-        Action = "secretsmanager:GetSecretValue"
+        Sid      = "ReadDeployConfig"
+        Effect   = "Allow"
+        Action   = "secretsmanager:GetSecretValue"
         Resource = "arn:aws:secretsmanager:${var.region}:${data.aws_caller_identity.current.account_id}:secret:${var.project_name}/${var.environment}/deploy-config*"
       },
       {
-        Sid    = "InvalidateCDN"
-        Effect = "Allow"
-        Action = "cloudfront:CreateInvalidation"
+        Sid      = "InvalidateCDN"
+        Effect   = "Allow"
+        Action   = "cloudfront:CreateInvalidation"
         Resource = "arn:aws:cloudfront::${data.aws_caller_identity.current.account_id}:distribution/${aws_cloudfront_distribution.main.id}"
       }
     ]
