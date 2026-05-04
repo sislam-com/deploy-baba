@@ -46,7 +46,9 @@ tracing-subscriber = { workspace = true }
 # AWS
 aws-config = { workspace = true }
 aws-sdk-lambda = { workspace = true }
+aws-sdk-s3 = { workspace = true }
 aws-sdk-secretsmanager = { workspace = true }
+flate2 = { workspace = true }
 
 # SPA dispatch / HTTP adapter for Lambda runtime
 lambda_runtime = { workspace = true }

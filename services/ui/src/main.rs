@@ -1,9 +1,12 @@
 use anyhow::Result;
+use aws_sdk_s3::Client as S3Client;
 use base64::Engine as _;
+use flate2::read::GzDecoder;
 use lambda_runtime::{service_fn, LambdaEvent};
 use rag_sqlite::RagStore;
+use rusqlite::Connection;
 use serde_json::{json, Value};
-use std::sync::Arc;
+use std::{io::Read as _, sync::Arc};
 use tower::ServiceExt as _;
 
 mod auth;
@@ -84,7 +87,12 @@ async fn dispatch(
         return handle_http(payload, app).await;
     }
 
-    Err(format!("unknown event: {payload:?}").into())
+    // Operational actions (EventBridge / manual invoke)
+    match payload.get("action").and_then(|a| a.as_str()) {
+        Some("backup") => handle_backup(&_state).await,
+        Some("ingest-rag") => handle_ingest_rag(&_state).await,
+        _ => Err(format!("unknown event: {payload:?}").into()),
+    }
 }
 
 async fn handle_http(payload: Value, app: axum::Router) -> Result<Value, lambda_runtime::Error> {
@@ -154,4 +162,136 @@ async fn handle_http(payload: Value, app: axum::Router) -> Result<Value, lambda_
         "body": body_str,
         "isBase64Encoded": is_b64,
     }))
+}
+
+// ── Operational handlers ──────────────────────────────────────────────────────
+
+/// Back up the EFS SQLite database to S3.
+///
+/// Invoked by EventBridge on a schedule (`{"action":"backup","source":"eventbridge"}`).
+async fn handle_backup(state: &state::AppState) -> Result<Value, lambda_runtime::Error> {
+    use flate2::write::GzEncoder;
+    use flate2::Compression;
+    use std::io::Write as _;
+
+    let db_path = std::env::var("DB_PATH").unwrap_or_else(|_| "/mnt/db/baba.db".to_string());
+    let bucket = std::env::var("S3_BACKUP_BUCKET")
+        .map_err(|_| "S3_BACKUP_BUCKET env var not set".to_string())?;
+
+    let data = std::fs::read(&db_path)
+        .map_err(|e| format!("read {db_path}: {e}"))?;
+
+    let mut enc = GzEncoder::new(Vec::new(), Compression::default());
+    enc.write_all(&data).map_err(|e| format!("compress: {e}"))?;
+    let compressed = enc.finish().map_err(|e| format!("compress finish: {e}"))?;
+
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| format!("time: {e}"))?
+        .as_secs();
+    let key = format!("db-backups/app-{ts}.db.gz");
+
+    let aws_cfg = aws_config::load_from_env().await;
+    let s3 = S3Client::new(&aws_cfg);
+    s3.put_object()
+        .bucket(&bucket)
+        .key(&key)
+        .body(aws_sdk_s3::primitives::ByteStream::from(compressed))
+        .send()
+        .await
+        .map_err(|e| format!("s3 put: {e}"))?;
+
+    tracing::info!("db backup → s3://{bucket}/{key}");
+    let _ = state; // suppress unused-var warning
+    Ok(json!({ "status": "ok", "key": key }))
+}
+
+/// Download a pre-indexed `rag-index.db.gz` from S3 and populate the EFS RAG store.
+///
+/// Uses ATTACH + bulk INSERT...SELECT + single FTS5 rebuild (O(n) vs the
+/// per-document O(n²) rebuild that `RagStore::upsert_document` does in a loop).
+///
+/// Invoked manually after running `rag-index` locally and uploading to S3:
+/// `{"action":"ingest-rag"}`
+async fn handle_ingest_rag(_state: &state::AppState) -> Result<Value, lambda_runtime::Error> {
+    let bucket = std::env::var("S3_BACKUP_BUCKET")
+        .map_err(|_| "S3_BACKUP_BUCKET env var not set".to_string())?;
+    let db_path = std::env::var("DB_PATH").unwrap_or_else(|_| "/mnt/db/baba.db".to_string());
+    let key = "rag-index.db.gz";
+    let tmp = "/tmp/rag-index.db";
+
+    // 1. Download + decompress from S3
+    tracing::info!("downloading rag index from s3://{bucket}/{key}");
+    let aws_cfg = aws_config::load_from_env().await;
+    let s3 = S3Client::new(&aws_cfg);
+    let obj = s3
+        .get_object()
+        .bucket(&bucket)
+        .key(key)
+        .send()
+        .await
+        .map_err(|e| format!("s3 get {key}: {e}"))?;
+
+    let compressed = obj
+        .body
+        .collect()
+        .await
+        .map_err(|e| format!("read body: {e}"))?
+        .into_bytes()
+        .to_vec();
+
+    let mut dec = GzDecoder::new(compressed.as_slice());
+    let mut raw = Vec::new();
+    dec.read_to_end(&mut raw)
+        .map_err(|e| format!("decompress: {e}"))?;
+
+    std::fs::write(tmp, &raw).map_err(|e| format!("write {tmp}: {e}"))?;
+    tracing::info!("rag index written to {tmp} ({} bytes)", raw.len());
+
+    // 2. Bulk-import via ATTACH + INSERT...SELECT + single FTS5 rebuild.
+    //    Opens a second connection to the EFS DB (WAL mode allows concurrent writers).
+    let conn = Connection::open(&db_path).map_err(|e| format!("open {db_path}: {e}"))?;
+    conn.execute_batch("PRAGMA journal_mode=WAL;")
+        .map_err(|e| format!("WAL pragma: {e}"))?;
+
+    conn.execute_batch(&format!("ATTACH DATABASE '{tmp}' AS rag_src;"))
+        .map_err(|e| format!("ATTACH: {e}"))?;
+
+    // Clean-slate replace: DELETE first so plain INSERT...SELECT works on any SQLite version.
+    // FTS5 rebuild at the end re-syncs rag_chunks_fts from rag_chunks.
+    conn.execute_batch("DELETE FROM rag_chunks; DELETE FROM rag_documents;")
+        .map_err(|e| format!("clear rag tables: {e}"))?;
+
+    conn.execute_batch(
+        "INSERT INTO rag_documents (source_kind, source_path, git_sha, updated_at)
+         SELECT source_kind, source_path, git_sha, updated_at
+         FROM rag_src.rag_documents;",
+    )
+    .map_err(|e| format!("insert documents: {e}"))?;
+
+    conn.execute_batch(
+        "INSERT INTO rag_chunks (document_id, ord, content, token_count, meta_json)
+         SELECT d.id, sc.ord, sc.content, sc.token_count, sc.meta_json
+         FROM rag_src.rag_chunks sc
+         JOIN rag_src.rag_documents sd ON sd.id = sc.document_id
+         JOIN rag_documents d ON d.source_kind = sd.source_kind
+                              AND d.source_path = sd.source_path;",
+    )
+    .map_err(|e| format!("insert chunks: {e}"))?;
+
+    conn.execute_batch("INSERT INTO rag_chunks_fts(rag_chunks_fts) VALUES('rebuild');")
+        .map_err(|e| format!("fts rebuild: {e}"))?;
+
+    conn.execute_batch("DETACH DATABASE rag_src;")
+        .map_err(|e| format!("detach: {e}"))?;
+
+    let docs: i64 = conn
+        .query_row("SELECT COUNT(*) FROM rag_documents", [], |r| r.get(0))
+        .map_err(|e| format!("count docs: {e}"))?;
+    let chunks: i64 = conn
+        .query_row("SELECT COUNT(*) FROM rag_chunks", [], |r| r.get(0))
+        .map_err(|e| format!("count chunks: {e}"))?;
+
+    tracing::info!("rag ingest complete: {docs} docs, {chunks} chunks");
+    Ok(json!({ "status": "ok", "docs": docs, "chunks": chunks }))
 }

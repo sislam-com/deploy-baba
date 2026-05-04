@@ -143,9 +143,22 @@ resource "aws_cloudfront_distribution" "main" {
     cache_policy_id = data.aws_cloudfront_cache_policy.caching_optimized.id
   }
 
-  # Cache behavior for POST /api/contact — routed to API Gateway (no OAC, POST body works)
+  # Cache behaviors for POST /api/* routed via API Gateway (no OAC — body hash works correctly)
+  # Must appear before the general /api/* behavior below so CloudFront matches the specific path first.
   ordered_cache_behavior {
     path_pattern           = "/api/contact"
+    target_origin_id       = "apigw-contact"
+    viewer_protocol_policy = "redirect-to-https"
+
+    allowed_methods = ["GET", "HEAD", "OPTIONS", "PUT", "PATCH", "POST", "DELETE"]
+    cached_methods  = ["GET", "HEAD"]
+
+    cache_policy_id          = data.aws_cloudfront_cache_policy.caching_disabled.id
+    origin_request_policy_id = data.aws_cloudfront_origin_request_policy.all_viewer_except_host.id
+  }
+
+  ordered_cache_behavior {
+    path_pattern           = "/api/ask"
     target_origin_id       = "apigw-contact"
     viewer_protocol_policy = "redirect-to-https"
 

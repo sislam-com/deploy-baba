@@ -35,6 +35,7 @@ resource "aws_lambda_function" "baba" {
       POW_SECRET_ARN        = aws_secretsmanager_secret.pow_secret.arn
       LLM_PROXY_LAMBDA_NAME = aws_lambda_function.llm_proxy.function_name
       RAG_PUBLIC_ENABLED    = "1"
+      S3_BACKUP_BUCKET      = aws_s3_bucket.backups.id
     }
   }
 

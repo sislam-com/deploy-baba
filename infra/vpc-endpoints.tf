@@ -62,3 +62,28 @@ resource "aws_vpc_endpoint" "secretsmanager" {
     Name = "${local.lambda_function_name}-secretsmanager-endpoint"
   }
 }
+
+# ─── VPC Gateway Endpoint: S3 ─────────────────────────────────────────────────
+#
+# Free Gateway endpoint that routes S3 traffic through the AWS backbone so the
+# VPC-bound Lambda (no NAT Gateway) can reach S3 for backup and RAG ingest.
+
+data "aws_route_tables" "main" {
+  vpc_id = data.aws_vpc.default.id
+
+  filter {
+    name   = "association.main"
+    values = ["true"]
+  }
+}
+
+resource "aws_vpc_endpoint" "s3" {
+  vpc_id            = data.aws_vpc.default.id
+  service_name      = "com.amazonaws.${var.region}.s3"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids   = data.aws_route_tables.main.ids
+
+  tags = {
+    Name = "${local.lambda_function_name}-s3-endpoint"
+  }
+}

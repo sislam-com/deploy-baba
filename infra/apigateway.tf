@@ -1,12 +1,12 @@
-# ─── API Gateway HTTP API for POST /api/contact ────────────────────────────────
+# ─── API Gateway HTTP API for POST /api/* that need OAC-bypass ─────────────────
 #
 # CloudFront OAC (AWS_IAM signing) rejects POST bodies because CloudFront sends
 # UNSIGNED-PAYLOAD instead of the actual body hash (DRL-FUA-3, W-AUTH.POST-FIX).
 # This API Gateway HTTP API sits as a second CloudFront origin that receives POST
 # requests WITHOUT OAC signing, forwarding them to the UI Lambda as a proxy.
 #
-# Only POST /api/contact is routed here. All other paths use the Lambda Function
-# URL origin with OAC as usual.
+# Routes served here: POST /api/contact, POST /api/ask.
+# All other paths use the Lambda Function URL origin with OAC as usual.
 
 # HTTP API (V2) — simpler + cheaper than REST API, supports Lambda proxy
 resource "aws_apigatewayv2_api" "contact" {
@@ -33,10 +33,17 @@ resource "aws_apigatewayv2_integration" "contact" {
   payload_format_version = "2.0"
 }
 
-# Route: POST /api/contact only
+# Route: POST /api/contact
 resource "aws_apigatewayv2_route" "contact_post" {
   api_id    = aws_apigatewayv2_api.contact.id
   route_key = "POST /api/contact"
+  target    = "integrations/${aws_apigatewayv2_integration.contact.id}"
+}
+
+# Route: POST /api/ask (same OAC-bypass workaround as /api/contact)
+resource "aws_apigatewayv2_route" "ask_post" {
+  api_id    = aws_apigatewayv2_api.contact.id
+  route_key = "POST /api/ask"
   target    = "integrations/${aws_apigatewayv2_integration.contact.id}"
 }
 
@@ -66,13 +73,13 @@ resource "aws_cloudwatch_log_group" "apigw_contact" {
   }
 }
 
-# Allow API Gateway to invoke the UI Lambda
+# Allow API Gateway to invoke the UI Lambda (covers all POST /api/* routes)
 resource "aws_lambda_permission" "apigw_contact" {
-  statement_id  = "AllowAPIGatewayContactInvoke"
+  statement_id  = "AllowAPIGatewayPostInvoke"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.baba.function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_apigatewayv2_api.contact.execution_arn}/*/*/api/contact"
+  source_arn    = "${aws_apigatewayv2_api.contact.execution_arn}/*/*/api/*"
 }
 
 # ─── Locals ────────────────────────────────────────────────────────────────────
