@@ -2307,6 +2307,7 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -4212,6 +4213,7 @@ name = "xtask"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "api-openapi",
  "aws-config",
  "aws-sdk-dynamodb",
  "aws-sdk-ecr",

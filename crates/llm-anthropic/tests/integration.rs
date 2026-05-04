@@ -39,10 +39,7 @@ macro_rules! skip_without_key {
 fn minimal_req(provider: &AnthropicProvider, content: &str) -> LlmRequest {
     LlmRequest {
         model: provider.default_model().to_owned(),
-        messages: vec![ChatMessage {
-            role: MessageRole::User,
-            content: content.to_owned(),
-        }],
+        messages: vec![ChatMessage::text(MessageRole::User, content)],
         system: None,
         tools: vec![],
         grounding: None,

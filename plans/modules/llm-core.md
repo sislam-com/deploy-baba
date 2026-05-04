@@ -220,13 +220,13 @@ is injected at startup in `main.rs`.
 | W-LLM.4.5 | `llm-anthropic` integration tests: `provider_id_is_anthropic`, `default_model_is_haiku` (CI-safe); `live_generate_*` (3 `#[ignore]` tests, run via `just test-llm PROFILE`) | DONE (2026-04-15) | |
 | W-LLM.4.6 | **Future**: `crates/llm-openai`, `crates/llm-bedrock`, `crates/llm-ollama`, `crates/llm-gemini` — additional `LlmProvider` adapters. Not scheduled. | DEFERRED | |
 | W-LLM.4.7 | **Future**: `crates/llm-fastembed` — local ONNX `EmbeddingProvider` impl. Ships alongside W-RST.4.11. ADR-016 created at that point. | DEFERRED | |
-| W-LLM.4.8 | Add `id: String` field to `ToolCall` struct | TODO | `crates/llm-core/src/types.rs:31`; required for Anthropic tool_result messages |
-| W-LLM.4.9 | Extend `ChatMessage.content` from `String` to `MessageContent` enum (Text + ToolResult) | TODO | Breaking change; add `ChatMessage::text()`, `ChatMessage::tool_result()` convenience constructors |
-| W-LLM.4.10 | Define `ToolExecutor` trait + `ToolResult` struct | TODO | New file `crates/llm-core/src/tool_executor.rs`; `available_tools()`, `execute()` |
-| W-LLM.4.11 | Implement `run_agent_loop()` orchestrator | TODO | New file `crates/llm-core/src/agent_loop.rs`; loops on `StopReason::ToolUse`; safety: `max_turns`, `token_budget` |
-| W-LLM.4.12 | Update `StubLlmProvider` for tool-use testing (`with_tool_response`) | TODO | `crates/llm-core/src/testing.rs`; simulate ToolUse → execute → EndTurn in CI |
-| W-LLM.4.13 | Update Anthropic adapter: parse `id` from `ContentBlock::ToolUse`, serialize `MessageContent::ToolResult` as content-array | TODO | `crates/llm-anthropic/src/lib.rs`; Anthropic tool_result format |
-| W-LLM.4.14 | Migrate all call-sites for `ChatMessage.content` breaking change | TODO | 6 files: grounding.rs, testing.rs, llm-anthropic, llm-proxy, xtask/rag.rs, xtask/resume/generate.rs |
+| W-LLM.4.8 | Add `id: String` field to `ToolCall` struct | DONE | `crates/llm-core/src/types.rs`; Anthropic tool_result id support |
+| W-LLM.4.9 | Extend `ChatMessage.content` from `String` to `MessageContent` enum (Text + ToolResult) | DONE | Breaking change; `ChatMessage::text()`, `ChatMessage::tool_result()`, `text_content()` |
+| W-LLM.4.10 | Define `ToolExecutor` trait + `ToolResult` struct | DONE | `crates/llm-core/src/tool_executor.rs`; `available_tools()`, `execute()` |
+| W-LLM.4.11 | Implement `run_agent_loop()` orchestrator | DONE | `crates/llm-core/src/agent_loop.rs`; loops on `StopReason::ToolUse`; 3 tests |
+| W-LLM.4.12 | Update `StubLlmProvider` for tool-use testing (`with_tool_response`) | DONE | `crates/llm-core/src/testing.rs`; `with_tool_response()`, `with_tool_response_always()` |
+| W-LLM.4.13 | Update Anthropic adapter: parse `id` from `ContentBlock::ToolUse`, serialize `MessageContent::ToolResult` as content-array | DONE | `crates/llm-anthropic/src/lib.rs`; tool_result wire format |
+| W-LLM.4.14 | Migrate all call-sites for `ChatMessage.content` breaking change | DONE | 7 files migrated: grounding.rs, testing.rs, lib.rs doc, llm-anthropic, llm-proxy, xtask/rag.rs, xtask/resume/generate.rs |
 
 ---
 

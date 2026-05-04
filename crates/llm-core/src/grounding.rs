@@ -80,11 +80,10 @@ pub fn assemble_grounded_prompt(mut req: LlmRequest) -> Result<LlmRequest, LlmEr
     // conversation context, not just in the system turn.
     req.messages.insert(
         0,
-        ChatMessage {
-            role: MessageRole::User,
-            content: "Remember: only rephrase the provided [source N] items. Do not invent."
-                .to_owned(),
-        },
+        ChatMessage::text(
+            MessageRole::User,
+            "Remember: only rephrase the provided [source N] items. Do not invent.",
+        ),
     );
 
     Ok(req)
@@ -98,10 +97,7 @@ mod tests {
     fn make_req(grounding: Option<GroundingContract>) -> LlmRequest {
         LlmRequest {
             model: String::new(),
-            messages: vec![ChatMessage {
-                role: MessageRole::User,
-                content: "Rewrite my bullets.".to_owned(),
-            }],
+            messages: vec![ChatMessage::text(MessageRole::User, "Rewrite my bullets.")],
             system: None,
             tools: vec![],
             grounding,
@@ -138,9 +134,9 @@ mod tests {
         assert!(system.contains("[source 2] Reduced latency by 40%"));
         // Reminder message injected at position 0
         assert_eq!(out.messages[0].role, MessageRole::User);
-        assert!(out.messages[0].content.contains("Do not invent"));
+        assert!(out.messages[0].text_content().contains("Do not invent"));
         // Original user message still present
-        assert_eq!(out.messages[1].content, "Rewrite my bullets.");
+        assert_eq!(out.messages[1].text_content(), "Rewrite my bullets.");
     }
 
     #[test]

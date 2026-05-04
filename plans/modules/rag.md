@@ -1,5 +1,5 @@
 # W-RAG: rag-core + rag-sqlite
-**Crate(s):** `crates/rag-core/`, `crates/rag-sqlite/` | **Status:** WIP (P1 DONE, P2/P3 TODO)
+**Crate(s):** `crates/rag-core/`, `crates/rag-sqlite/` | **Status:** WIP (P1 DONE, P4 Phase 9 DONE, P2/P3/P5 TODO)
 **Coverage floor:** 70% | **Depends on:** W-LLM, W-UI, W-OTF | **Depended on by:** (none yet)
 
 ## W-RAG.1 Purpose
@@ -205,13 +205,13 @@ injects this contract via `PromptBundle.system_prompt`.
 | W-RAG.6.1 | `services/ui/src/routes/api/ask.rs` + router wiring | DONE (2026-04-15) | POST /api/ask; Arc<RagStore> in AppState; WAL concurrent reader |
 | W-RAG.6.2 | Bundle `sqlite-vec` aarch64 SO into Lambda zip | TODO | P2; confirm binary size (~300 KB) |
 | W-RAG.6.3 | Rate-limit + `RAG_PUBLIC_ENABLED` feature flag | DONE (updated 2026-05-01) | `ASK_RATE_LIMIT` env var (default 2/min); IP from `x-forwarded-for` first → `ConnectInfo` → `"unknown"` (Lambda fix — was 127.0.0.1 global bucket); `RAG_PUBLIC_ENABLED=1` gate |
-| W-RAG.7.1 | Add `OpenApi` + `Portfolio` variants to `SourceKind` enum + `as_str()`/`Display` | TODO | `crates/rag-core/src/types.rs` — extends 4→6 variants |
-| W-RAG.7.2 | OpenAPI chunker: parse JSON spec, emit one chunk per path-operation + per component schema | TODO | New file `crates/rag-core/src/chunk/openapi.rs`; meta: `{"endpoint": "GET /api/jobs"}` |
-| W-RAG.7.3 | Portfolio data chunker: JSON-serialized jobs/competencies/about → readable prose chunks | TODO | New file `crates/rag-core/src/chunk/portfolio.rs`; one chunk per entity |
-| W-RAG.7.4 | Wire new chunkers into `chunk_file()` dispatcher | TODO | `crates/rag-core/src/chunk/mod.rs` — 2 new match arms |
-| W-RAG.7.5 | Extend `xtask rag ingest` to emit OpenAPI + portfolio corpora (6 total) | TODO | `xtask/src/rag.rs`; OpenAPI via `full_spec()`, portfolio via SQLite query |
-| W-RAG.8.1 | Enhance `DefaultPromptAssembler` for portfolio/API-aware system prompt | TODO | `crates/rag-core/src/lib.rs:93`; inspect `source_kind` of retrieved chunks |
-| W-RAG.8.2 | Add `retrieve_filtered()` with optional `source_kind IN (...)` clause | TODO | `crates/rag-sqlite/src/lib.rs`; default `retrieve()` delegates with `None` |
+| W-RAG.7.1 | Add `OpenApi` + `Portfolio` variants to `SourceKind` enum + `as_str()`/`Display` | DONE | `crates/rag-core/src/types.rs` — 6 variants |
+| W-RAG.7.2 | OpenAPI chunker: parse JSON spec, emit one chunk per path-operation + per component schema | DONE | `crates/rag-core/src/chunk/openapi.rs`; 6 tests |
+| W-RAG.7.3 | Portfolio data chunker: JSON-serialized jobs/competencies/about → readable prose chunks | DONE | `crates/rag-core/src/chunk/portfolio.rs`; 5 tests |
+| W-RAG.7.4 | Wire new chunkers into `chunk_file()` dispatcher | DONE | `crates/rag-core/src/chunk/mod.rs` — 2 new match arms |
+| W-RAG.7.5 | Extend `xtask rag ingest` to emit OpenAPI + portfolio corpora (6 total) | DONE | `xtask/src/rag.rs`; OpenAPI via `full_spec()`, portfolio via SQLite query |
+| W-RAG.8.1 | Enhance `DefaultPromptAssembler` for portfolio/API-aware system prompt | DONE | `crates/rag-core/src/lib.rs`; portfolio-aware preamble; 2 tests |
+| W-RAG.8.2 | Add `retrieve_filtered()` with optional `source_kind IN (...)` clause | DONE | `crates/rag-sqlite/src/lib.rs`; `source_kind IN` filter; 2 tests |
 | W-RAG.9.1 | `PortfolioDataProvider` trait in `rag-core` for live DB queries at ask-time | TODO | New file `crates/rag-core/src/portfolio.rs`; `serde_json::Value` return |
 | W-RAG.9.2 | Implement `PortfolioDataProvider` for `Db` (reuse existing SQL queries) | TODO | `services/ui/src/db.rs` or new `portfolio_data.rs` |
 | W-RAG.9.3 | `HybridRetriever` combining FTS + live portfolio virtual chunks | TODO | Merges indexed + live data; `source_kind="portfolio"`, `git_sha="live"` |

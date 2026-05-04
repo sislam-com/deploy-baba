@@ -65,10 +65,7 @@ async fn handler(event: LambdaEvent<AskProxyRequest>) -> Result<AskProxyResponse
     let provider = AnthropicProvider::new(api_key);
     let llm_req = LlmRequest {
         model: provider.default_model().to_owned(),
-        messages: vec![ChatMessage {
-            role: MessageRole::User,
-            content: req.user_message,
-        }],
+        messages: vec![ChatMessage::text(MessageRole::User, req.user_message)],
         system: Some(req.system_prompt),
         tools: vec![],
         grounding: None,

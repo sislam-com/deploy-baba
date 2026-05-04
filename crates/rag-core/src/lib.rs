@@ -90,11 +90,23 @@ impl PromptAssembler for DefaultPromptAssembler {
             });
         }
 
+        let has_portfolio_sources = chunks
+            .iter()
+            .any(|c| c.source_kind == "portfolio" || c.source_kind == "openapi");
+
+        let preamble = if has_portfolio_sources {
+            "You are the portfolio assistant for a senior Rust engineer and cloud architect. \
+             When sources include portfolio data (jobs, competencies, about sections), answer \
+             as the portfolio owner's assistant. When sources include API documentation, \
+             explain endpoints precisely with method, path, parameters, and response shapes. "
+        } else {
+            "You are an expert on the deploy-baba codebase. "
+        };
+
         let system_prompt = format!(
-            "You are an expert on the deploy-baba codebase. Answer the user's question \
-             using ONLY the sources provided below. Cite every claim with [source N] \
-             where N matches the source number. Do not invent information not present \
-             in the sources.\n\n{sources_text}"
+            "{preamble}Answer the user's question using ONLY the sources provided below. \
+             Cite every claim with [source N] where N matches the source number. \
+             Do not invent information not present in the sources.\n\n{sources_text}"
         );
 
         let user_message = query.to_owned();
@@ -146,5 +158,33 @@ mod tests {
         let assembler = DefaultPromptAssembler;
         let bundle = assembler.assemble("what?", &[]);
         assert!(bundle.citations.is_empty());
+    }
+
+    #[test]
+    fn portfolio_chunks_get_portfolio_preamble() {
+        let assembler = DefaultPromptAssembler;
+        let chunks = vec![
+            RankedChunk {
+                source_kind: "portfolio".to_string(),
+                ..make_chunk(0, "Job: Engineer at Acme")
+            },
+            RankedChunk {
+                source_kind: "plan".to_string(),
+                ..make_chunk(1, "ADR-002 text")
+            },
+        ];
+        let bundle = assembler.assemble("what jobs?", &chunks);
+        assert!(bundle.system_prompt.contains("portfolio owner's assistant"));
+    }
+
+    #[test]
+    fn code_only_chunks_get_codebase_preamble() {
+        let assembler = DefaultPromptAssembler;
+        let chunks = vec![make_chunk(0, "fn main() {}")];
+        let bundle = assembler.assemble("what does main do?", &chunks);
+        assert!(bundle
+            .system_prompt
+            .contains("expert on the deploy-baba codebase"));
+        assert!(!bundle.system_prompt.contains("portfolio owner's assistant"));
     }
 }

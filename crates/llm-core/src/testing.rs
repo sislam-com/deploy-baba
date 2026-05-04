@@ -16,7 +16,7 @@
 //!
 //!     let req = LlmRequest {
 //!         model: String::new(),
-//!         messages: vec![ChatMessage { role: MessageRole::User, content: "Please rewrite this.".to_owned() }],
+//!         messages: vec![ChatMessage::text(MessageRole::User, "Please rewrite this.")],
 //!         system: None,
 //!         tools: vec![],
 //!         grounding: None,
@@ -28,18 +28,22 @@
 //! ```
 
 use crate::error::LlmError;
-use crate::types::{LlmRequest, LlmResponse, StopReason};
+use crate::types::{LlmRequest, LlmResponse, StopReason, ToolCall};
 use async_trait::async_trait;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// A deterministic stub that returns canned responses without network calls.
 ///
 /// Match rules are evaluated in insertion order; the first rule whose key is
 /// a substring of the concatenated user message content wins. Falls back to
 /// `default_response` if no rule matches.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 pub struct StubLlmProvider {
     rules: Vec<(String, String)>,
     default_response: String,
+    tool_rules: Vec<(String, Vec<ToolCall>)>,
+    always_tool_calls: Option<Vec<ToolCall>>,
+    call_count: AtomicUsize,
 }
 
 impl StubLlmProvider {
@@ -47,6 +51,9 @@ impl StubLlmProvider {
         Self {
             rules: Vec::new(),
             default_response: "stub response".to_owned(),
+            tool_rules: Vec::new(),
+            always_tool_calls: None,
+            call_count: AtomicUsize::new(0),
         }
     }
 
@@ -63,6 +70,21 @@ impl StubLlmProvider {
         self.default_response = response.into();
         self
     }
+
+    /// On the first call matching `key`, return a ToolUse stop reason with these tool calls.
+    /// Subsequent calls fall through to text rules.
+    #[must_use]
+    pub fn with_tool_response(mut self, key: impl Into<String>, calls: Vec<ToolCall>) -> Self {
+        self.tool_rules.push((key.into(), calls));
+        self
+    }
+
+    /// Always return ToolUse stop reason (for testing max_turns exhaustion).
+    #[must_use]
+    pub fn with_tool_response_always(mut self, calls: Vec<ToolCall>) -> Self {
+        self.always_tool_calls = Some(calls);
+        self
+    }
 }
 
 #[async_trait]
@@ -76,14 +98,45 @@ impl crate::LlmProvider for StubLlmProvider {
     }
 
     async fn generate(&self, req: LlmRequest) -> Result<LlmResponse, LlmError> {
+        let call_num = self.call_count.fetch_add(1, Ordering::SeqCst);
+
         let user_content: String = req
             .messages
             .iter()
             .filter(|m| matches!(m.role, crate::types::MessageRole::User))
-            .map(|m| m.content.as_str())
+            .map(|m| m.text_content())
             .collect::<Vec<_>>()
             .join(" ");
 
+        // Always-tool mode (for exhaustion testing)
+        if let Some(calls) = &self.always_tool_calls {
+            return Ok(LlmResponse {
+                content: String::new(),
+                tool_calls: calls.clone(),
+                input_tokens: 0,
+                output_tokens: 0,
+                model: "stub-model".to_owned(),
+                stop_reason: StopReason::ToolUse,
+            });
+        }
+
+        // Tool rules: fire once (first call matching key)
+        if call_num == 0 {
+            for (key, calls) in &self.tool_rules {
+                if user_content.contains(key.as_str()) {
+                    return Ok(LlmResponse {
+                        content: String::new(),
+                        tool_calls: calls.clone(),
+                        input_tokens: 0,
+                        output_tokens: 0,
+                        model: "stub-model".to_owned(),
+                        stop_reason: StopReason::ToolUse,
+                    });
+                }
+            }
+        }
+
+        // Text rules
         let content = self
             .rules
             .iter()
@@ -110,10 +163,7 @@ mod tests {
     fn req(content: &str) -> LlmRequest {
         LlmRequest {
             model: String::new(),
-            messages: vec![ChatMessage {
-                role: MessageRole::User,
-                content: content.to_owned(),
-            }],
+            messages: vec![ChatMessage::text(MessageRole::User, content)],
             system: None,
             tools: vec![],
             grounding: None,

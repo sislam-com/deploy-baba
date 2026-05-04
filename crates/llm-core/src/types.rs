@@ -1,11 +1,59 @@
 use crate::grounding::GroundingContract;
 use serde::{Deserialize, Serialize};
 
+/// Content of a chat message — either plain text or a tool result.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum MessageContent {
+    Text {
+        text: String,
+    },
+    ToolResult {
+        tool_use_id: String,
+        content: String,
+        #[serde(default)]
+        is_error: bool,
+    },
+}
+
 /// A single message in a chat conversation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatMessage {
     pub role: MessageRole,
-    pub content: String,
+    pub content: MessageContent,
+}
+
+impl ChatMessage {
+    pub fn text(role: MessageRole, content: impl Into<String>) -> Self {
+        Self {
+            role,
+            content: MessageContent::Text {
+                text: content.into(),
+            },
+        }
+    }
+
+    pub fn tool_result(
+        tool_use_id: impl Into<String>,
+        content: impl Into<String>,
+        is_error: bool,
+    ) -> Self {
+        Self {
+            role: MessageRole::User,
+            content: MessageContent::ToolResult {
+                tool_use_id: tool_use_id.into(),
+                content: content.into(),
+                is_error,
+            },
+        }
+    }
+
+    pub fn text_content(&self) -> &str {
+        match &self.content {
+            MessageContent::Text { text } => text,
+            MessageContent::ToolResult { content, .. } => content,
+        }
+    }
 }
 
 /// Role of a message participant.
@@ -29,6 +77,7 @@ pub struct ToolDef {
 /// A tool call produced by the model in a response.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolCall {
+    pub id: String,
     pub name: String,
     /// Parsed arguments as returned by the model.
     pub arguments: serde_json::Value,

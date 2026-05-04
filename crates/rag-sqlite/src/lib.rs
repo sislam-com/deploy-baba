@@ -149,6 +149,105 @@ impl RagStore {
         conn.query_row("SELECT COUNT(*) FROM rag_documents", [], |row| row.get(0))
             .map_err(|e| RagError::Database(e.to_string()))
     }
+
+    /// Retrieve chunks filtered by optional `source_kind` values.
+    ///
+    /// When `kinds` is `None`, retrieves from all source kinds (same as `retrieve`).
+    /// When `kinds` is `Some(&["portfolio", "openapi"])`, restricts results to those kinds.
+    pub fn retrieve_filtered(
+        &self,
+        query: &str,
+        top_k: usize,
+        kinds: Option<&[&str]>,
+    ) -> Result<Vec<RankedChunk>, RagError> {
+        let conn = self.conn.lock().unwrap();
+        let fts_query = to_fts5_or_query(query);
+
+        let (sql, bind_count) = match kinds {
+            None => (
+                "SELECT rc.id, rc.document_id, rd.source_kind, rd.source_path, rd.git_sha,
+                        rc.ord, rc.content, bm25(rag_chunks_fts) AS score
+                 FROM rag_chunks_fts
+                 JOIN rag_chunks   rc ON rc.id  = rag_chunks_fts.rowid
+                 JOIN rag_documents rd ON rd.id = rc.document_id
+                 WHERE rag_chunks_fts MATCH ?1
+                 ORDER BY score
+                 LIMIT ?2"
+                    .to_string(),
+                0,
+            ),
+            Some([]) => return Ok(Vec::new()),
+            Some(ks) => {
+                let placeholders: Vec<String> =
+                    (0..ks.len()).map(|i| format!("?{}", i + 3)).collect();
+                let in_clause = placeholders.join(", ");
+                (
+                    format!(
+                        "SELECT rc.id, rc.document_id, rd.source_kind, rd.source_path, rd.git_sha,
+                                rc.ord, rc.content, bm25(rag_chunks_fts) AS score
+                         FROM rag_chunks_fts
+                         JOIN rag_chunks   rc ON rc.id  = rag_chunks_fts.rowid
+                         JOIN rag_documents rd ON rd.id = rc.document_id
+                         WHERE rag_chunks_fts MATCH ?1
+                           AND rd.source_kind IN ({in_clause})
+                         ORDER BY score
+                         LIMIT ?2"
+                    ),
+                    ks.len(),
+                )
+            }
+        };
+
+        let mut stmt = conn
+            .prepare(&sql)
+            .map_err(|e| RagError::Database(e.to_string()))?;
+
+        let rows = if bind_count == 0 {
+            stmt.query_map(params![fts_query, top_k as i64], |row| {
+                Ok(RankedChunk {
+                    chunk_id: row.get(0)?,
+                    document_id: row.get(1)?,
+                    source_kind: row.get(2)?,
+                    source_path: row.get(3)?,
+                    git_sha: row.get(4)?,
+                    ord: row.get(5)?,
+                    content: row.get(6)?,
+                    score: -(row.get::<_, f64>(7)?),
+                })
+            })
+            .map_err(|e| RagError::Database(e.to_string()))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| RagError::Database(e.to_string()))?
+        } else {
+            let kinds_slice = kinds.unwrap();
+            let mut param_values: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+            param_values.push(Box::new(fts_query.clone()));
+            param_values.push(Box::new(top_k as i64));
+            for k in kinds_slice {
+                param_values.push(Box::new(k.to_string()));
+            }
+            let param_refs: Vec<&dyn rusqlite::types::ToSql> =
+                param_values.iter().map(|p| p.as_ref()).collect();
+
+            stmt.query_map(param_refs.as_slice(), |row| {
+                Ok(RankedChunk {
+                    chunk_id: row.get(0)?,
+                    document_id: row.get(1)?,
+                    source_kind: row.get(2)?,
+                    source_path: row.get(3)?,
+                    git_sha: row.get(4)?,
+                    ord: row.get(5)?,
+                    content: row.get(6)?,
+                    score: -(row.get::<_, f64>(7)?),
+                })
+            })
+            .map_err(|e| RagError::Database(e.to_string()))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| RagError::Database(e.to_string()))?
+        };
+
+        Ok(rows)
+    }
 }
 
 // ── Retriever impl ────────────────────────────────────────────────────────
@@ -189,42 +288,7 @@ fn to_fts5_or_query(query: &str) -> String {
 #[async_trait]
 impl Retriever for RagStore {
     async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<RankedChunk>, RagError> {
-        let conn = self.conn.lock().unwrap();
-        let fts_query = to_fts5_or_query(query);
-
-        let mut stmt = conn
-            .prepare(
-                "SELECT rc.id, rc.document_id, rd.source_kind, rd.source_path, rd.git_sha,
-                        rc.ord, rc.content, bm25(rag_chunks_fts) AS score
-                 FROM rag_chunks_fts
-                 JOIN rag_chunks   rc ON rc.id  = rag_chunks_fts.rowid
-                 JOIN rag_documents rd ON rd.id = rc.document_id
-                 WHERE rag_chunks_fts MATCH ?1
-                 ORDER BY score
-                 LIMIT ?2",
-            )
-            .map_err(|e| RagError::Database(e.to_string()))?;
-
-        let rows = stmt
-            .query_map(params![fts_query, top_k as i64], |row| {
-                Ok(RankedChunk {
-                    chunk_id: row.get(0)?,
-                    document_id: row.get(1)?,
-                    source_kind: row.get(2)?,
-                    source_path: row.get(3)?,
-                    git_sha: row.get(4)?,
-                    ord: row.get(5)?,
-                    content: row.get(6)?,
-                    // BM25 in SQLite returns negative values (lower = more relevant).
-                    // Negate so that higher score = more relevant (conventional).
-                    score: -(row.get::<_, f64>(7)?),
-                })
-            })
-            .map_err(|e| RagError::Database(e.to_string()))?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| RagError::Database(e.to_string()))?;
-
-        Ok(rows)
+        self.retrieve_filtered(query, top_k, None)
     }
 }
 
@@ -338,5 +402,51 @@ mod tests {
             !results.is_empty(),
             "OR query should match on 'sqlite' even when other terms miss"
         );
+    }
+
+    #[test]
+    fn retrieve_filtered_by_kind() {
+        let store = RagStore::in_memory().unwrap();
+        store
+            .upsert_document(
+                "rust",
+                "crates/lib.rs",
+                "sha1",
+                &fixture_chunks(&["Rust systems programming language."]),
+            )
+            .unwrap();
+        store
+            .upsert_document(
+                "portfolio",
+                "portfolio/jobs.json",
+                "sha1",
+                &fixture_chunks(&["Job: Senior Rust Engineer at Acme Corp."]),
+            )
+            .unwrap();
+
+        let all = store.retrieve_filtered("Rust", 10, None).unwrap();
+        assert_eq!(all.len(), 2, "unfiltered should return both");
+
+        let portfolio_only = store
+            .retrieve_filtered("Rust", 10, Some(&["portfolio"]))
+            .unwrap();
+        assert_eq!(portfolio_only.len(), 1);
+        assert_eq!(portfolio_only[0].source_kind, "portfolio");
+
+        let rust_only = store
+            .retrieve_filtered("Rust", 10, Some(&["rust"]))
+            .unwrap();
+        assert_eq!(rust_only.len(), 1);
+        assert_eq!(rust_only[0].source_kind, "rust");
+    }
+
+    #[test]
+    fn retrieve_filtered_empty_kinds_returns_empty() {
+        let store = RagStore::in_memory().unwrap();
+        store
+            .upsert_document("plan", "test.md", "sha", &fixture_chunks(&["content"]))
+            .unwrap();
+        let results = store.retrieve_filtered("content", 10, Some(&[])).unwrap();
+        assert!(results.is_empty());
     }
 }
