@@ -1,5 +1,5 @@
 # W-AIL: AI Development Lifecycle
-**Path:** `.claude/` | **Status:** TODO
+**Path:** `.claude/` | **Status:** DONE
 **Coverage floor:** n/a | **Depends on:** W-DX | **Depended on by:** all modules
 
 ## W-AIL.1 Purpose

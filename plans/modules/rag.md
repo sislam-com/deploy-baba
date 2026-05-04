@@ -186,6 +186,7 @@ injects this contract via `PromptBundle.system_prompt`.
 - → ADR-010 (upsert convention — all rag_* INSERTs)
 - → ADR-015 (W-LLM — Embedder + generate traits consumed here)
 - → ADR-016 (RAG architecture decision record)
+- → ADR-019 (SPA replaces Askama — RAG UI is React, not server-rendered)
 - → `cross-cutting/llm-policy.md` (grounding contract, citation format)
 - ← W-UI (P3: `/api/ask` route lives in ui-service)
 - ← W-XT (xtask rag subcommands)

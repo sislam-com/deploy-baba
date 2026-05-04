@@ -161,6 +161,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | DRL-2026-05-03-coverage-floors | 2026-05-03 | 9/10 library crates below coverage floors; `get_crate_coverage` TOTAL line inflated by workspace deps | **RESOLVED 2026-05-03** — tests added to all 9 crates; `get_crate_coverage` rewritten for per-file aggregation; all floors pass |
 | DRL-2026-05-03-rustsec-webpki-cves | 2026-05-03 | `cargo audit` failing: RUSTSEC-2026-0098/0099/0104 in `rustls-webpki 0.101.7` (via `aws-sdk-*` default features → `hyper-rustls 0.24` → `rustls 0.21`) | **RESOLVED 2026-05-03** — `default-features = false` on all `aws-sdk-*` workspace deps; only `rustls-webpki 0.103.13` remains |
 | DRL-2026-05-04-sislam-outage | 2026-05-04 | sislam.com + dev.sislam.com 404ing — EFS SPA mount never applied; SPA bucket empty | **RESOLVED 2026-05-04** — CF→S3 direct serving; deploy-config SM secret; Lambda SPA code removed; both domains 200 |
+| DRL-2026-05-04-adr009-ask-api-scope | 2026-05-04 | ADR-009 claims API GW is for `POST /api/contact` only; `/api/ask` also added; rate limit not enforced | Open — update ADR-009 text; enforce 2-req rate limit in prod |
 
 ---
 
