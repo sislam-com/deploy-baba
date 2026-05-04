@@ -52,6 +52,26 @@ resource "aws_secretsmanager_secret_version" "anthropic_api_key_placeholder" {
   }
 }
 
+# --- deploy-config: CI/CD deploy identifiers, self-populated from infra outputs ---
+# Re-populated on every `just infra-apply`. CI reads this to avoid storing
+# bucket/distribution IDs in GitHub Variables (W-SEC alignment).
+
+resource "aws_secretsmanager_secret" "deploy_config" {
+  name        = "${var.project_name}/${var.environment}/deploy-config"
+  description = "CI/CD deploy identifiers — auto-populated by tofu apply"
+  tags        = { Name = "${var.project_name}-deploy-config" }
+}
+
+resource "aws_secretsmanager_secret_version" "deploy_config" {
+  secret_id = aws_secretsmanager_secret.deploy_config.id
+  secret_string = jsonencode({
+    spa_bucket    = aws_s3_bucket.spa.id
+    cloudfront_id = aws_cloudfront_distribution.main.id
+    ui_fn_name    = aws_lambda_function.baba.function_name
+    fn_url        = "https://${var.domain_name}"
+  })
+}
+
 # --- IAM: Lambda can read managed secrets ---
 
 resource "aws_iam_role_policy" "lambda_secretsmanager" {

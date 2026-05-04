@@ -640,4 +640,150 @@ message Post {
         );
         assert!(result2.is_ok());
     }
+
+    #[test]
+    fn test_unified_api_spec_to_json_all_variants() {
+        let openapi = create_test_openapi_spec("Test");
+        assert!(openapi.to_json().is_ok());
+
+        let graphql = create_test_graphql_spec("type User { id: ID! }");
+        assert!(graphql.to_json().is_ok());
+
+        let grpc = create_test_grpc_spec("test", "syntax = \"proto3\";");
+        assert!(grpc.to_json().is_ok());
+    }
+
+    #[test]
+    fn test_unified_api_spec_content_all_variants() {
+        let openapi = create_test_openapi_spec("Test");
+        let content = openapi.content();
+        assert!(!content.is_empty());
+
+        let graphql = create_test_graphql_spec("type User { id: ID! }");
+        assert_eq!(graphql.content(), "type User { id: ID! }");
+
+        let grpc = create_test_grpc_spec("test", "syntax = \"proto3\";");
+        assert_eq!(grpc.content(), "syntax = \"proto3\";");
+    }
+
+    #[test]
+    fn test_merge_error_variants_display() {
+        let err = MergeError::EmptySpecificationList;
+        assert!(err.to_string().contains("empty"));
+
+        let err = MergeError::FormatMismatch {
+            expected: SpecFormat::OpenApi,
+            found: SpecFormat::GraphQL,
+        };
+        assert!(err.to_string().contains("mismatch"));
+
+        let err = MergeError::UnsupportedFormat(SpecFormat::AsyncApi);
+        assert!(err.to_string().contains("Unsupported"));
+
+        let err = MergeError::MergeFailed("something".to_string());
+        assert!(err.to_string().contains("Merge failed"));
+
+        let err = MergeError::ValidationFailed(vec![SpecValidationError::new("f", "m")]);
+        assert!(err.to_string().contains("Validation"));
+
+        let err = MergeError::ConflictResolutionFailed("conflict".to_string());
+        assert!(err.to_string().contains("Conflict"));
+    }
+
+    #[test]
+    fn test_from_spec_error_for_merge_error() {
+        let spec_err = SpecError::MergeError("test".to_string());
+        let merge_err: MergeError = spec_err.into();
+        assert!(matches!(merge_err, MergeError::MergeFailed(_)));
+    }
+
+    #[test]
+    fn test_conflict_type_variants() {
+        let types = [
+            ConflictType::DuplicateType,
+            ConflictType::DuplicatePath,
+            ConflictType::IncompatibleType,
+            ConflictType::PackageConflict,
+            ConflictType::VersionMismatch,
+        ];
+        assert_eq!(types.len(), 5);
+        assert_eq!(ConflictType::DuplicateType, ConflictType::DuplicateType);
+        assert_ne!(ConflictType::DuplicatePath, ConflictType::VersionMismatch);
+    }
+
+    #[test]
+    fn test_validation_disabled_skips_validate_merged_spec() {
+        let spec1 = create_test_openapi_spec("Service1");
+        let spec2 = create_test_openapi_spec("Service2");
+
+        let merger = SpecificationMerger::new(SpecFormat::OpenApi).with_validation(false);
+        let result = merger.merge_specifications(vec![spec1, spec2]);
+        assert!(result.is_ok());
+        assert!(!result.unwrap().metadata.validated);
+    }
+
+    #[test]
+    fn test_non_fail_on_conflict_graphql_records_conflict() {
+        let spec1 = create_test_graphql_spec("type User { id: ID! }");
+        let spec2 = create_test_graphql_spec("type User { name: String! }");
+
+        let merger = SpecificationMerger::new(SpecFormat::GraphQL)
+            .with_conflict_resolution(ConflictResolutionStrategy::FirstWins);
+        let result = merger.merge_specifications(vec![spec1, spec2]);
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), MergeError::MergeFailed(_)));
+    }
+
+    #[test]
+    fn test_non_fail_on_conflict_grpc_records_conflict() {
+        let spec1 = create_test_grpc_spec("a", "syntax = \"proto3\";\npackage a;\nmessage A {}\n");
+        let spec2 = create_test_grpc_spec("b", "syntax = \"proto3\";\npackage b;\nmessage B {}\n");
+
+        let merger = SpecificationMerger::new(SpecFormat::Grpc)
+            .with_conflict_resolution(ConflictResolutionStrategy::LastWins);
+        let result = merger.merge_specifications(vec![spec1, spec2]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_non_fail_on_conflict_openapi_records_conflict() {
+        use utoipa::openapi::{InfoBuilder, OpenApiBuilder, PathItem, PathsBuilder};
+
+        fn make_spec_with_path(title: &str, path: &str) -> UnifiedApiSpec {
+            let openapi = OpenApiBuilder::new()
+                .info(InfoBuilder::new().title(title).version("1.0").build())
+                .paths(PathsBuilder::new().path(path, PathItem::default()).build())
+                .build();
+            let metadata = OpenApiMetadata {
+                generator: "test".to_string(),
+                generated_at: "2025-01-01T00:00:00Z".to_string(),
+                validated: true,
+                path_count: 1,
+                schema_count: 0,
+            };
+            UnifiedApiSpec::OpenApi(Box::new(OpenApiSpec { openapi, metadata }))
+        }
+
+        let spec1 = make_spec_with_path("S1", "/users");
+        let spec2 = make_spec_with_path("S2", "/users");
+
+        let merger = SpecificationMerger::new(SpecFormat::OpenApi)
+            .with_conflict_resolution(ConflictResolutionStrategy::Merge);
+        let result = merger.merge_specifications(vec![spec1, spec2]);
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), MergeError::MergeFailed(_)));
+    }
+
+    #[test]
+    fn test_merge_metadata_fields() {
+        let spec1 = create_test_openapi_spec("S1");
+        let spec2 = create_test_openapi_spec("S2");
+
+        let result = merge_specifications(SpecFormat::OpenApi, vec![spec1, spec2]);
+        let merged = result.unwrap();
+        assert_eq!(merged.metadata.source_count, 2);
+        assert_eq!(merged.metadata.format, SpecFormat::OpenApi);
+        assert!(!merged.metadata.merged_at.is_empty());
+        assert_eq!(merged.metadata.resolution_strategy, "FailOnConflict");
+    }
 }

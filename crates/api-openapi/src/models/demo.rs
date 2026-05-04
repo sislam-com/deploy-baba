@@ -116,3 +116,31 @@ impl ApiModel for GenerateSpecResponse {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_demo_models_example() {
+        let req = ParseConfigRequest::example();
+        assert_eq!(ParseConfigRequest::schema_name(), "ParseConfigRequest");
+        assert!(!req.format.is_empty());
+
+        let resp = ParseConfigResponse::example();
+        assert_eq!(ParseConfigResponse::schema_name(), "ParseConfigResponse");
+        assert!(resp.success);
+
+        let field = Field::example();
+        assert_eq!(Field::schema_name(), "Field");
+        assert!(!field.name.is_empty());
+
+        let spec_req = GenerateSpecRequest::example();
+        assert_eq!(GenerateSpecRequest::schema_name(), "GenerateSpecRequest");
+        assert!(!spec_req.title.is_empty());
+
+        let spec_resp = GenerateSpecResponse::example();
+        assert_eq!(GenerateSpecResponse::schema_name(), "GenerateSpecResponse");
+        assert!(spec_resp.spec.is_object());
+    }
+}

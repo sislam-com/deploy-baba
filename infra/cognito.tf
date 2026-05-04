@@ -52,11 +52,13 @@ resource "aws_cognito_user_pool_client" "baba_web" {
 
   callback_urls = [
     "https://${var.domain_name}/auth/callback",
+    "https://dev.${var.domain_name}/auth/callback",
     "http://localhost:3000/auth/callback",
   ]
 
   logout_urls = [
     "https://${var.domain_name}",
+    "https://dev.${var.domain_name}",
     "http://localhost:3000",
   ]
 

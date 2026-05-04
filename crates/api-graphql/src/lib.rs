@@ -613,4 +613,115 @@ type User {
             assert!(msg.contains("Duplicate type"));
         }
     }
+
+    #[test]
+    fn test_graphql_generator_default() {
+        let _gen = GraphQLGenerator::<QueryRoot>::default();
+    }
+
+    #[test]
+    fn test_merge_specs_empty_returns_error() {
+        let result = GraphQLGenerator::<QueryRoot>::merge_specs(vec![]);
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), SpecError::MergeError(_)));
+    }
+
+    #[test]
+    fn test_merge_specs_single_returns_ok() {
+        let schema = QueryRoot::schema_definition();
+        let spec = GraphQLGenerator::<QueryRoot>::generate_spec(schema).unwrap();
+        let sdl = spec.sdl.clone();
+        let result = GraphQLGenerator::<QueryRoot>::merge_specs(vec![spec]);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().sdl, sdl);
+    }
+
+    #[test]
+    fn test_mutation_subscription_counting() {
+        let sdl = r#"type Mutation {
+    createUser(name: String!): User!
+    deleteUser(id: ID!): Boolean!
+}
+type Subscription {
+    userAdded: User!
+}"#;
+        assert_eq!(count_operations(sdl, "Mutation"), 2);
+        assert_eq!(count_operations(sdl, "Subscription"), 1);
+        assert_eq!(count_operations(sdl, "Query"), 0);
+    }
+
+    #[test]
+    fn test_graphql_spec_debug_format() {
+        let schema = QueryRoot::schema_definition();
+        let spec = GraphQLGenerator::<QueryRoot>::generate_spec(schema).unwrap();
+        let debug_str = format!("{:?}", spec);
+        assert!(debug_str.contains("GraphQLSpec"));
+        assert!(debug_str.contains("sdl_length"));
+    }
+
+    #[test]
+    fn test_graphql_error_conversions() {
+        let err = GraphQLSpecError::Schema("schema error".to_string());
+        let spec_err: SpecError = err.into();
+        assert!(matches!(spec_err, SpecError::GenerationFailed(_)));
+
+        let err = GraphQLSpecError::SdlParsing("parse error".to_string());
+        let spec_err: SpecError = err.into();
+        assert!(matches!(spec_err, SpecError::GenerationFailed(_)));
+
+        let err = GraphQLSpecError::Validation(vec![SpecValidationError::new("f", "msg")]);
+        let spec_err: SpecError = err.into();
+        assert!(matches!(spec_err, SpecError::InvalidSchema(_)));
+
+        let spec_err = SpecError::InvalidSchema("invalid".to_string());
+        let gql_err: GraphQLSpecError = spec_err.into();
+        assert!(matches!(gql_err, GraphQLSpecError::Schema(_)));
+
+        let spec_err = SpecError::MergeError("merge failed".to_string());
+        let gql_err: GraphQLSpecError = spec_err.into();
+        assert!(matches!(gql_err, GraphQLSpecError::Schema(_)));
+    }
+
+    #[test]
+    fn test_validate_graphql_types_duplicate_input() {
+        let sdl = r#"type Query { hello: String }
+input CreateUserInput { name: String! }
+input CreateUserInput { email: String! }"#;
+        let result = validate_graphql_types(sdl);
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors.iter().any(|e| e.message.contains("CreateUserInput")));
+    }
+
+    #[test]
+    fn test_merge_with_interface_type() {
+        let spec1 = GraphQLSpec {
+            sdl: "interface Node { id: ID! }\ntype User implements Node { id: ID! }".to_string(),
+            metadata: GraphQLMetadata {
+                generator: "test".to_string(),
+                generated_at: "2025-01-01T00:00:00Z".to_string(),
+                validated: true,
+                type_count: 2,
+                query_count: 0,
+                mutation_count: 0,
+                subscription_count: 0,
+            },
+        };
+        let spec2 = GraphQLSpec {
+            sdl: "type Post { id: ID! }".to_string(),
+            metadata: GraphQLMetadata {
+                generator: "test".to_string(),
+                generated_at: "2025-01-01T00:00:00Z".to_string(),
+                validated: true,
+                type_count: 1,
+                query_count: 0,
+                mutation_count: 0,
+                subscription_count: 0,
+            },
+        };
+        let result = merge_graphql_schemas(vec![spec1, spec2]);
+        assert!(result.is_ok());
+        let merged = result.unwrap();
+        assert!(merged.sdl.contains("interface Node"));
+    }
 }

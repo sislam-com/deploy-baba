@@ -34,8 +34,6 @@ resource "aws_lambda_function" "baba" {
       COGNITO_JWKS          = data.http.cognito_jwks.response_body
       POW_SECRET_ARN        = aws_secretsmanager_secret.pow_secret.arn
       ANTHROPIC_API_KEY_ARN = aws_secretsmanager_secret.anthropic_api_key.arn
-      SPA_ROOT              = "/mnt/spa/active"
-      SPA_BUCKET            = aws_s3_bucket.spa.id
     }
   }
 
@@ -58,7 +56,6 @@ resource "aws_lambda_function" "baba" {
     aws_iam_role_policy_attachment.lambda_vpc,
     aws_iam_role_policy.lambda_efs,
     aws_iam_role_policy.lambda_s3,
-    aws_iam_role_policy.lambda_s3_spa,
     aws_iam_role_policy.lambda_ssm,
     aws_iam_role_policy.lambda_invoke_email,
     aws_iam_role_policy.lambda_secretsmanager,

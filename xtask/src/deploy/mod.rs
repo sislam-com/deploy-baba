@@ -58,7 +58,7 @@ pub enum DeployAction {
         #[arg(long)]
         function: Option<String>,
     },
-    /// Build SPA, sync to S3, invoke sync-spa handler, and smoke /health (steps 3–6)
+    /// Build SPA, sync to S3, invalidate CloudFront, smoke /health
     Spa {
         /// AWS profile
         #[arg(long)]
@@ -69,6 +69,9 @@ pub enum DeployAction {
         /// Skip the Lambda wait step (useful when Lambda is already settled)
         #[arg(long)]
         skip_wait: bool,
+        /// Environment to read deploy-config from (default: prod)
+        #[arg(long, default_value = "prod")]
+        env: String,
     },
 }
 
@@ -94,11 +97,20 @@ pub async fn execute(action: DeployAction) -> anyhow::Result<()> {
             profile,
             sha,
             skip_wait,
+            env,
         } => {
             let sha = sha.or_else(|| git_head_sha().ok()).ok_or_else(|| {
                 anyhow::anyhow!("Could not determine git SHA; pass --sha explicitly")
             })?;
-            let env_cfg = spa::SpaEnvConfig::from_env()?;
+            // Try Secrets Manager first (CI + standard deploys); fall back to env vars for local dev.
+            let env_cfg =
+                match spa::SpaEnvConfig::from_secrets_manager(profile.as_deref(), &env).await {
+                    Ok(cfg) => cfg,
+                    Err(sm_err) => {
+                        println!("   SM read failed ({sm_err}); falling back to env vars");
+                        spa::SpaEnvConfig::from_env()?
+                    }
+                };
             spa::deploy_spa(profile, env_cfg, &sha, skip_wait).await
         }
     }

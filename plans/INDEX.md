@@ -1,5 +1,5 @@
 # deploy-baba — Plan Index
-**GitHub:** `shantopagla/deploy-baba` | **Last updated:** 2026-05-02
+**GitHub:** `shantopagla/deploy-baba` | **Last updated:** 2026-05-03
 **Source repo:** `~/shanto` (Baba Toolchain, ~85K LOC) | **Status:** ~95% complete
 
 See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming rules.
@@ -37,8 +37,8 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | rag | W-RAG | `crates/rag-core/`, `crates/rag-sqlite/` | WIP | P1 DONE (CLI + SQLite store); P2/P3 TODO; W-RAG.1.1–1.2 DONE; blocked on W-LLM for generation |
 | gdrive-planning | W-GDR | `justfile`, `.claude/settings.json`, `.github/workflows/` | TODO | Drive MCP plan export/import (W-GDR.4.1–4.3); Stop hook quality gate (W-GDR.4.4); evaluated from Gemini proposal 2026-04-15 |
 | ai-dlc | W-AIL | `.claude/agents/`, `.claude/skills/` | DONE | plan-doctor + drift-detector subagents; /plan-sync, /cache-refresh, /memory-curate skills; weekly schedule |
-| ci | W-CI | `.github/workflows/` | WIP | Code complete (C.1 + C.2 DONE). Remaining: W-CI.4.5 (dev Lambda workspace, manual), W-CI.4.9 (GitHub Variables, manual), W-CI.4.10 (production env gate, manual) |
-| web (SPA) | W-WEB | `web/` | DONE | All 15 Askama templates replaced; Askama removed; EFS sync handler live; SEO prerender deferred to W-WEB.5 (P3) |
+| ci | W-CI | `.github/workflows/` | WIP | Code complete (C.1 + C.2 DONE). W-CI.4.9 RESOLVED 2026-05-04 — GH Variables replaced by SM fetch (DRL-2026-05-04-sislam-outage); bootstrap ARNs set. Remaining: W-CI.4.5 (dev Lambda workspace), W-CI.4.10 (production env gate) |
+| web (SPA) | W-WEB | `web/` | DONE | All 15 Askama templates replaced; Askama removed; CF→S3 direct serving (EFS sync dropped 2026-05-04, DRL-2026-05-04-sislam-outage); SEO prerender deferred to W-WEB.5 (P3) |
 | dev-environment | W-DEV | `scripts/`, `.devcontainer/` | DONE | bootstrap-tfstate.sh; dev-doctor.sh; devcontainer; initial-setup.md |
 
 ---
@@ -158,6 +158,9 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | DRL-2026-05-02-contact-response-dual-definition | 2026-05-02 | `contact.rs` defines local ChallengeResponse/ContactSubmitRequest/ContactResponse shadowing ADR-012 SSOT models | Open — fix: import api_openapi::models in contact.rs |
 | DRL-2026-05-02-openapi-full-spec-public-endpoint | 2026-05-02 | `/api/openapi.json` now serves full spec unauthenticated (intentional); ADR-012 rules 3–5 superseded | Open — update ADR-012 to reflect intentional change |
 | DRL-2026-05-02-askama-workspace-orphan | 2026-05-02 | `askama`/`askama_axum` still in workspace deps with no consumers; tsconfig strict claim points to wrong file | Open — remove orphaned deps; update ADR-019 claim |
+| DRL-2026-05-03-coverage-floors | 2026-05-03 | 9/10 library crates below coverage floors; `get_crate_coverage` TOTAL line inflated by workspace deps | **RESOLVED 2026-05-03** — tests added to all 9 crates; `get_crate_coverage` rewritten for per-file aggregation; all floors pass |
+| DRL-2026-05-03-rustsec-webpki-cves | 2026-05-03 | `cargo audit` failing: RUSTSEC-2026-0098/0099/0104 in `rustls-webpki 0.101.7` (via `aws-sdk-*` default features → `hyper-rustls 0.24` → `rustls 0.21`) | **RESOLVED 2026-05-03** — `default-features = false` on all `aws-sdk-*` workspace deps; only `rustls-webpki 0.103.13` remains |
+| DRL-2026-05-04-sislam-outage | 2026-05-04 | sislam.com + dev.sislam.com 404ing — EFS SPA mount never applied; SPA bucket empty | **RESOLVED 2026-05-04** — CF→S3 direct serving; deploy-config SM secret; Lambda SPA code removed; both domains 200 |
 
 ---
 
@@ -241,7 +244,7 @@ shantopagla/deploy-baba/
 | 5 | UI service | DONE |
 | 6 | OpenTofu + end-to-end deploy | WIP (Terraform→OpenTofu migration W-OTF) |
 | 7 | Examples + docs | TODO |
-| 8 | Quality pass | TODO |
+| 8 | Quality pass | WIP (`just quality` passes: coverage floors ✅, audit ✅; per-crate READMEs + examples TODO) |
 | 9 | Publish | TODO |
 
 **Overall: ~95% complete**

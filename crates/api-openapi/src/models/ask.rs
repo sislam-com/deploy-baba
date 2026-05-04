@@ -89,3 +89,15 @@ impl ApiModel for AskResponse {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ask_request_default_top_k() {
+        // trigger default_top_k via serde deserialization with missing field
+        let req: AskRequest = serde_json::from_str(r#"{"query": "how does auth work?"}"#).unwrap();
+        assert_eq!(req.top_k, 10);
+    }
+}

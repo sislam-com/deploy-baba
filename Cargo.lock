@@ -1268,7 +1268,6 @@ dependencies = [
  "api-openapi",
  "aws-config",
  "aws-sdk-lambda",
- "aws-sdk-s3",
  "aws-sdk-secretsmanager",
  "axum",
  "base64",

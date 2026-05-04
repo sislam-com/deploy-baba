@@ -10,17 +10,20 @@
 All 10 library crates must meet these minimums (enforced by `cargo xtask coverage`):
 
 ```
-config-core:    90%
-api-core:       90%
-config-toml:    85%
-config-yaml:    85%
-config-json:    85%
-api-openapi:    80%
-api-graphql:    80%
-api-grpc:       80%
-api-merger:     80%
-infra-types:    75%
+config-core:    90%   (current: 98.3%)
+api-core:       90%   (current: 96.5%)
+config-toml:    85%   (current: 96.7%)
+config-yaml:    85%   (current: 95.5%)
+config-json:    85%   (current: 97.0%)
+api-openapi:    80%   (current: 80.2%)
+api-graphql:    80%   (current: 95.4%)
+api-grpc:       80%   (current: 94.6%)
+api-merger:     80%   (current: 96.5%)
+infra-types:    75%   (current: 89.5%)
 ```
+
+All floors passing as of 2026-05-03. See `plans/drift/DRL-2026-05-03-coverage-floors.md`
+for the root-cause analysis and fix (per-file aggregation in `xtask/src/coverage.rs`).
 
 **Tool:** `cargo-llvm-cov` (`cargo install cargo-llvm-cov`)
 **Binary excluded:** `services/ui/` and `xtask/` are excluded from coverage floors
@@ -71,6 +74,10 @@ Coverage floors are checked locally with `just quality` but not in CI
 - Zero known vulnerabilities in direct dependencies
 - `cargo audit` is run as part of `just quality` and as a standalone `just audit`
 - Unmaintained crate warnings do not fail the gate (only vulnerabilities do)
+
+**Current state (2026-05-03):** 0 vulnerabilities. 1 allowed warning: `proc-macro-error`
+(RUSTSEC-2024-0370, via `utoipa-gen 4.3.1`). Deferred to W-UI.4.1 (utoipa 4 → 5 migration).
+RUSTSEC-2026-0098/0099/0104 (`rustls-webpki` CVEs) resolved — see `DRL-2026-05-03-rustsec-webpki-cves`.
 
 ---
 

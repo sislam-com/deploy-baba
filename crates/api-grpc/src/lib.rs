@@ -922,6 +922,149 @@ message Post {
     }
 
     #[test]
+    fn test_method_streaming_client_and_bidi() {
+        let client = ProtoMethod {
+            name: "Upload".to_string(),
+            input_type: "Chunk".to_string(),
+            output_type: "UploadResponse".to_string(),
+            streaming: MethodStreaming::ClientStreaming,
+        };
+        let bidi = ProtoMethod {
+            name: "Chat".to_string(),
+            input_type: "Message".to_string(),
+            output_type: "Message".to_string(),
+            streaming: MethodStreaming::BiDirectional,
+        };
+        assert_eq!(
+            generate_method_definition(&client).unwrap(),
+            "rpc Upload(stream Chunk) returns (UploadResponse);"
+        );
+        assert_eq!(
+            generate_method_definition(&bidi).unwrap(),
+            "rpc Chat(stream Message) returns (stream Message);"
+        );
+    }
+
+    #[test]
+    fn test_grpc_generator_default() {
+        let _gen = GrpcGenerator::<TestGrpcService>::default();
+    }
+
+    #[test]
+    fn test_merge_specs_empty() {
+        let result = GrpcGenerator::<TestGrpcService>::merge_specs(vec![]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_merge_specs_single() {
+        let proto_def = TestGrpcService::proto_definition();
+        let spec = GrpcGenerator::<TestGrpcService>::generate_spec(proto_def).unwrap();
+        let result = GrpcGenerator::<TestGrpcService>::merge_specs(vec![spec]);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_grpc_error_conversions() {
+        let validation_err =
+            GrpcSpecError::Validation(vec![SpecValidationError::new("field", "bad")]);
+        let spec_err: SpecError = validation_err.into();
+        assert!(matches!(spec_err, SpecError::InvalidSchema(_)));
+
+        let gen_err = GrpcSpecError::ProtoGeneration("fail".to_string());
+        let spec_err: SpecError = gen_err.into();
+        assert!(matches!(spec_err, SpecError::GenerationFailed(_)));
+
+        let parsing_err = GrpcSpecError::ProtoParsing("parse fail".to_string());
+        let spec_err2: SpecError = parsing_err.into();
+        assert!(matches!(spec_err2, SpecError::GenerationFailed(_)));
+
+        let merge_err = SpecError::MergeError("merge".to_string());
+        let grpc_err: GrpcSpecError = merge_err.into();
+        assert!(matches!(grpc_err, GrpcSpecError::ProtoGeneration(_)));
+    }
+
+    #[test]
+    fn test_validate_proto_duplicate_service() {
+        let proto_content = r#"syntax = "proto3";
+package test;
+
+service MyService {
+}
+
+service MyService {
+}
+"#;
+        let result = validate_proto_definitions(proto_content);
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors.iter().any(|e| e.path.contains("MyService")));
+    }
+
+    #[test]
+    fn test_merge_different_packages_error() {
+        let spec1 = GrpcSpec {
+            proto_content: "syntax = \"proto3\";\npackage a;\nmessage A {\n}\n".to_string(),
+            metadata: GrpcMetadata {
+                generator: "t".to_string(),
+                generated_at: "x".to_string(),
+                validated: false,
+                package: "a".to_string(),
+                message_count: 1,
+                service_count: 0,
+                method_count: 0,
+            },
+        };
+        let spec2 = GrpcSpec {
+            proto_content: "syntax = \"proto3\";\npackage b;\nmessage B {\n}\n".to_string(),
+            metadata: GrpcMetadata {
+                generator: "t".to_string(),
+                generated_at: "x".to_string(),
+                validated: false,
+                package: "b".to_string(),
+                message_count: 1,
+                service_count: 0,
+                method_count: 0,
+            },
+        };
+        let result = merge_proto_specs(vec![spec1, spec2]);
+        assert!(matches!(result, Err(SpecError::MergeError(_))));
+    }
+
+    #[test]
+    fn test_grpc_spec_debug() {
+        let proto_def = TestGrpcService::proto_definition();
+        let spec = GrpcGenerator::<TestGrpcService>::generate_spec(proto_def).unwrap();
+        let debug_str = format!("{:?}", spec);
+        assert!(debug_str.contains("GrpcSpec"));
+    }
+
+    #[test]
+    fn test_proto_message_from_type() {
+        let msg = ProtoMessage::from_type("EmptyMsg");
+        assert_eq!(msg.name, "EmptyMsg");
+        assert!(msg.fields.is_empty());
+    }
+
+    #[test]
+    fn test_validate_spec_empty_content() {
+        let invalid = GrpcSpec {
+            proto_content: "   ".to_string(),
+            metadata: GrpcMetadata {
+                generator: "t".to_string(),
+                generated_at: "x".to_string(),
+                validated: false,
+                package: "t".to_string(),
+                message_count: 0,
+                service_count: 0,
+                method_count: 0,
+            },
+        };
+        let result = GrpcGenerator::<TestGrpcService>::validate_spec(&invalid);
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_proto_merge_conflict() {
         let spec1 = GrpcSpec {
             proto_content: r#"syntax = "proto3";

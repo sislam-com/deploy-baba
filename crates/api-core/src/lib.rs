@@ -484,4 +484,76 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), spec);
     }
+
+    #[test]
+    fn test_merge_multiple_specs_not_implemented() {
+        let result = MockGenerator::merge_specs(vec!["a".to_string(), "b".to_string()]);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            SpecError::MergeError(msg) => assert!(msg.contains("not implemented")),
+            _ => panic!("Expected MergeError"),
+        }
+    }
+
+    #[test]
+    fn test_spec_error_variants_display() {
+        assert!(SpecError::InvalidSchema("x".to_string())
+            .to_string()
+            .contains("Invalid schema"));
+        assert!(SpecError::GenerationFailed("x".to_string())
+            .to_string()
+            .contains("Generation failed"));
+        assert!(SpecError::MergeError("x".to_string())
+            .to_string()
+            .contains("Merge error"));
+        assert!(SpecError::UnsupportedFormat("x".to_string())
+            .to_string()
+            .contains("Unsupported format"));
+        assert!(SpecError::VersionError("x".to_string())
+            .to_string()
+            .contains("Version error"));
+    }
+
+    #[test]
+    fn test_validation_error_display_no_code() {
+        let error = SpecValidationError::new("paths./users", "Missing field");
+        let display = error.to_string();
+        assert!(display.contains("paths./users"));
+        assert!(display.contains("Missing field"));
+        assert!(!display.contains('['));
+    }
+
+    #[test]
+    fn test_spec_generation_error_validation_display() {
+        let errors = vec![SpecValidationError::with_code("f", "m", "CODE")];
+        let err = SpecGenerationError::Validation(errors);
+        let display = err.to_string();
+        assert!(display.contains("Validation errors"));
+    }
+
+    #[test]
+    fn test_spec_metadata_construction() {
+        let metadata = SpecMetadata {
+            title: "My API".to_string(),
+            version: "1.0.0".to_string(),
+            description: Some("desc".to_string()),
+            contact: Some(ContactInfo {
+                name: Some("Alice".to_string()),
+                email: Some("alice@example.com".to_string()),
+                url: None,
+            }),
+            license: Some(LicenseInfo {
+                name: "MIT".to_string(),
+                url: Some("https://opensource.org/licenses/MIT".to_string()),
+            }),
+            servers: vec![ServerInfo {
+                url: "https://api.example.com".to_string(),
+                description: Some("Production".to_string()),
+            }],
+        };
+        assert_eq!(metadata.title, "My API");
+        assert_eq!(metadata.servers.len(), 1);
+        assert!(metadata.contact.is_some());
+        assert!(metadata.license.is_some());
+    }
 }

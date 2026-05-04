@@ -3,7 +3,6 @@ use base64::Engine as _;
 use lambda_runtime::{service_fn, LambdaEvent};
 use rag_sqlite::RagStore;
 use serde_json::{json, Value};
-use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 use tower::ServiceExt as _;
 
@@ -14,7 +13,6 @@ mod openapi;
 mod router;
 mod routes;
 mod state;
-mod sync;
 mod tailor;
 
 // ─── Anthropic API key ────────────────────────────────────────────────────────
@@ -93,24 +91,11 @@ async fn main() -> Result<()> {
         anthropic_api_key.is_some()
     );
 
-    // Lambda sets SPA_ROOT=/mnt/spa/active via env var.
-    // Local default is web/dist — run `just web-build` first.
-    let spa_root =
-        PathBuf::from(std::env::var("SPA_ROOT").unwrap_or_else(|_| "web/dist".to_owned()));
-    let spa_bucket = std::env::var("SPA_BUCKET").unwrap_or_default();
-    tracing::info!("→ SPA root: {:?}", spa_root);
-
-    let sdk_config = aws_config::load_from_env().await;
-    let s3 = aws_sdk_s3::Client::new(&sdk_config);
-
     let app_state = state::AppState {
         db,
         auth: auth_config,
         anthropic_api_key,
         rag,
-        spa_root,
-        spa_bucket,
-        s3,
     };
 
     let app = router::build(app_state.clone());
@@ -140,7 +125,7 @@ async fn main() -> Result<()> {
 async fn dispatch(
     event: LambdaEvent<Value>,
     app: axum::Router,
-    state: state::AppState,
+    _state: state::AppState,
 ) -> Result<Value, lambda_runtime::Error> {
     let payload = event.payload;
 
@@ -153,22 +138,7 @@ async fn dispatch(
         return handle_http(payload, app).await;
     }
 
-    match payload.get("action").and_then(|v| v.as_str()) {
-        Some("sync-spa") => {
-            let sp: sync::SyncPayload = serde_json::from_value(payload)
-                .map_err(|e| format!("invalid sync payload: {e}"))?;
-            let resp = sync::handle(sp, &state.s3, &state.spa_bucket)
-                .await
-                .map_err(|e| e.to_string())?;
-            Ok(serde_json::to_value(resp)?)
-        }
-        Some("prune") => {
-            let keep = payload.get("keep").and_then(|v| v.as_u64()).unwrap_or(3) as usize;
-            let removed = sync::prune(keep).await.map_err(|e| e.to_string())?;
-            Ok(json!({"status": "ok", "removed": removed}))
-        }
-        _ => Err(format!("unknown event: {payload:?}").into()),
-    }
+    Err(format!("unknown event: {payload:?}").into())
 }
 
 async fn handle_http(payload: Value, app: axum::Router) -> Result<Value, lambda_runtime::Error> {

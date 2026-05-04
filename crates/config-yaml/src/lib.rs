@@ -507,4 +507,70 @@ ports:
         let validation = 42i32.validate_yaml();
         assert!(validation.is_ok());
     }
+
+    #[test]
+    fn test_yaml_blanket_validation_remaining_types() {
+        assert!(42u32.validate_yaml().is_ok());
+        assert!(42u64.validate_yaml().is_ok());
+        assert!(1.5_f32.validate_yaml().is_ok());
+        assert!(1.5_f64.validate_yaml().is_ok());
+        assert!(42i64.validate_yaml().is_ok());
+        assert!(false.validate_yaml().is_ok());
+    }
+
+    #[test]
+    fn test_yaml_parse_and_validate_validation_failure() {
+        let yaml_content = r#"
+name: ""
+port: 0
+enabled: true
+"#;
+        let result: Result<TestConfig, _> = YamlParser::parse_and_validate(yaml_content);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            config_core::ConfigParseError::Validation(errors) => {
+                assert!(!errors.is_empty());
+            }
+            _ => panic!("Expected Validation error"),
+        }
+    }
+
+    #[test]
+    fn test_yaml_validation_error_display_and_conversion() {
+        let errors = vec![ValidationError::new("port", "must be nonzero")];
+        let err = YamlConfigError::Validation(errors.clone());
+        assert!(err.to_string().contains("Validation failed"));
+
+        let config_err: ConfigError = YamlConfigError::Validation(errors).into();
+        assert!(matches!(config_err, ConfigError::Validation(_)));
+    }
+
+    #[test]
+    fn test_load_and_save_yaml_config() {
+        let dir = std::env::temp_dir();
+        let path = dir.join("test_config_yaml_roundtrip.yaml");
+
+        let original = TestConfig {
+            name: "roundtrip".to_string(),
+            port: 4321,
+            enabled: false,
+        };
+
+        save_yaml_config(&original, &path).expect("save failed");
+
+        let loaded: TestConfig = load_yaml_config(&path).expect("load failed");
+        assert_eq!(loaded.name, "roundtrip");
+        assert_eq!(loaded.port, 4321);
+        assert!(!loaded.enabled);
+
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn test_load_yaml_config_file_not_found() {
+        let result: Result<TestConfig, ConfigError> =
+            load_yaml_config("/nonexistent/path/config.yaml");
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), ConfigError::Io(_)));
+    }
 }
