@@ -29,6 +29,9 @@ llm-anthropic = { workspace = true }
 rag-core = { workspace = true }
 rag-sqlite = { workspace = true }
 
+# OpenAPI spec (for RAG ingest)
+api-openapi = { workspace = true }
+
 # AWS SDK
 aws-config = { workspace = true }
 aws-sdk-sts = { workspace = true }

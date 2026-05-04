@@ -1,30 +1,18 @@
 //! `POST /api/ask` — RAG Q&A over the deploy-baba codebase (W-RAG.6.1).
 //!
-//! # Availability
+//! # Dual-mode (ADR-004)
 //!
-//! The route requires:
-//! 1. `RAG_PUBLIC_ENABLED=1` env var (gate for P3 rollout)
-//! 2. `LLM_PROXY_LAMBDA_NAME` env var pointing to the non-VPC LLM-proxy Lambda
+//! - **Lambda (production):** invokes the non-VPC llm-proxy Lambda via `LLM_PROXY_LAMBDA_NAME`.
+//! - **Local dev:** calls the Anthropic API directly when `ANTHROPIC_API_KEY` is available
+//!   (loaded at startup via `init_anthropic_key()`).
 //!
-//! Missing either returns a 503. Rate-limited per IP: default 2/min, overridable
-//! via `ASK_RATE_LIMIT` env var (useful for local dev).
-//!
-//! # Flow
-//!
-//! ```text
-//! POST /api/ask
-//!   → check RAG_PUBLIC_ENABLED + LLM_PROXY_LAMBDA_NAME
-//!   → rate-limit check (per IP, ASK_RATE_LIMIT/min, default 2)
-//!   → RagStore::retrieve (FTS5 BM25, top_k)
-//!   → DefaultPromptAssembler::assemble
-//!   → invoke llm-proxy Lambda (non-VPC, reaches api.anthropic.com)
-//!   → AskResponse { answer, citations, model, tokens }
-//! ```
+//! The route requires `RAG_PUBLIC_ENABLED=1`. Rate-limited per IP: default 2/min,
+//! overridable via `ASK_RATE_LIMIT` env var.
 
 use std::{
     collections::HashMap,
     net::SocketAddr,
-    sync::{Arc, LazyLock, Mutex},
+    sync::{Arc, LazyLock, Mutex, OnceLock},
     time::Instant,
 };
 
@@ -34,12 +22,56 @@ use axum::{
     http::{HeaderMap, StatusCode},
     Json,
 };
-use rag_core::{DefaultPromptAssembler, PromptAssembler, Retriever};
+use llm_anthropic::AnthropicProvider;
+use llm_core::{ChatMessage, GenerationConfig, LlmProvider, LlmRequest, MessageRole};
+use rag_core::{DefaultPromptAssembler, HybridRetriever, PromptAssembler, Retriever};
 use rag_sqlite::RagStore;
+
+use crate::db::Db;
 
 pub use api_openapi::models::{
     AskCitation, AskProxyRequest, AskProxyResponse, AskRequest, AskResponse,
 };
+
+// ── Anthropic API key (local dev direct path) ────────────────────────────────
+
+static ANTHROPIC_API_KEY: OnceLock<Option<String>> = OnceLock::new();
+
+pub async fn init_anthropic_key() {
+    if ANTHROPIC_API_KEY.get().is_some() {
+        return;
+    }
+
+    let value = if let Ok(arn) = std::env::var("ANTHROPIC_API_KEY_ARN") {
+        let config = aws_config::load_from_env().await;
+        let client = aws_sdk_secretsmanager::Client::new(&config);
+        match client.get_secret_value().secret_id(&arn).send().await {
+            Ok(resp) => resp.secret_string().map(|s| {
+                let s = s.trim().to_string();
+                if s.starts_with('{') {
+                    if let Ok(serde_json::Value::Object(map)) = serde_json::from_str(&s) {
+                        if let Some(v) = map.values().next().and_then(|v| v.as_str()) {
+                            return v.to_string();
+                        }
+                    }
+                }
+                s
+            }),
+            Err(e) => {
+                tracing::error!("Failed to fetch Anthropic key from Secrets Manager: {e}");
+                None
+            }
+        }
+    } else {
+        std::env::var("ANTHROPIC_API_KEY").ok()
+    };
+
+    ANTHROPIC_API_KEY.set(value).ok();
+}
+
+pub fn get_anthropic_key() -> Option<&'static str> {
+    ANTHROPIC_API_KEY.get().and_then(|v| v.as_deref())
+}
 
 // ── Rate limiter ──────────────────────────────────────────────────────────────
 
@@ -114,13 +146,14 @@ fn err(status: StatusCode, msg: &str) -> (StatusCode, Json<serde_json::Value>) {
     responses(
         (status = 200, description = "Grounded answer with citations", body = AskResponse),
         (status = 429, description = "Rate limit exceeded"),
-        (status = 503, description = "RAG not enabled or LLM proxy not configured"),
+        (status = 503, description = "RAG not enabled or no LLM backend available"),
     )
 )]
 pub async fn ask(
     headers: HeaderMap,
     connect_info: Option<ConnectInfo<SocketAddr>>,
     State(rag): State<Arc<RagStore>>,
+    State(db): State<Arc<Db>>,
     Json(req): Json<AskRequest>,
 ) -> ApiResult<AskResponse> {
     let ip = extract_client_ip(&headers, connect_info.as_ref());
@@ -130,9 +163,15 @@ pub async fn ask(
         return Err(err(StatusCode::SERVICE_UNAVAILABLE, "RAG Q&A not enabled"));
     }
 
-    // Gate 2: LLM proxy configured
-    let proxy_fn_name = std::env::var("LLM_PROXY_LAMBDA_NAME")
-        .map_err(|_| err(StatusCode::SERVICE_UNAVAILABLE, "LLM proxy not configured"))?;
+    // Gate 2: need either Lambda proxy name OR a direct Anthropic key
+    let proxy_fn_name = std::env::var("LLM_PROXY_LAMBDA_NAME").ok();
+    let direct_key = get_anthropic_key();
+    if proxy_fn_name.is_none() && direct_key.is_none() {
+        return Err(err(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "No LLM backend configured (set LLM_PROXY_LAMBDA_NAME or ANTHROPIC_API_KEY_ARN)",
+        ));
+    }
 
     // Gate 3: rate limit
     if !check_rate_limit(&ip) {
@@ -145,8 +184,12 @@ pub async fn ask(
     // Clamp top_k
     let top_k = req.top_k.clamp(1, 20);
 
-    // Retrieve relevant chunks via FTS5 BM25
-    let chunks = rag.retrieve(&req.query, top_k).await.map_err(|e| {
+    // Retrieve relevant chunks via FTS5 BM25 + live portfolio data
+    let hybrid = HybridRetriever {
+        fts: Arc::clone(&rag),
+        portfolio: Arc::clone(&db),
+    };
+    let chunks = hybrid.retrieve(&req.query, top_k).await.map_err(|e| {
         err(
             StatusCode::INTERNAL_SERVER_ERROR,
             &format!("retrieval failed: {e}"),
@@ -164,7 +207,6 @@ pub async fn ask(
     let assembler = DefaultPromptAssembler;
     let bundle = assembler.assemble(&req.query, &chunks);
 
-    // Build citations from retrieval results (before moving bundle into proxy request)
     let citations: Vec<AskCitation> = bundle
         .citations
         .iter()
@@ -176,12 +218,41 @@ pub async fn ask(
         })
         .collect();
 
-    // Invoke the non-VPC LLM-proxy Lambda (reaches api.anthropic.com)
+    // Dual-mode generation (ADR-004):
+    //   Production: invoke llm-proxy Lambda
+    //   Local dev:  call Anthropic directly
+    let proxy_resp = if let Some(fn_name) = proxy_fn_name {
+        invoke_proxy_lambda(&fn_name, &bundle.system_prompt, &bundle.user_message).await?
+    } else {
+        generate_direct(
+            direct_key.unwrap(),
+            &bundle.system_prompt,
+            &bundle.user_message,
+        )
+        .await?
+    };
+
+    Ok(Json(AskResponse {
+        answer: proxy_resp.content,
+        citations,
+        model: proxy_resp.model,
+        input_tokens: proxy_resp.input_tokens,
+        output_tokens: proxy_resp.output_tokens,
+    }))
+}
+
+async fn invoke_proxy_lambda(
+    fn_name: &str,
+    system_prompt: &str,
+    user_message: &str,
+) -> Result<AskProxyResponse, (StatusCode, Json<serde_json::Value>)> {
     let proxy_req = AskProxyRequest {
-        system_prompt: bundle.system_prompt,
-        user_message: bundle.user_message,
+        system_prompt: system_prompt.to_owned(),
+        user_message: user_message.to_owned(),
         max_tokens: 1024,
         temperature: 0.2,
+        tools: vec![],
+        api_base_url: std::env::var("PORTFOLIO_API_BASE_URL").ok(),
     };
 
     let payload_bytes = serde_json::to_vec(&proxy_req).map_err(|e| {
@@ -196,7 +267,7 @@ pub async fn ask(
 
     let invoke_resp = lambda_client
         .invoke()
-        .function_name(&proxy_fn_name)
+        .function_name(fn_name)
         .payload(Blob::new(payload_bytes))
         .send()
         .await
@@ -205,18 +276,44 @@ pub async fn ask(
             err(StatusCode::BAD_GATEWAY, "LLM proxy invocation failed")
         })?;
 
-    let proxy_resp = invoke_resp
+    invoke_resp
         .payload()
         .and_then(|blob| serde_json::from_slice::<AskProxyResponse>(blob.as_ref()).ok())
-        .ok_or_else(|| err(StatusCode::BAD_GATEWAY, "Invalid response from LLM proxy"))?;
+        .ok_or_else(|| err(StatusCode::BAD_GATEWAY, "Invalid response from LLM proxy"))
+}
 
-    Ok(Json(AskResponse {
-        answer: proxy_resp.content,
-        citations,
-        model: proxy_resp.model,
-        input_tokens: proxy_resp.input_tokens,
-        output_tokens: proxy_resp.output_tokens,
-    }))
+async fn generate_direct(
+    api_key: &str,
+    system_prompt: &str,
+    user_message: &str,
+) -> Result<AskProxyResponse, (StatusCode, Json<serde_json::Value>)> {
+    let provider = AnthropicProvider::new(api_key.to_owned());
+    let llm_req = LlmRequest {
+        model: provider.default_model().to_owned(),
+        messages: vec![ChatMessage::text(MessageRole::User, user_message)],
+        system: Some(system_prompt.to_owned()),
+        tools: vec![],
+        grounding: None,
+        config: GenerationConfig {
+            max_tokens: 1024,
+            temperature: 0.2,
+            prompt_version: "ask-v1",
+        },
+    };
+
+    let resp = provider.generate(llm_req).await.map_err(|e| {
+        tracing::error!("Direct LLM generation failed: {e}");
+        err(StatusCode::BAD_GATEWAY, &format!("LLM error: {e}"))
+    })?;
+
+    Ok(AskProxyResponse {
+        content: resp.content,
+        model: resp.model,
+        input_tokens: resp.input_tokens,
+        output_tokens: resp.output_tokens,
+        tools_used: vec![],
+        turns: 1,
+    })
 }
 
 pub fn router() -> axum::Router<crate::state::AppState> {

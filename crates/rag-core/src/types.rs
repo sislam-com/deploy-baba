@@ -10,6 +10,8 @@ pub enum SourceKind {
     Hcl,
     Plan,
     Cache,
+    OpenApi,
+    Portfolio,
 }
 
 impl SourceKind {
@@ -19,6 +21,8 @@ impl SourceKind {
             SourceKind::Hcl => "hcl",
             SourceKind::Plan => "plan",
             SourceKind::Cache => "cache",
+            SourceKind::OpenApi => "openapi",
+            SourceKind::Portfolio => "portfolio",
         }
     }
 }

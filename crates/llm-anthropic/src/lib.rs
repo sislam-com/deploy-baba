@@ -18,10 +18,7 @@
 //!
 //!     let req = LlmRequest {
 //!         model: provider.default_model().to_owned(),
-//!         messages: vec![ChatMessage {
-//!             role: MessageRole::User,
-//!             content: "Hello!".to_owned(),
-//!         }],
+//!         messages: vec![ChatMessage::text(MessageRole::User, "Hello!")],
 //!         system: None,
 //!         tools: vec![],
 //!         grounding: None,
@@ -35,7 +32,7 @@
 use async_trait::async_trait;
 use llm_core::{
     grounding::assemble_grounded_prompt, LlmError, LlmProvider, LlmRequest, LlmResponse,
-    StopReason, ToolCall,
+    MessageContent, StopReason, ToolCall,
 };
 use serde::{Deserialize, Serialize};
 
@@ -53,7 +50,7 @@ pub const UPGRADE_MODEL: &str = "claude-sonnet-4-6";
 struct ApiRequest<'a> {
     model: &'a str,
     max_tokens: u32,
-    messages: Vec<ApiMessage<'a>>,
+    messages: Vec<ApiMessage>,
     #[serde(skip_serializing_if = "Option::is_none")]
     system: Option<&'a str>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -62,9 +59,9 @@ struct ApiRequest<'a> {
 }
 
 #[derive(Serialize)]
-struct ApiMessage<'a> {
-    role: &'a str,
-    content: &'a str,
+struct ApiMessage {
+    role: String,
+    content: serde_json::Value,
 }
 
 #[derive(Serialize)]
@@ -90,6 +87,7 @@ enum ContentBlock {
         text: String,
     },
     ToolUse {
+        id: String,
         name: String,
         input: serde_json::Value,
     },
@@ -136,6 +134,33 @@ impl AnthropicProvider {
     }
 }
 
+fn message_to_api(msg: &llm_core::ChatMessage) -> ApiMessage {
+    let role = match msg.role {
+        llm_core::MessageRole::User => "user",
+        llm_core::MessageRole::Assistant => "assistant",
+        llm_core::MessageRole::System => "user",
+    };
+
+    let content = match &msg.content {
+        MessageContent::Text { text } => serde_json::Value::String(text.clone()),
+        MessageContent::ToolResult {
+            tool_use_id,
+            content,
+            is_error,
+        } => serde_json::json!([{
+            "type": "tool_result",
+            "tool_use_id": tool_use_id,
+            "content": content,
+            "is_error": is_error,
+        }]),
+    };
+
+    ApiMessage {
+        role: role.to_string(),
+        content,
+    }
+}
+
 #[async_trait]
 impl LlmProvider for AnthropicProvider {
     fn provider_id(&self) -> &'static str {
@@ -147,7 +172,6 @@ impl LlmProvider for AnthropicProvider {
     }
 
     async fn generate(&self, req: LlmRequest) -> Result<LlmResponse, LlmError> {
-        // Enforce grounding contract if present (mutates prompt before sending).
         let req = assemble_grounded_prompt(req)?;
 
         let model = if req.model.is_empty() {
@@ -156,18 +180,7 @@ impl LlmProvider for AnthropicProvider {
             req.model.as_str()
         };
 
-        let messages: Vec<ApiMessage<'_>> = req
-            .messages
-            .iter()
-            .map(|m| ApiMessage {
-                role: match m.role {
-                    llm_core::MessageRole::User => "user",
-                    llm_core::MessageRole::Assistant => "assistant",
-                    llm_core::MessageRole::System => "user", // flatten unusual system turns
-                },
-                content: &m.content,
-            })
-            .collect();
+        let messages: Vec<ApiMessage> = req.messages.iter().map(message_to_api).collect();
 
         let tools: Vec<ApiTool<'_>> = req
             .tools
@@ -218,7 +231,6 @@ impl LlmProvider for AnthropicProvider {
                 .text()
                 .await
                 .unwrap_or_else(|_| status.to_string());
-            // Try to parse as structured API error.
             if let Ok(api_err) = serde_json::from_str::<ApiError>(&text) {
                 return Err(LlmError::Upstream {
                     message: format!("[{}] {}", api_err.error.kind, api_err.error.message),
@@ -243,8 +255,9 @@ impl LlmProvider for AnthropicProvider {
                     }
                     text_content.push_str(&text);
                 }
-                ContentBlock::ToolUse { name, input } => {
+                ContentBlock::ToolUse { id, name, input } => {
                     tool_calls.push(ToolCall {
+                        id,
                         name,
                         arguments: input,
                     });

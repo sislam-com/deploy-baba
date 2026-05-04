@@ -1,9 +1,16 @@
+mod tool_executor;
+mod tools;
+
 use api_openapi::models::{AskProxyRequest, AskProxyResponse};
 use lambda_runtime::{run, service_fn, Error, LambdaEvent};
 use llm_anthropic::AnthropicProvider;
-use llm_core::{ChatMessage, GenerationConfig, LlmProvider, LlmRequest, MessageRole};
+use llm_core::{
+    run_agent_loop, ChatMessage, GenerationConfig, LlmProvider, LlmRequest, MessageRole,
+};
 use serde_json::Value;
 use std::sync::OnceLock;
+
+use crate::tool_executor::PortfolioToolExecutor;
 
 // ─── Anthropic API key ────────────────────────────────────────────────────────
 //
@@ -65,10 +72,7 @@ async fn handler(event: LambdaEvent<AskProxyRequest>) -> Result<AskProxyResponse
     let provider = AnthropicProvider::new(api_key);
     let llm_req = LlmRequest {
         model: provider.default_model().to_owned(),
-        messages: vec![ChatMessage {
-            role: MessageRole::User,
-            content: req.user_message,
-        }],
+        messages: vec![ChatMessage::text(MessageRole::User, req.user_message)],
         system: Some(req.system_prompt),
         tools: vec![],
         grounding: None,
@@ -78,6 +82,29 @@ async fn handler(event: LambdaEvent<AskProxyRequest>) -> Result<AskProxyResponse
             prompt_version: "ask-v1",
         },
     };
+
+    if !req.tools.is_empty() {
+        let base_url = req
+            .api_base_url
+            .ok_or("api_base_url required when tools are provided")?;
+        let executor = PortfolioToolExecutor::new(base_url);
+        let result = run_agent_loop(&provider, &executor, llm_req, 5, 4000)
+            .await
+            .map_err(|e| format!("Agent loop error: {e}"))?;
+
+        return Ok(AskProxyResponse {
+            content: result.final_content,
+            model: result.model,
+            input_tokens: result.total_input_tokens,
+            output_tokens: result.total_output_tokens,
+            tools_used: result
+                .tool_calls_made
+                .iter()
+                .map(|(c, _)| c.name.clone())
+                .collect(),
+            turns: result.turns as u32,
+        });
+    }
 
     let resp = provider
         .generate(llm_req)
@@ -89,6 +116,8 @@ async fn handler(event: LambdaEvent<AskProxyRequest>) -> Result<AskProxyResponse
         model: resp.model,
         input_tokens: resp.input_tokens,
         output_tokens: resp.output_tokens,
+        tools_used: vec![],
+        turns: 1,
     })
 }
 

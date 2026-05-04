@@ -260,10 +260,7 @@ async fn polish_bio_to_summary_ai(raw_bio: &str, api_key: &str) -> anyhow::Resul
 
     let req = LlmRequest {
         model: provider.default_model().to_owned(),
-        messages: vec![ChatMessage {
-            role: MessageRole::User,
-            content: user_content,
-        }],
+        messages: vec![ChatMessage::text(MessageRole::User, user_content)],
         system: Some(system),
         tools: vec![],
         grounding: None,

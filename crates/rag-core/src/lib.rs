@@ -11,12 +11,17 @@
 
 pub mod chunk;
 pub mod error;
+pub mod hybrid;
+pub mod portfolio;
 pub mod types;
 
 pub use error::RagError;
+pub use hybrid::HybridRetriever;
+pub use portfolio::PortfolioDataProvider;
 pub use types::{Chunk, CitationRef, PromptBundle, RankedChunk, SourceKind};
 
 use async_trait::async_trait;
+use std::sync::Arc;
 
 // ── Traits ────────────────────────────────────────────────────────────────
 
@@ -55,6 +60,29 @@ pub trait Retriever: Send + Sync {
     async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<RankedChunk>, RagError>;
 }
 
+#[async_trait]
+impl<T: Retriever> Retriever for Arc<T> {
+    async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<RankedChunk>, RagError> {
+        (**self).retrieve(query, top_k).await
+    }
+}
+
+#[async_trait]
+impl<T: PortfolioDataProvider> PortfolioDataProvider for Arc<T> {
+    async fn get_jobs_summary(&self) -> Result<Vec<serde_json::Value>, RagError> {
+        (**self).get_jobs_summary().await
+    }
+    async fn get_job_details(&self, slug: &str) -> Result<Option<serde_json::Value>, RagError> {
+        (**self).get_job_details(slug).await
+    }
+    async fn get_competencies_summary(&self) -> Result<Vec<serde_json::Value>, RagError> {
+        (**self).get_competencies_summary().await
+    }
+    async fn get_about_sections(&self) -> Result<Vec<serde_json::Value>, RagError> {
+        (**self).get_about_sections().await
+    }
+}
+
 /// Assembles a grounded prompt from retrieved chunks.
 pub trait PromptAssembler {
     /// Wrap `chunks` in citation tags and build a [`PromptBundle`] for the LLM.
@@ -90,11 +118,23 @@ impl PromptAssembler for DefaultPromptAssembler {
             });
         }
 
+        let has_portfolio_sources = chunks
+            .iter()
+            .any(|c| c.source_kind == "portfolio" || c.source_kind == "openapi");
+
+        let preamble = if has_portfolio_sources {
+            "You are the portfolio assistant for a senior Rust engineer and cloud architect. \
+             When sources include portfolio data (jobs, competencies, about sections), answer \
+             as the portfolio owner's assistant. When sources include API documentation, \
+             explain endpoints precisely with method, path, parameters, and response shapes. "
+        } else {
+            "You are an expert on the deploy-baba codebase. "
+        };
+
         let system_prompt = format!(
-            "You are an expert on the deploy-baba codebase. Answer the user's question \
-             using ONLY the sources provided below. Cite every claim with [source N] \
-             where N matches the source number. Do not invent information not present \
-             in the sources.\n\n{sources_text}"
+            "{preamble}Answer the user's question using ONLY the sources provided below. \
+             Cite every claim with [source N] where N matches the source number. \
+             Do not invent information not present in the sources.\n\n{sources_text}"
         );
 
         let user_message = query.to_owned();
@@ -146,5 +186,33 @@ mod tests {
         let assembler = DefaultPromptAssembler;
         let bundle = assembler.assemble("what?", &[]);
         assert!(bundle.citations.is_empty());
+    }
+
+    #[test]
+    fn portfolio_chunks_get_portfolio_preamble() {
+        let assembler = DefaultPromptAssembler;
+        let chunks = vec![
+            RankedChunk {
+                source_kind: "portfolio".to_string(),
+                ..make_chunk(0, "Job: Engineer at Acme")
+            },
+            RankedChunk {
+                source_kind: "plan".to_string(),
+                ..make_chunk(1, "ADR-002 text")
+            },
+        ];
+        let bundle = assembler.assemble("what jobs?", &chunks);
+        assert!(bundle.system_prompt.contains("portfolio owner's assistant"));
+    }
+
+    #[test]
+    fn code_only_chunks_get_codebase_preamble() {
+        let assembler = DefaultPromptAssembler;
+        let chunks = vec![make_chunk(0, "fn main() {}")];
+        let bundle = assembler.assemble("what does main do?", &chunks);
+        assert!(bundle
+            .system_prompt
+            .contains("expert on the deploy-baba codebase"));
+        assert!(!bundle.system_prompt.contains("portfolio owner's assistant"));
     }
 }

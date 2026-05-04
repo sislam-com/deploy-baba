@@ -251,6 +251,74 @@ Can land before, between, or after any other phase — no shared files.
 
 ---
 
+## Phase 9 — Extended RAG Corpora (W-RAG.7.x–8.x, ADR-023)
+
+Extends the RAG index with two new corpora (OpenAPI spec + portfolio domain data) and
+adds filtered retrieval. No LLM cost. Ships independently of Phases 5–7.
+
+| # | Work item | Task | Notes |
+|---|-----------|------|-------|
+| 9.1 | W-RAG.7.1–7.4 | Add `OpenApi`+`Portfolio` SourceKind variants, 2 new chunkers, wire into dispatcher | No LLM cost; extends existing chunker pattern |
+| 9.2 | W-RAG.7.5 | Extend `xtask rag ingest` to emit 6 corpora (OpenAPI spec + portfolio data from SQLite) | Requires `api_openapi` dep in xtask |
+| 9.3 | W-RAG.8.1–8.2 | Portfolio-aware prompt assembly + filtered retrieval | `retrieve_filtered()` with `source_kind` clause |
+
+**Exit criteria:**
+- `just rag-index && just rag-query "GET /api/jobs"` returns OpenAPI chunks
+- `just rag-query "AWS experience"` returns portfolio chunks
+- Existing FTS results for code/plan queries unchanged (regression check)
+
+**Dependencies:** W-RAG P1 (DONE). No LLM dependency.
+
+**Reversibility:** Revert SourceKind variants + delete 2 chunker files. Existing corpora unaffected.
+
+---
+
+## Phase 10 — Live-Data Retrieval (W-RAG.9.x)
+
+Enables ask-time queries against live SQLite data. Answers reflect dashboard edits without re-indexing.
+
+| # | Work item | Task | Notes |
+|---|-----------|------|-------|
+| 10.1 | W-RAG.9.1–9.2 | `PortfolioDataProvider` trait + `Db` impl | Reuses existing SQL queries from route handlers |
+| 10.2 | W-RAG.9.3–9.4 | `HybridRetriever` + ask handler wiring | FTS + live virtual chunks; `git_sha="live"` |
+
+**Exit criteria:**
+- `POST /api/ask` with "what jobs does the owner have?" returns answer grounded in live DB data
+- Dashboard edits reflected immediately (no re-index needed)
+
+**Dependencies:** Phase 9 (SourceKind variants).
+
+**Reversibility:** Revert to raw `RagStore` in ask handler. `PortfolioDataProvider` trait stays inert.
+
+---
+
+## Phase 11 — Agentic Core (W-LLM.4.8–4.14 + W-RAG.10.x, ADR-023)
+
+The architectural keystone. Implements the missing tool-dispatch loop in `llm-core`, defines
+portfolio tools in `llm-proxy`, and wires the agent loop into the ask endpoint.
+
+| # | Work item | Task | Notes |
+|---|-----------|------|-------|
+| 11.1 | W-LLM.4.8–4.12 | `ToolCall.id`, `MessageContent` enum, `ToolExecutor` trait, `run_agent_loop()`, stub testing | `llm-core` changes; breaking `ChatMessage` migration |
+| 11.2 | W-LLM.4.13 | Anthropic adapter: tool_result serialization | `llm-anthropic` wire types |
+| 11.3 | W-LLM.4.14 | Migrate 6 call-sites for `ChatMessage.content` change | grounding.rs, testing.rs, anthropic, proxy, xtask |
+| 11.4 | W-RAG.10.1–10.2 | Portfolio tools + HTTP `PortfolioToolExecutor` in llm-proxy | 6 tools mapping to portfolio API endpoints |
+| 11.5 | W-RAG.10.3–10.6 | Wire agent loop into proxy, extend proxy contract, agentic ask handler, evolved system prompt | llm-proxy becomes orchestrator |
+
+**Exit criteria:**
+- `just ask "What AWS experience does the portfolio owner have?"` returns grounded answer citing
+  job details via `search_experience` tool
+- Agent loop tests pass with `StubLlmProvider` (zero API calls in CI)
+- Max-turns safety confirmed (stub always returns ToolUse → capped at 5)
+- Token budget enforcement confirmed (cumulative tracking across turns)
+
+**Dependencies:** Phases 9–10 + W-LLM 4.1–4.5 (DONE).
+
+**Reversibility:** Unset `tools` in `AskProxyRequest` → proxy falls back to single-turn. Agent loop
+code stays inert. No data migration involved.
+
+---
+
 ## Parallelism map
 
 ```
@@ -260,14 +328,21 @@ Phase 1 ─┬─► (merge) ─┬─► Phase 2  ─► Phase 5 ──┐
          │            │                          │
          │            └─► Phase 3 ─┐             │
          │                         ├─► Phase 6 ─► Phase 7
-         └─► Phase 4 ──────────────┘
-                                                 │
-Phase 8  ─ runs anytime ─────────────────────────┘
+         └─► Phase 4 ──────────────┘                │
+                                                    │
+Phase 8  ─ runs anytime ───────────────────────────┘
+                                                    │
+Phase 9  (extended corpora, no LLM dep) ────────────┤
+         ▼                                          │
+Phase 10 (live data) ──────────────────────────────┤
+         ▼                                          │
+Phase 11 (agentic core, ADR-023) ───────────────────┘
 ```
 
 Rule of thumb: **one Phase-1-descendant + optionally Phase 8 concurrent.**
 Never two LLM-touching phases in flight at once — they share the
 `llm-policy.md` operational budget and would race on prompt version bumps.
+Phases 9–10 can start immediately (no LLM dep); Phase 11 requires Phase 10 + W-LLM 4.1–4.5 (DONE).
 
 ---
 
@@ -281,6 +356,9 @@ Never two LLM-touching phases in flight at once — they share the
 | 3 → 6 | RAG P1 → RAG P2 | `just rag-query` returns correct FTS results across all 4 corpora |
 | 5 → 6 | W-RST done → W-RAG gen | W-RST.4.10 rate-limit proven; token budget not breached in 24h test |
 | 6 → 7 | RAG local → RAG public | sqlite-vec aarch64 binary size + license confirmed |
+| P1 → 9 | RAG P1 → extended corpora | W-RAG P1 DONE (already met) |
+| 9 → 10 | extended corpora → live data | `just rag-query "GET /api/jobs"` returns OpenAPI chunks |
+| 10 → 11 | live data → agentic | `HybridRetriever` returns live virtual chunks; W-LLM 4.1–4.5 DONE |
 
 ---
 
@@ -295,6 +373,9 @@ Never two LLM-touching phases in flight at once — they share the
 | 5 | Disable Cognito-gated route; tailor_cache is computed state, droppable |
 | 6 | Feature-flag embedder; FTS-only fallback path stays live |
 | 7 | Unset `RAG_PUBLIC_ENABLED` — no Lambda redeploy needed |
+| 9 | Revert SourceKind variants + delete 2 chunker files; existing corpora unaffected |
+| 10 | Revert to raw `RagStore` in ask handler; `PortfolioDataProvider` stays inert |
+| 11 | Unset `tools` in `AskProxyRequest` → proxy falls back to single-turn; agent loop code inert |
 
 Every phase is reversible without data loss and without touching the
 critical path (public portfolio, contact form, resume generation).
@@ -303,10 +384,11 @@ critical path (public portfolio, contact form, resume generation).
 
 ## Cross-References
 
-- → `plans/modules/llm-core.md` (W-LLM work items)
+- → `plans/modules/llm-core.md` (W-LLM work items incl. W-LLM.4.8–4.14)
 - → `plans/modules/resume-tailor.md` (W-RST work items)
-- → `plans/modules/rag.md` (W-RAG work items)
+- → `plans/modules/rag.md` (W-RAG work items incl. W-RAG.7.x–10.x)
 - → `plans/modules/gdrive-planning.md` (W-GDR work items)
-- → `plans/cross-cutting/llm-policy.md` (operational rules shared by all LLM work)
+- → `plans/cross-cutting/llm-policy.md` (operational rules, agentic cost model)
 - → ADR-015 (LLM Provider Abstraction + Grounding Contract)
 - → ADR-016 (RAG Architecture)
+- → ADR-023 (Agentic Tool-Dispatch Architecture — Phases 9–11)

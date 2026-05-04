@@ -100,6 +100,10 @@ pub struct AskProxyRequest {
     pub user_message: String,
     pub max_tokens: u32,
     pub temperature: f32,
+    #[serde(default)]
+    pub tools: Vec<serde_json::Value>,
+    #[serde(default)]
+    pub api_base_url: Option<String>,
 }
 
 /// Response from the LLM-proxy Lambda.
@@ -109,6 +113,10 @@ pub struct AskProxyResponse {
     pub model: String,
     pub input_tokens: u32,
     pub output_tokens: u32,
+    #[serde(default)]
+    pub tools_used: Vec<String>,
+    #[serde(default)]
+    pub turns: u32,
 }
 
 #[cfg(test)]
@@ -129,19 +137,25 @@ mod tests {
             user_message: "How does auth work?".into(),
             max_tokens: 1024,
             temperature: 0.2,
+            tools: vec![],
+            api_base_url: None,
         };
         let json = serde_json::to_string(&req).unwrap();
         let back: AskProxyRequest = serde_json::from_str(&json).unwrap();
         assert_eq!(back.max_tokens, 1024);
+        assert!(back.tools.is_empty());
 
         let resp = AskProxyResponse {
             content: "Auth uses Cognito.".into(),
             model: "claude-haiku-4-5".into(),
             input_tokens: 10,
             output_tokens: 5,
+            tools_used: vec![],
+            turns: 1,
         };
         let json = serde_json::to_string(&resp).unwrap();
         let back: AskProxyResponse = serde_json::from_str(&json).unwrap();
         assert_eq!(back.output_tokens, 5);
+        assert_eq!(back.turns, 1);
     }
 }

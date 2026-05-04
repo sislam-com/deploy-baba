@@ -19,10 +19,7 @@
 //! async fn summarise(provider: &dyn LlmProvider, text: &str) -> Result<String, llm_core::LlmError> {
 //!     let req = LlmRequest {
 //!         model: provider.default_model().to_owned(),
-//!         messages: vec![ChatMessage {
-//!             role: MessageRole::User,
-//!             content: text.to_owned(),
-//!         }],
+//!         messages: vec![ChatMessage::text(MessageRole::User, text)],
 //!         system: Some("Summarise the following in one sentence.".to_owned()),
 //!         tools: vec![],
 //!         grounding: None,
@@ -33,16 +30,20 @@
 //! }
 //! ```
 
+pub mod agent_loop;
 pub mod error;
 pub mod grounding;
 pub mod testing;
+pub mod tool_executor;
 pub mod types;
 
+pub use agent_loop::{run_agent_loop, AgentResult};
 pub use error::LlmError;
 pub use grounding::{assemble_grounded_prompt, GroundingContract, RefusalPolicy};
+pub use tool_executor::{ToolExecutor, ToolResult};
 pub use types::{
-    ChatMessage, GenerationConfig, LlmRequest, LlmResponse, MessageRole, StopReason, ToolCall,
-    ToolDef,
+    ChatMessage, GenerationConfig, LlmRequest, LlmResponse, MessageContent, MessageRole,
+    StopReason, ToolCall, ToolDef,
 };
 
 use async_trait::async_trait;

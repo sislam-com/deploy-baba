@@ -36,10 +36,10 @@ async fn main() -> Result<()> {
     routes::contact::init_pow_secret().await;
     tracing::info!("→ PoW secret ready");
 
-    tracing::info!(
-        "→ LLM proxy configured: {}",
-        std::env::var("LLM_PROXY_LAMBDA_NAME").is_ok()
-    );
+    routes::api::ask::init_anthropic_key().await;
+    let has_proxy = std::env::var("LLM_PROXY_LAMBDA_NAME").is_ok();
+    let has_direct = routes::api::ask::get_anthropic_key().is_some();
+    tracing::info!("→ LLM backend: proxy={has_proxy}, direct={has_direct}",);
 
     let app_state = state::AppState {
         db,

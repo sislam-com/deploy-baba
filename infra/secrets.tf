@@ -52,6 +52,25 @@ resource "aws_secretsmanager_secret_version" "anthropic_api_key_placeholder" {
   }
 }
 
+# --- ses-config: email sender/recipient addresses ---
+# Backing secret for SES_FROM_EMAIL, SES_ACK_FROM_EMAIL, CONTACT_TO_EMAIL.
+# The email Lambda reads these from env vars set by lambda.tf, but this secret
+# provides a durable, auditable backup per W-SEC policy.
+
+resource "aws_secretsmanager_secret" "ses_config" {
+  name = "${var.project_name}/${var.environment}/ses-config"
+  tags = { Name = "${var.project_name}-ses-config" }
+}
+
+resource "aws_secretsmanager_secret_version" "ses_config" {
+  secret_id = aws_secretsmanager_secret.ses_config.id
+  secret_string = jsonencode({
+    ses_from_email     = "noreply@${local.ses_domain}"
+    ses_ack_from_email = "it@sislam.com"
+    contact_to_email   = var.contact_email
+  })
+}
+
 # --- deploy-config: CI/CD deploy identifiers, self-populated from infra outputs ---
 # Re-populated on every `just infra-apply`. CI reads this to avoid storing
 # bucket/distribution IDs in GitHub Variables (W-SEC alignment).
@@ -86,7 +105,9 @@ resource "aws_iam_role_policy" "lambda_secretsmanager" {
       Resource = [
         aws_secretsmanager_secret.pow_secret.arn,
         aws_secretsmanager_secret.cognito_temp_password.arn,
-        # anthropic_api_key is now read by the llm-proxy Lambda, not the UI Lambda
+        aws_secretsmanager_secret.anthropic_api_key.arn,
+        aws_secretsmanager_secret.ses_config.arn,
+        aws_secretsmanager_secret.deploy_config.arn,
       ]
     }]
   })

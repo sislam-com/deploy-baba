@@ -1,6 +1,6 @@
 # LLM Policy — deploy-baba
 
-**Last updated:** 2026-04-10
+**Last updated:** 2026-05-04
 **Owner:** W-LLM, W-RST, W-RAG
 **Status:** Active — updated when providers or models change
 
@@ -20,6 +20,9 @@ grounding contract), see **ADR-015**.
 Any change to this table (new provider, model swap, secret rename) requires
 a revision to **ADR-015** (alternatives and affected modules sections) and a
 corresponding bump to `prompt_version` in the affected prompts.
+
+**Note:** The llm-proxy Lambda now runs agent loops (ADR-023), not just single-turn
+passthrough. Multi-turn agentic conversations consume the same provider/model budget.
 
 ---
 
@@ -144,11 +147,36 @@ When adding a new `LlmProvider` impl (e.g. `crates/llm-openai`):
 
 ---
 
+## Agentic Cost Model (ADR-023)
+
+When the agent loop is active (`run_agent_loop` in llm-core), each tool-use turn is a separate LLM
+call. Cost projections for Haiku 4.5:
+
+- **Per-agentic-request (worst case):** `max_turns=5` × (4K input + 1K output) = 25K tokens
+- **Typical agentic request:** 2–3 turns × ~1.5K tokens/turn = ~4.5K tokens per conversation
+- **Single-turn RAG (no tools):** ~1.5K tokens (unchanged from P1/P3 behavior)
+- **Cost per agentic conversation:** ~$0.001–0.003 (Haiku 4.5 pricing)
+
+**Daily budget impact:** At 50 agentic conversations/day, ~225K tokens — exceeds the current 100K
+daily cap. When agentic mode ships (Phase 11), either:
+
+1. Raise daily cap to 250K tokens, or
+2. Enforce per-conversation token budget of 10K tokens (hard stop via `token_budget` param)
+
+**Tool latency:** Each tool call adds ~100 ms (Lambda invocation overhead, cold start amortized).
+A 3-tool agentic conversation adds ~300 ms total beyond the LLM generation time.
+
+**Monitoring:** The agent loop emits cumulative token counts per turn via `tracing::info!`. The
+`AgentResult` struct includes `total_input_tokens` and `total_output_tokens` for downstream logging.
+
+---
+
 ## Cross-References
 
 - → ADR-015 (structural decision: pluggable framework + grounding contract)
-- → W-LLM (llm-core + llm-anthropic module plan)
+- → ADR-023 (agentic tool-dispatch architecture — agent loop + portfolio tools)
+- → W-LLM (llm-core + llm-anthropic module plan, incl. W-LLM.4.8–4.14)
 - → W-RST (resume-tailor — primary consumer)
-- → W-RAG (retrieval-augmented generation — secondary consumer; `.claude/` corpus local-CLI only per ADR-016)
+- → W-RAG (retrieval-augmented generation — incl. W-RAG.7.x–10.x agentic extension)
 - → W-SEC (secrets management — API key storage + rotation)
 - → ADR-016 (RAG architecture — grounding contract application in retrieval pipeline)

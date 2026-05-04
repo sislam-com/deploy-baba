@@ -23,19 +23,21 @@ resource "aws_lambda_function" "baba" {
   # Environment variables passed to the Lambda function
   environment {
     variables = {
-      DB_PATH               = "/mnt/db/baba.db"
-      RUST_LOG              = "info"
-      COGNITO_POOL_ID       = aws_cognito_user_pool.baba.id
-      COGNITO_CLIENT_ID     = aws_cognito_user_pool_client.baba_web.id
-      COGNITO_DOMAIN        = "${aws_cognito_user_pool_domain.baba.domain}.auth.${var.region}.amazoncognito.com"
-      COGNITO_REGION        = var.region
-      APP_DOMAIN            = "https://${var.domain_name}"
-      EMAIL_LAMBDA_NAME     = aws_lambda_function.email.function_name
-      COGNITO_JWKS          = data.http.cognito_jwks.response_body
-      POW_SECRET_ARN        = aws_secretsmanager_secret.pow_secret.arn
-      LLM_PROXY_LAMBDA_NAME = aws_lambda_function.llm_proxy.function_name
-      RAG_PUBLIC_ENABLED    = "1"
-      S3_BACKUP_BUCKET      = aws_s3_bucket.backups.id
+      DB_PATH                = "/mnt/db/baba.db"
+      RUST_LOG               = "info"
+      COGNITO_POOL_ID        = aws_cognito_user_pool.baba.id
+      COGNITO_CLIENT_ID      = aws_cognito_user_pool_client.baba_web.id
+      COGNITO_DOMAIN         = "${aws_cognito_user_pool_domain.baba.domain}.auth.${var.region}.amazoncognito.com"
+      COGNITO_REGION         = var.region
+      APP_DOMAIN             = "https://${var.domain_name}"
+      EMAIL_LAMBDA_NAME      = aws_lambda_function.email.function_name
+      COGNITO_JWKS           = data.http.cognito_jwks.response_body
+      POW_SECRET_ARN         = aws_secretsmanager_secret.pow_secret.arn
+      LLM_PROXY_LAMBDA_NAME  = aws_lambda_function.llm_proxy.function_name
+      ANTHROPIC_API_KEY_ARN  = aws_secretsmanager_secret.anthropic_api_key.arn
+      RAG_PUBLIC_ENABLED     = "1"
+      S3_BACKUP_BUCKET       = aws_s3_bucket.backups.id
+      PORTFOLIO_API_BASE_URL = "https://${var.domain_name}"
     }
   }
 
