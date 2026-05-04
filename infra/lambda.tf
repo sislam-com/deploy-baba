@@ -31,10 +31,10 @@ resource "aws_lambda_function" "baba" {
       COGNITO_REGION        = var.region
       APP_DOMAIN            = "https://${var.domain_name}"
       EMAIL_LAMBDA_NAME     = aws_lambda_function.email.function_name
-      COGNITO_JWKS            = data.http.cognito_jwks.response_body
-      POW_SECRET_ARN          = aws_secretsmanager_secret.pow_secret.arn
-      LLM_PROXY_LAMBDA_NAME   = aws_lambda_function.llm_proxy.function_name
-      RAG_PUBLIC_ENABLED      = "1"
+      COGNITO_JWKS          = data.http.cognito_jwks.response_body
+      POW_SECRET_ARN        = aws_secretsmanager_secret.pow_secret.arn
+      LLM_PROXY_LAMBDA_NAME = aws_lambda_function.llm_proxy.function_name
+      RAG_PUBLIC_ENABLED    = "1"
     }
   }
 

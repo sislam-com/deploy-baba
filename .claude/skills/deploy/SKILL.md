@@ -1,7 +1,7 @@
 ---
 name: deploy
 description: Build and deploy Lambda functions and the React SPA to AWS. Covers full 7-step pipeline (Lambda + SPA), quality gate, email Lambda, infra changes, and secrets rotation. Full pipeline mirrors deploy-dev.yml / deploy-prod.yml exactly.
-argument-hint: "<profile> [--full [--env=dev|prod] [--tag]] [--fast|--email|--infra]"
+argument-hint: "<profile> [--full [--env=dev|prod] [--tag]] [--fast|--email|--llm-proxy|--infra]"
 disable-model-invocation: true
 ---
 
@@ -15,6 +15,7 @@ Deploy the portfolio Lambda(s) and/or SPA to AWS. All commands go through `just`
 - `--tag` — also create `dev-vX.Y.Z` git tag after deploy (opt-in; CI is the canonical tagger).
 - `--fast` — skip quality gate (hotfixes only; confirm with user).
 - `--email` — deploy the email Lambda instead of the UI Lambda.
+- `--llm-proxy` — deploy the LLM-proxy Lambda (non-VPC, reaches api.anthropic.com).
 - `--infra` — run `infra-apply` before the Lambda deploy.
 
 ## Decision Tree
@@ -90,11 +91,27 @@ just email-build
 just email-deploy <PROFILE>
 ```
 
+### LLM-proxy Lambda deploy (`--llm-proxy`)
+Code-only update path — use after editing `services/llm-proxy/`.
+```
+just llm-proxy-build
+just llm-proxy-deploy <PROFILE>
+```
+
 ### With infra changes (`--infra`)
 ```
 just infra-plan <PROFILE>          # show OpenTofu plan — review before applying
 just infra-apply <PROFILE>         # apply infra — confirm with user first
 just lambda-build && just lambda-deploy <PROFILE>
+```
+
+**First-time LLM-proxy bootstrap** — when introducing the proxy Lambda for the first time, or after changes to `infra/llm-proxy-lambda.tf` or UI Lambda env vars (`LLM_PROXY_LAMBDA_NAME`):
+```
+just infra-plan <PROFILE>            # confirm only additive proxy resources
+just infra-apply <PROFILE>           # creates proxy Lambda + IAM grants
+just lambda-deploy <PROFILE>         # UI Lambda picks up new LLM_PROXY_LAMBDA_NAME env var
+just llm-proxy-build
+just llm-proxy-deploy <PROFILE>      # uploads real proxy binary (replaces infra placeholder)
 ```
 
 ### After adding a secret (post W-SEC)
@@ -113,6 +130,7 @@ just lambda-deploy <PROFILE>
 - **sync-spa returns non-ok** → read the full JSON response. Common causes: EFS not mounted (`/mnt/spa` missing), S3 bucket mismatch (`SPA_BUCKET` wrong env).
 - **/health returns non-200** → Lambda may have restarted cold; retry once after 5s. If still failing, check CloudWatch for panics.
 - **Dirty worktree + `--tag`** → `xtask release tag` enforces a clean tree. Commit or stash changes first.
+- **LLM-proxy invocation fails (BAD_GATEWAY from `/api/ask`)** → check proxy logs: `aws logs tail /aws/lambda/deploy-baba-llm-proxy --profile <PROFILE> --since 5m`. Common causes: `ANTHROPIC_API_KEY_ARN` env var unset on proxy Lambda, secret value still placeholder (run `just secret-put anthropic-api-key <key> <PROFILE>`), or proxy Lambda not yet deployed (`just llm-proxy-deploy <PROFILE>`).
 
 ## Key Files
 
@@ -123,3 +141,6 @@ just lambda-deploy <PROFILE>
 - `infra/outputs.tf`, `infra/s3-spa.tf` — `spa_bucket_name`, `lambda_function_name`, `function_url`
 - `services/ui/src/sync.rs` — server-side sync-spa handler (EFS atomic swap)
 - `.github/workflows/deploy-dev.yml` — the canonical CI pipeline this mirrors locally
+- `services/llm-proxy/src/main.rs` — proxy Lambda handler (Anthropic call, OnceLock key init)
+- `infra/llm-proxy-lambda.tf` — proxy Lambda + dedicated IAM role (no VPC)
+- `justfile` — `llm-proxy-build`, `llm-proxy-deploy` recipes
