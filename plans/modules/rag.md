@@ -13,6 +13,12 @@ OpenTofu HCL, plan modules/ADRs/drift logs, and the `.claude/` agent cache. The 
   snippets and produce a root-cause explanation via `llm-core::generate`.
 - **P3 — Public `/api/ask` demo:** live endpoint on sislam.com lets visitors query the repo.
   Rate-limited; gated on `RAG_PUBLIC_ENABLED` env var.
+- **P4 — Extended knowledge corpora:** Index the portfolio's own API spec (OpenAPI JSON) and domain
+  data (jobs, competencies, about sections) alongside code/plans. Live-data retrieval at ask-time via
+  `PortfolioDataProvider` trait ensures answers reflect dashboard edits without re-indexing.
+- **P5 — Agentic portfolio assistant:** Tool-dispatch loop in llm-proxy Lambda (ADR-023); portfolio
+  tools (HTTP call-back to UI Lambda API); Claude selects tools based on query intent. Transforms
+  `/api/ask` from static RAG Q&A to an agentic assistant that can query live portfolio data.
 
 The `.claude/` cache corpus (L1 fast-path) is scoped to local CLI only — it is gitignored and must
 not be bundled into the Lambda.
@@ -116,8 +122,42 @@ All `INSERT` statements use `ON CONFLICT DO UPDATE` (ADR-010).
 | Infra HCL (`infra/*.tf`) | brace-balance regex splitter | single resource or variable block |
 | Plans/ADRs/drift (`plans/**/*.md`) | markdown H2/H3 heading split | section |
 | `.claude/` cache + memory | JSON-leaf + MD heading split | cache entry (local CLI only) |
+| OpenAPI spec (P4) | JSON path-operation splitter | one chunk per endpoint + per component schema |
+| Portfolio data (P4) | entity-to-prose serializer | one chunk per job/competency/about section |
 
 Hard max per chunk: ~800 tokens; oversize blocks fall through to sliding-window with 50% overlap.
+
+### Extended corpora (P4)
+
+**OpenAPI chunker** (`crates/rag-core/src/chunk/openapi.rs`): Parses the generated OpenAPI JSON spec,
+emits one chunk per path-operation (e.g., `GET /api/jobs`) with method, description, parameters,
+request/response schemas rendered as readable text. Component schemas emit as separate chunks. Meta
+carries `{"endpoint": "GET /api/jobs"}`.
+
+**Portfolio data chunker** (`crates/rag-core/src/chunk/portfolio.rs`): Accepts JSON-serialized
+portfolio entities from SQLite. Produces one chunk per job (with bullet details inlined), one per
+competency (with evidence items), one per about section. Content is readable prose, not raw JSON.
+
+### Filtered retrieval (P4)
+
+`retrieve_filtered(&self, query, top_k, kinds: Option<&[&str]>)` adds a `WHERE rd.source_kind IN
+(...)` clause to the FTS query. Default `retrieve()` delegates with `kinds: None` for backward
+compatibility. Enables targeted queries (e.g., portfolio-only or API-only retrieval).
+
+### Live-data retrieval (P4)
+
+`PortfolioDataProvider` trait (`crates/rag-core/src/portfolio.rs`) provides live DB queries at
+ask-time. `HybridRetriever` wraps FTS `Retriever` + `PortfolioDataProvider` — on query, injects
+live DB data as virtual `RankedChunk`s with `source_kind="portfolio"`, `git_sha="live"`. Ensures
+answers reflect dashboard edits without re-indexing.
+
+### Agentic tool execution (P5, ADR-023)
+
+The llm-proxy Lambda (non-VPC) executes portfolio tools by calling back to the UI Lambda's public
+API endpoints over HTTP. Six tools map to existing endpoints (`list_jobs`, `get_job_details`,
+`list_competencies`, `get_competency_details`, `get_resume`, `search_codebase`). The proxy Lambda
+knows the API base URL via `PORTFOLIO_API_BASE_URL` env var. Safety: `max_turns=5`,
+`token_budget=4000`.
 
 ### Embedding caching
 
@@ -165,6 +205,23 @@ injects this contract via `PromptBundle.system_prompt`.
 | W-RAG.6.1 | `services/ui/src/routes/api/ask.rs` + router wiring | DONE (2026-04-15) | POST /api/ask; Arc<RagStore> in AppState; WAL concurrent reader |
 | W-RAG.6.2 | Bundle `sqlite-vec` aarch64 SO into Lambda zip | TODO | P2; confirm binary size (~300 KB) |
 | W-RAG.6.3 | Rate-limit + `RAG_PUBLIC_ENABLED` feature flag | DONE (updated 2026-05-01) | `ASK_RATE_LIMIT` env var (default 2/min); IP from `x-forwarded-for` first → `ConnectInfo` → `"unknown"` (Lambda fix — was 127.0.0.1 global bucket); `RAG_PUBLIC_ENABLED=1` gate |
+| W-RAG.7.1 | Add `OpenApi` + `Portfolio` variants to `SourceKind` enum + `as_str()`/`Display` | TODO | `crates/rag-core/src/types.rs` — extends 4→6 variants |
+| W-RAG.7.2 | OpenAPI chunker: parse JSON spec, emit one chunk per path-operation + per component schema | TODO | New file `crates/rag-core/src/chunk/openapi.rs`; meta: `{"endpoint": "GET /api/jobs"}` |
+| W-RAG.7.3 | Portfolio data chunker: JSON-serialized jobs/competencies/about → readable prose chunks | TODO | New file `crates/rag-core/src/chunk/portfolio.rs`; one chunk per entity |
+| W-RAG.7.4 | Wire new chunkers into `chunk_file()` dispatcher | TODO | `crates/rag-core/src/chunk/mod.rs` — 2 new match arms |
+| W-RAG.7.5 | Extend `xtask rag ingest` to emit OpenAPI + portfolio corpora (6 total) | TODO | `xtask/src/rag.rs`; OpenAPI via `full_spec()`, portfolio via SQLite query |
+| W-RAG.8.1 | Enhance `DefaultPromptAssembler` for portfolio/API-aware system prompt | TODO | `crates/rag-core/src/lib.rs:93`; inspect `source_kind` of retrieved chunks |
+| W-RAG.8.2 | Add `retrieve_filtered()` with optional `source_kind IN (...)` clause | TODO | `crates/rag-sqlite/src/lib.rs`; default `retrieve()` delegates with `None` |
+| W-RAG.9.1 | `PortfolioDataProvider` trait in `rag-core` for live DB queries at ask-time | TODO | New file `crates/rag-core/src/portfolio.rs`; `serde_json::Value` return |
+| W-RAG.9.2 | Implement `PortfolioDataProvider` for `Db` (reuse existing SQL queries) | TODO | `services/ui/src/db.rs` or new `portfolio_data.rs` |
+| W-RAG.9.3 | `HybridRetriever` combining FTS + live portfolio virtual chunks | TODO | Merges indexed + live data; `source_kind="portfolio"`, `git_sha="live"` |
+| W-RAG.9.4 | Wire `HybridRetriever` into ask handler replacing raw `RagStore` | TODO | `services/ui/src/routes/api/ask.rs` |
+| W-RAG.10.1 | Define portfolio tools in llm-proxy (`list_jobs`, `get_job_details`, etc.) | TODO | New file `services/llm-proxy/src/tools.rs`; HTTP call-back to UI Lambda API |
+| W-RAG.10.2 | `PortfolioToolExecutor` implementing `ToolExecutor` via HTTP to UI Lambda | TODO | New file `services/llm-proxy/src/tool_executor.rs`; `PORTFOLIO_API_BASE_URL` env var |
+| W-RAG.10.3 | Wire agent loop into llm-proxy handler (when `tools` non-empty) | TODO | `services/llm-proxy/src/main.rs`; `max_turns=5`, `token_budget=4000` |
+| W-RAG.10.4 | Extend `AskProxyRequest`/`AskProxyResponse` with `tools`, `api_base_url`, `tools_used`, `turns` | TODO | `crates/api-openapi/src/models/ask.rs` |
+| W-RAG.10.5 | Update ask handler for agentic mode (include tool defs in proxy request) | TODO | `services/ui/src/routes/api/ask.rs` |
+| W-RAG.10.6 | Evolve system prompt for agentic portfolio assistant mode | TODO | `crates/rag-core/src/lib.rs`; codebase sources + live tools + grounding |
 
 ## W-RAG.5 Test Strategy
 
@@ -178,6 +235,32 @@ injects this contract via `PromptBundle.system_prompt`.
 - **Coverage floor:** 70% (relaxed from the library 80% floor because P3 Lambda path is harder to
   cover in unit tests).
 
+### P4 (Extended Corpora) tests
+
+- **Unit:** OpenAPI chunker against a fixture JSON spec — assert correct number of chunks (one per
+  endpoint + one per schema), assert chunk content contains endpoint method/path/parameters.
+- **Unit:** Portfolio chunker against fixture job/competency JSON — assert one chunk per entity,
+  assert content includes detail text as readable prose.
+- **Unit:** Filtered retrieval — insert portfolio + rust chunks, retrieve with
+  `kinds: Some(&["portfolio"])`, assert only portfolio chunks returned.
+- **Unit:** Enhanced assembler — given mixed openapi + plan chunks, assert system prompt includes
+  portfolio-aware instructions.
+- **Integration:** `PortfolioDataProvider` impl against seeded test DB — assert correct JSON output.
+- **Integration:** `HybridRetriever` with seeded DB + FTS index — query "what jobs does the owner
+  have?", assert both indexed chunks and live virtual chunks appear.
+- **Smoke:** `just rag-index && just rag-query "GET /api/jobs"` — expect OpenAPI chunks in results.
+
+### P5 (Agentic) tests
+
+- **Unit:** `run_agent_loop` with `StubLlmProvider` — stub returns `StopReason::ToolUse` on first
+  call, `StopReason::EndTurn` on second; assert 2 turns, tool result fed back correctly.
+- **Unit:** Max-turns safety — stub always returns ToolUse; assert capped at `max_turns`.
+- **Unit:** Token budget — cumulative tracking across turns; assert enforcement.
+- **Integration:** `PortfolioToolExecutor` against stub HTTP server — assert correct tool result
+  from each portfolio tool.
+- **E2E smoke:** `just ask "What AWS experience does the portfolio owner have?"` — assert answer
+  cites job details with AWS tech_stack.
+
 ## W-RAG.6 Cross-References
 
 - → ADR-002 (SQLite on EFS — rag store co-located in same DB)
@@ -187,6 +270,8 @@ injects this contract via `PromptBundle.system_prompt`.
 - → ADR-015 (W-LLM — Embedder + generate traits consumed here)
 - → ADR-016 (RAG architecture decision record)
 - → ADR-019 (SPA replaces Askama — RAG UI is React, not server-rendered)
-- → `cross-cutting/llm-policy.md` (grounding contract, citation format)
+- → ADR-023 (Agentic Tool-Dispatch Architecture — P5 agent loop + portfolio tools)
+- → `cross-cutting/llm-policy.md` (grounding contract, citation format, agentic cost model)
+- ← W-LLM (ToolExecutor trait + run_agent_loop in llm-core)
 - ← W-UI (P3: `/api/ask` route lives in ui-service)
 - ← W-XT (xtask rag subcommands)

@@ -16,6 +16,12 @@ The grounding contract — which enforces that the generator may only rephrase
 existing resume bullets, never invent content — is also enforced here in the
 prompt-assembly layer, making it universal across all adapters.
 
+The agent loop infrastructure — `ToolExecutor` trait and `run_agent_loop()`
+orchestrator — also lives in `llm-core`, making agentic behavior
+provider-agnostic (ADR-023). Any adapter (Anthropic, OpenAI, Bedrock) that
+parses tool calls can participate in agentic workflows without implementing
+its own loop.
+
 Template crate for structure and conventions: `crates/api-core/`.
 
 ---
@@ -37,6 +43,16 @@ pub trait EmbeddingProvider: Send + Sync {
     async fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>, LlmError>;
 }
 
+pub enum MessageContent {
+    Text(String),
+    ToolResult { tool_use_id: String, content: String, is_error: bool },
+}
+
+pub struct ChatMessage {
+    pub role: MessageRole,
+    pub content: MessageContent,       // was: String (P5 breaking change, ADR-023)
+}
+
 pub struct LlmRequest {
     pub model: String,
     pub messages: Vec<ChatMessage>,
@@ -53,6 +69,31 @@ pub struct LlmResponse {
     pub model: String,
     pub stop_reason: StopReason,
 }
+
+pub struct ToolCall {
+    pub id: String,                    // tool_use block id from API (P5, ADR-023)
+    pub name: String,
+    pub arguments: serde_json::Value,
+}
+
+pub struct ToolResult {
+    pub name: String,
+    pub content: String,
+    pub is_error: bool,
+}
+
+pub trait ToolExecutor: Send + Sync {
+    fn available_tools(&self) -> Vec<ToolDef>;
+    async fn execute(&self, call: &ToolCall) -> Result<ToolResult, LlmError>;
+}
+
+pub async fn run_agent_loop(
+    provider: &dyn LlmProvider,
+    executor: &dyn ToolExecutor,
+    initial_request: LlmRequest,
+    max_turns: usize,       // safety: 5
+    token_budget: u32,       // cumulative ceiling
+) -> Result<AgentResult, LlmError>;
 
 pub struct GroundingContract {
     /// Exact bullet text strings the generator is allowed to rephrase.
@@ -124,6 +165,31 @@ commitment. All errors use `thiserror` per workspace convention
 - Uses the Anthropic Messages API. For structured output / tool use,
   maps `LlmRequest.tools` to Anthropic's `tool_choice` format.
 
+### `ChatMessage.content` breaking change (ADR-023)
+
+`ChatMessage.content` changes from `String` to `MessageContent` enum to support
+tool-result content blocks alongside plain text. Convenience constructors
+`ChatMessage::text(role, content)` and `ChatMessage::tool_result(id, content, is_error)`
+minimize call-site migration churn. Affected files (6 total):
+
+- `crates/llm-core/src/grounding.rs` — message construction
+- `crates/llm-core/src/testing.rs` — stub response construction
+- `crates/llm-anthropic/src/lib.rs` — message serialization
+- `services/llm-proxy/src/main.rs` — request construction
+- `xtask/src/rag.rs` — ask command
+- `xtask/src/resume/generate.rs` — polish_bio
+
+### Agent loop (`run_agent_loop`)
+
+The loop lives in `crates/llm-core/src/agent_loop.rs`:
+
+1. Sends `LlmRequest` to the provider
+2. On `StopReason::ToolUse`, calls `ToolExecutor::execute()` for each tool call
+3. Appends tool results as `MessageContent::ToolResult` messages
+4. Repeats until `EndTurn`, `max_turns` (default 5), or `token_budget` (default 4000) exhaustion
+
+Returns `AgentResult { final_content, tool_calls_made, total_tokens, turns, model }`.
+
 ### Cargo feature flag selection
 `services/ui/Cargo.toml` feature flag:
 ```toml
@@ -154,6 +220,13 @@ is injected at startup in `main.rs`.
 | W-LLM.4.5 | `llm-anthropic` integration tests: `provider_id_is_anthropic`, `default_model_is_haiku` (CI-safe); `live_generate_*` (3 `#[ignore]` tests, run via `just test-llm PROFILE`) | DONE (2026-04-15) | |
 | W-LLM.4.6 | **Future**: `crates/llm-openai`, `crates/llm-bedrock`, `crates/llm-ollama`, `crates/llm-gemini` — additional `LlmProvider` adapters. Not scheduled. | DEFERRED | |
 | W-LLM.4.7 | **Future**: `crates/llm-fastembed` — local ONNX `EmbeddingProvider` impl. Ships alongside W-RST.4.11. ADR-016 created at that point. | DEFERRED | |
+| W-LLM.4.8 | Add `id: String` field to `ToolCall` struct | TODO | `crates/llm-core/src/types.rs:31`; required for Anthropic tool_result messages |
+| W-LLM.4.9 | Extend `ChatMessage.content` from `String` to `MessageContent` enum (Text + ToolResult) | TODO | Breaking change; add `ChatMessage::text()`, `ChatMessage::tool_result()` convenience constructors |
+| W-LLM.4.10 | Define `ToolExecutor` trait + `ToolResult` struct | TODO | New file `crates/llm-core/src/tool_executor.rs`; `available_tools()`, `execute()` |
+| W-LLM.4.11 | Implement `run_agent_loop()` orchestrator | TODO | New file `crates/llm-core/src/agent_loop.rs`; loops on `StopReason::ToolUse`; safety: `max_turns`, `token_budget` |
+| W-LLM.4.12 | Update `StubLlmProvider` for tool-use testing (`with_tool_response`) | TODO | `crates/llm-core/src/testing.rs`; simulate ToolUse → execute → EndTurn in CI |
+| W-LLM.4.13 | Update Anthropic adapter: parse `id` from `ContentBlock::ToolUse`, serialize `MessageContent::ToolResult` as content-array | TODO | `crates/llm-anthropic/src/lib.rs`; Anthropic tool_result format |
+| W-LLM.4.14 | Migrate all call-sites for `ChatMessage.content` breaking change | TODO | 6 files: grounding.rs, testing.rs, llm-anthropic, llm-proxy, xtask/rag.rs, xtask/resume/generate.rs |
 
 ---
 
@@ -178,10 +251,12 @@ is injected at startup in `main.rs`.
 ## W-LLM.6 Cross-References
 
 - → ADR-015 (structural decision — pluggable framework + grounding contract)
+- → ADR-023 (Agentic Tool-Dispatch Architecture — agent loop + ToolExecutor)
 - → ADR-012 (OpenAPI SSOT — LlmRequest/LlmResponse may surface via OpenAPI models)
 - → W-RST (primary consumer of `LlmProvider` trait)
 - → W-SEC (secret `deploy-baba/prod/anthropic-api-key`)
 - → W-DX.3 (per-crate README coverage)
-- → `plans/cross-cutting/llm-policy.md` (operational rules, provider registry)
+- → `plans/cross-cutting/llm-policy.md` (operational rules, provider registry, agentic cost model)
 - → `crates/api-core/` (template crate for structure and conventions)
 - → workspace `claude-api` skill (Anthropic SDK usage guidance)
+- ← W-RAG (PortfolioToolExecutor consumes ToolExecutor trait + agent loop)

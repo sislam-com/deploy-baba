@@ -1,5 +1,5 @@
 # deploy-baba — Plan Index
-**GitHub:** `shantopagla/deploy-baba` | **Last updated:** 2026-05-03
+**GitHub:** `shantopagla/deploy-baba` | **Last updated:** 2026-05-04
 **Source repo:** `~/shanto` (Baba Toolchain, ~85K LOC) | **Status:** ~95% complete
 
 See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming rules.
@@ -32,9 +32,9 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | contact-form | W-CTF | `services/email/`, `services/ui/src/routes/contact.rs`, `infra/ses.tf`, `infra/email-lambda.tf`, `infra/apigateway.tf` | WIP | e2e test (W-CTF.4.12) — deploy step pending |
 | secrets-manager | W-SEC | `xtask/src/secret.rs`, `infra/secrets.tf`, `infra/vpc-endpoints.tf`, `services/ui/src/routes/contact.rs` | DONE | Deploy: `just infra-apply` + `just secret-put pow-secret $(openssl rand -hex 32)` + `just lambda-deploy` |
 | dashboard-sync | W-SYNC | `plans/modules/dashboard-sync.md`, `services/ui/migrations/`, `services/ui/src/db.rs`, `services/ui/src/routes/api/admin.rs`, `.claude/skills/sync-dashboard-data/` | DONE | 4.1–4.5 complete; zero drift on first run 2026-04-08; .4.6/.4.7 deferred (on-demand) |
-| llm-core + llm-anthropic | W-LLM | `crates/llm-core/`, `crates/llm-anthropic/` | WIP | W-LLM.4.1–4.3, 4.5 DONE; W-LLM.4.4 (per-crate READMEs), W-LLM.4.6 DEFERRED |
+| llm-core + llm-anthropic | W-LLM | `crates/llm-core/`, `crates/llm-anthropic/` | WIP | W-LLM.4.1–4.5 DONE; W-LLM.4.8–4.14 (tool-dispatch loop, ADR-023) TODO; W-LLM.4.4 (READMEs), 4.6 DEFERRED |
 | resume-tailor | W-RST | `services/ui/src/tailor/`, `crates/api-openapi/src/models/tailor.rs`, `services/ui/migrations/016` | TODO | All items; BLOCKED-on-deploy for 4.3/4.4/4.5 until W-SEC deployed + `anthropic-api-key` in SM |
-| rag | W-RAG | `crates/rag-core/`, `crates/rag-sqlite/` | WIP | P1 DONE (CLI + SQLite store); P2/P3 TODO; W-RAG.1.1–1.2 DONE; blocked on W-LLM for generation |
+| rag | W-RAG | `crates/rag-core/`, `crates/rag-sqlite/` | WIP | P1 DONE; P3 (public `/api/ask`) DONE; P4 extended corpora (W-RAG.7–8) TODO; P5 agentic (W-RAG.9–10, ADR-023) TODO |
 | gdrive-planning | W-GDR | `justfile`, `.claude/settings.json`, `.github/workflows/` | TODO | Drive MCP plan export/import (W-GDR.4.1–4.3); Stop hook quality gate (W-GDR.4.4); evaluated from Gemini proposal 2026-04-15 |
 | ai-dlc | W-AIL | `.claude/agents/`, `.claude/skills/` | DONE | plan-doctor + drift-detector subagents; /plan-sync, /cache-refresh, /memory-curate skills; weekly schedule |
 | ci | W-CI | `.github/workflows/` | WIP | Code complete (C.1 + C.2 DONE). W-CI.4.9 RESOLVED 2026-05-04 — GH Variables replaced by SM fetch (DRL-2026-05-04-sislam-outage); bootstrap ARNs set. Remaining: W-CI.4.5 (dev Lambda workspace), W-CI.4.10 (production env gate) |
@@ -102,12 +102,17 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 11. **W-PUB.2** — Tag `v0.1.0` + `just publish`
 11. **W-UI.4.1** — Wire utoipa-rapidoc properly (currently using inline HTML)
 
-### P3 — LLM + RAG Subsystem (new, phased)
-12. **W-LLM** — Author `crates/llm-core` + `crates/llm-anthropic` + ADR-015 (prerequisite for W-RAG generation and W-RST)
-13. **W-RAG.2.1–3.4** — `rag-core` + `rag-sqlite` crates, chunkers, `xtask rag ingest/query`, justfile verbs (P1: FTS-only CLI, no embedder needed)
+### P3 — LLM + RAG Subsystem (phased)
+12. ~~**W-LLM**~~ — `crates/llm-core` + `crates/llm-anthropic` + ADR-015 — **DONE** (W-LLM.4.1–4.5)
+13. ~~**W-RAG.2.1–3.4**~~ — `rag-core` + `rag-sqlite` crates, chunkers, xtask rag, justfile verbs — **DONE** (P1 FTS-only)
 14. **W-RAG.4.1–4.2** — Wire embedder + generate via W-LLM (BLOCKED on W-LLM)
 15. **W-RAG.5.1** — Deploy-failure diagnosis hook (P2; BLOCKED on W-RAG.4.2)
-16. **W-RAG.6.1–6.3** — Public `/api/ask` endpoint + rate-limit + Lambda bundle (P3; BLOCKED on W-RAG.4.2)
+16. ~~**W-RAG.6.1–6.3**~~ — Public `/api/ask` endpoint + rate-limit — **DONE** (2026-05-01)
+17. **W-RAG.7.1–7.5** — Extended RAG corpora: OpenAPI spec + portfolio data chunkers, 6-corpus ingest
+18. **W-RAG.8.1–8.2** — Portfolio-aware prompt assembly + filtered retrieval
+19. **W-RAG.9.1–9.4** — Live-data retrieval: `PortfolioDataProvider` trait, `HybridRetriever`, ask handler wiring
+20. **W-LLM.4.8–4.14** — Tool-dispatch loop: `ToolExecutor` trait, `run_agent_loop()`, `ChatMessage` content enum, Anthropic adapter update (ADR-023)
+21. **W-RAG.10.1–10.6** — Agentic portfolio assistant: portfolio tools, HTTP call-back executor, agentic ask handler (ADR-023)
 
 ---
 
@@ -137,6 +142,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | ADR-020 | GitHub Actions CI with OIDC — two IAM roles (dev/prod); no long-lived keys; deploy-dev.yml + deploy-prod.yml | W-CI, W-OTF, W-WEB |
 | ADR-021 | Automated Release Tagging via xtask — `dev-vX.Y.Z` on CI; `vX.Y.Z` via `just release-promote`; conventional-commits versioning | W-CI, W-XT |
 | ADR-022 | Developer First-Run Environment — scripts/bootstrap-tfstate.sh; scripts/dev-doctor.sh; .devcontainer/; initial-setup.md | W-DEV, W-DX |
+| ADR-023 | Agentic Tool-Dispatch Architecture — provider-agnostic agent loop in llm-core; HTTP call-back from llm-proxy to UI Lambda for tool execution; ChatMessage breaking change | W-LLM, W-RAG, W-UI, W-APIO |
 
 ---
 
@@ -173,7 +179,8 @@ api-core     ←── api-openapi, api-graphql, api-grpc, api-merger, services/
 api-openapi  ←── api-merger, services/ui
 api-graphql  ←── api-merger
 api-grpc     ←── api-merger
-llm-core     ←── llm-anthropic, services/ui (via W-RST tailor pipeline)
+llm-core     ←── llm-anthropic, services/ui (via W-RST), services/llm-proxy (agent loop, ADR-023)
+rag-core     ←── rag-sqlite, services/ui (ask handler), xtask (rag commands)
 ```
 
 Full dependency order: `plans/cross-cutting/dependency-graph.md`
