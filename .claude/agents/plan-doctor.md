@@ -47,11 +47,11 @@ Read all `plans/adr/ADR-*.md` files whose **Status** is "Accepted".
 
 ## Output format
 
-Produce a markdown report with exactly four sections. Under each section, use bullet points. Each finding must cite a file path and line number where possible.
+Keep output concise to minimize parent context cost. Only report findings — do not enumerate every module/ADR checked.
 
 ```
 ## Status mismatches
-- <finding>
+- <finding with file path and line number>
 
 ## Stale work items
 - <finding>
@@ -63,9 +63,9 @@ Produce a markdown report with exactly four sections. Under each section, use bu
 - <finding>
 ```
 
-If a section has no findings, write `- None.` under it.
+If a section has no findings, write `None` on one line. Do not list what was checked — only problems found.
 
-End with a one-line summary: "X findings total (Y blocking, Z advisory)."
+End with: "X findings total (Y blocking, Z advisory)."
 
 Blocking = status mismatch or cache drift > 7 days old. Advisory = everything else.
 
