@@ -1,107 +1,105 @@
 ---
 name: add-route
-description: Add a new Axum route handler with an Askama template following the services/ui patterns. Handles handler creation, router registration, and template wiring including social_links for nav.
+description: Add a new Axum JSON API endpoint and/or React page route following the services/ui + web/ SPA patterns. Handles handler creation, router registration, and React component wiring.
 argument-hint: "[route-path] [handler-name]"
 ---
 
-Add a new page or API endpoint to `services/ui`. All routes use Axum + Askama (compile-time Jinja2 templates).
+Add a new page or API endpoint to the portfolio. Backend routes use Axum (JSON API). Frontend pages are React components in `web/` (ADR-019).
 
 ## Decision: Page Route vs API Endpoint?
 
-- **Page route** (HTML response, public) → follow Steps 1–5
-- **Admin API endpoint** (JSON, auth-gated) → see `add-dashboard-crud` skill instead
+- **Page route** (visible in browser) → Steps 1–4
+- **API endpoint** (JSON, public or auth-gated) → Step 5
+- **Both** (new page that needs new data) → Steps 1–5
 
 ## Steps for a Page Route
 
-### 1. Create the handler file
+### 1. Create the React component
 
-Path: `services/ui/src/routes/<name>.rs`
+Path: `web/src/routes/<Name>.tsx` (public) or `web/src/routes/dashboard/<Name>.tsx` (auth-gated)
+
+```tsx
+export default function Name() {
+  return (
+    <section className="max-w-4xl mx-auto px-4 py-8">
+      <h1 className="text-2xl font-bold text-white mb-6">Page Title</h1>
+    </section>
+  );
+}
+```
+
+For pages that fetch data, use `useEffect` + `useState` to call the corresponding `/api/*` endpoint.
+
+### 2. Register in App.tsx
+
+File: `web/src/App.tsx`
+
+For public routes, add inside the `<Layout>` wrapper:
+```tsx
+<Route path="/path" element={<Name />} />
+```
+
+For dashboard routes, add inside the `<DashboardLayout>` wrapper:
+```tsx
+<Route path="/dashboard/path" element={<Name />} />
+```
+
+### 3. Add navigation link (if needed)
+
+- **Public nav:** Edit `web/src/components/Layout.tsx`
+- **Dashboard sidebar:** Edit `web/src/routes/dashboard/Layout.tsx`
+
+### 4. Verify
+
+```
+cd web && pnpm typecheck   # TypeScript strict mode
+cd web && pnpm dev         # confirm the route loads in a browser
+```
+
+## Step 5: API Endpoint (JSON)
+
+### 5a. Create the handler
+
+Path: `services/ui/src/routes/api/<name>.rs`
 
 ```rust
-use askama::Template;
-use axum::response::Html;
-use crate::db::DbPool;
-use crate::routes::SocialLink;
-
-#[derive(Template)]
-#[template(path = "<name>.html")]
-struct <Name>Template {
-    social_links: Vec<SocialLink>,
-    // add page-specific fields here
-}
+use axum::{extract::State, Json};
+use std::sync::Arc;
+use crate::db::Db;
 
 pub async fn handler(
-    axum::extract::State(pool): axum::extract::State<DbPool>,
-) -> Html<String> {
-    let social_links = crate::db::get_social_links(&pool).unwrap_or_default();
-    let tmpl = <Name>Template { social_links };
-    Html(tmpl.render().unwrap())
+    State(db): State<Arc<Db>>,
+) -> Json<serde_json::Value> {
+    Json(serde_json::json!({ "status": "ok" }))
 }
 ```
 
-**Critical:** Always include `social_links: Vec<SocialLink>` — the base template renders the nav from this field.
+### 5b. Register in router.rs
 
-### 2. Register in routes/mod.rs
-
-File: `services/ui/src/routes/mod.rs`
+File: `services/ui/src/router.rs`
 
 ```rust
-pub mod <name>;
+.route("/api/<path>", get(api::<name>::handler))
 ```
 
-### 3. Register in router.rs
+For auth-protected endpoints, nest under the `/api/admin` router with `require_auth` middleware.
 
-File: `services/ui/src/routes/router.rs` (or wherever `Router::new()` is built)
+### 5c. Add OpenAPI annotation (if public)
 
-```rust
-.route("/<path>", get(<name>::handler))
-```
+Add `#[utoipa::path(...)]` attribute to the handler. Register in `openapi.rs`.
 
-For auth-protected routes, chain `.route_layer(require_auth())`.
-
-### 4. Create the Askama template
-
-Path: `services/ui/templates/<name>.html`
-
-```html
-{% extends "base.html" %}
-
-{% block title %}<Page Title>{% endblock %}
-
-{% block content %}
-<section class="...">
-  <h1>...</h1>
-</section>
-{% endblock %}
-```
-
-The `base.html` template iterates `social_links` for the nav — no extra wiring needed beyond including the field in the template struct.
-
-### 5. Verify
+### 5d. Verify
 
 ```
 just dev       # fmt + lint + test
-just ui-run    # confirm the route loads in a browser
+just ui        # confirm the endpoint responds
 ```
-
-## API Endpoint (JSON, no template)
-
-```rust
-pub async fn handler(
-    axum::extract::State(pool): axum::extract::State<DbPool>,
-) -> axum::Json<serde_json::Value> {
-    // ...
-    axum::Json(serde_json::json!({ "status": "ok" }))
-}
-```
-
-Register with the appropriate HTTP verb: `get()`, `post()`, `put()`, `delete()`.
 
 ## Key Files
 
-- `services/ui/src/routes/` — all route handlers
-- `services/ui/src/routes/router.rs` — router assembly
-- `services/ui/src/routes/mod.rs` — module declarations
-- `services/ui/templates/` — Askama templates
-- `services/ui/templates/base.html` — base layout with nav
-- `services/ui/src/db.rs` — `get_social_links()` and other DB helpers
+- `web/src/App.tsx` — React route definitions
+- `web/src/routes/` — page components (public)
+- `web/src/routes/dashboard/` — dashboard components (auth-gated)
+- `services/ui/src/routes/` — Axum API handlers
+- `services/ui/src/router.rs` — router assembly
+- `services/ui/src/db.rs` — DB query helpers

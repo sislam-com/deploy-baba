@@ -2,19 +2,19 @@
 
 **Date:** 2026-05-04
 **Topic:** ADR-005 rule 2 references Askama, which was removed by ADR-019
-**Status:** Open
+**Status:** Resolved (2026-05-04)
 
 ## Observation
 
-ADR-005 (HTML-First UI Architecture) rule 2 states:
-> "All HTML is rendered via Askama typed templates."
+ADR-005 (Zero-Cost Philosophy) rule 2 states:
+> "Compile-time template embedding — services/ui/ uses Askama..."
 
-However, ADR-019 replaced Askama with Minijinja as the template engine. The codebase confirms Minijinja is in use — `askama` does not appear in any `Cargo.toml`.
+However, ADR-019 replaced all 15 Askama templates with a React/Vite SPA in `web/`. The `services/ui` crate now serves JSON only.
 
 ## Impact
 
-Low — ADR-005 is structurally sound except for the stale engine name. The principle (typed server-rendered templates) still holds; only the specific engine reference is wrong.
+Low — ADR-005 is structurally sound except for the stale engine reference. The zero-cost principle still holds via content-hashed static assets from S3/EFS.
 
-## Recommended Resolution
+## Resolution
 
-Update ADR-005 rule 2 to reference Minijinja instead of Askama, or add an addendum noting that ADR-019 supersedes the engine choice while preserving the architectural intent.
+ADR-005 rule 2 updated with ADR-019 supersession addendum. Zero-cost rationale preserved.

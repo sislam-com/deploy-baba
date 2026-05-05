@@ -60,16 +60,15 @@ services/ui/src/
 ├── router.rs        # All route registration + OpenAPI spec assembly
 ├── openapi.rs       # #[derive(OpenApi)] root spec
 └── routes/
-    ├── resume.rs    # GET / → Askama template (home page, → W-RSM)
+    ├── resume.rs    # GET /api/resume → JSON handler (home page data, → W-RSM)
     ├── health.rs    # GET /health → JSON
     └── api/
         ├── crates.rs  # crate metadata (hardcoded from workspace)
         ├── stack.rs   # parse stack.toml via config-toml
         └── demo.rs    # live config-parse + spec-generate
-templates/
-├── base.html        # Layout: nav ("Sharful Islam"), footer, Tailwind CDN
-└── resume.html      # Dual-view home page: timeline + capabilities toggle
 ```
+
+UI rendering handled by React SPA in `web/` (ADR-019). Lambda serves JSON only.
 
 ### Lambda Binary Size (target < 10 MB compressed)
 ```toml
@@ -80,7 +79,7 @@ opt-level      = "z"    # optimize for size
 strip          = true
 ```
 
-Askama templates: ~0 overhead (compile-time embedded).
+UI rendering moved to React SPA in web/ (ADR-019). Lambda serves JSON only.
 SQLite (rusqlite, bundled) added for resume data — see W-RSM for data model and migration runner.
 
 ### Not imported in UI service

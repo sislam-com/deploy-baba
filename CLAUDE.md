@@ -32,7 +32,7 @@ Update `git.sha`, `last_updated`, and the relevant component's `git_sha_at_scan`
 |-----|----------|
 | `project` | Name, status, tech stack, task runner |
 | `crates.*` | Per-crate: description, dependencies, dependents, role, open issues |
-| `services.ui` | Routes dir, templates dir, framework, auth, open issues |
+| `services.ui` | Routes dir, framework (JSON API), auth, open issues |
 | `infra` | OpenTofu files, AWS resources, open issues |
 | `plans` | Priority queue (P0→P3), module status, ADRs |
 | `database` | Engine, location, migration path |

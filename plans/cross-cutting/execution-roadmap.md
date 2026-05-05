@@ -175,7 +175,7 @@ With Phase 2 proving the stack, the full pipeline is mechanical.
 | 5.3 | W-RST.4.6 | Refactor `xtask/src/resume/generate.rs` renderer to accept tailored JSON alongside static DB read | Refactor, not rewrite |
 | 5.4 | W-RST.4.8 | Migration 016: `tailor_cache` table with cache key `sha256(jd_text ‖ provider_id ‖ model ‖ prompt_version)` | ADR-010 upsert NOT required — this is computed state |
 | 5.5 | W-RST.4.7 | `POST /api/admin/tailor` handler — parser → matcher → generator → renderer → S3 upload → presigned URL | Cognito-gated; Lambda Function URL (ADR-003, NOT ADR-009) |
-| 5.6 | W-RST.4.9 | `/dashboard/tailor` Askama template — paste form, async submit, download links | ADR-013 dark theme |
+| 5.6 | W-RST.4.9 | `/dashboard/tailor` React component (ADR-019) — paste form, async submit, download links | ADR-013 dark theme |
 | 5.7 | W-RST.4.10 | Cost cap + rate limit enforcement via `llm-core` middleware | Per `plans/cross-cutting/llm-policy.md` |
 
 **Exit criteria:**

@@ -58,10 +58,6 @@ base64 = "0.22"
 lambda_http = "0.13"
 lambda_runtime = "0.13"
 
-# Templates
-askama = "0.12"
-askama_axum = "0.4"
-
 # OpenAPI
 utoipa = { version = "4", features = ["axum_extras"] }
 utoipa-rapidoc = "4"

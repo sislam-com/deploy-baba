@@ -53,13 +53,10 @@ services/ui/
 ├── src/
 │   ├── db.rs                            # Db struct, open(), migration runner
 │   └── routes/
-│       ├── resume.rs                    # GET / → Askama handler (home page)
+│       ├── resume.rs                    # GET /api/resume → JSON handler (home page data)
 │       └── api/
 │           ├── jobs.rs                  # GET /api/jobs, GET /api/jobs/{slug}
 │           └── competencies.rs          # GET /api/competencies, GET /api/competencies/{slug}
-└── templates/
-    └── resume.html                      # Dual-view: timeline + capabilities toggle
-
 xtask resume generation (W-XT.4.5):
 xtask/src/resume/
 ├── mod.rs                               # CLI subcommand: resume generate | resume upload
@@ -72,7 +69,8 @@ xtask/src/resume/
 ## W-RSM.4 API Surface
 
 ```
-GET  /                                    Dual-view HTML home page (Askama server-rendered)
+GET  /                                    SPA entry point (React — ADR-019)
+GET  /api/resume                          Resume data JSON endpoint
 GET  /api/jobs                            [{slug, company, title, dates, summary, tech_stack}, ...]
 GET  /api/jobs/{slug}                     Job + detail bullets grouped by category
 GET  /api/competencies                    [{slug, name, description, icon}, ...]
