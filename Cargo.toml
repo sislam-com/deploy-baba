@@ -15,6 +15,7 @@ members = [
     "crates/api-grpc",
     "crates/api-merger",
     "crates/infra-types",
+    "crates/portfolio-rag-mcp",
     "services/ui",
     "services/email",
     "services/llm-proxy",
@@ -57,10 +58,6 @@ base64 = "0.22"
 # Lambda
 lambda_http = "0.13"
 lambda_runtime = "0.13"
-
-# Templates
-askama = "0.12"
-askama_axum = "0.4"
 
 # OpenAPI
 utoipa = { version = "4", features = ["axum_extras"] }

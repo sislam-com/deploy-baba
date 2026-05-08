@@ -7,7 +7,7 @@
 
 Add two public "About" pages to the portfolio: `/about/me` (personal bio, skills, background)
 and `/about/repo` (project description, tech stack, architecture decisions). Content is stored
-in SQLite and rendered via Askama templates extending `base.html`.
+in SQLite and served as JSON via `/api/about/sections` to the React SPA (ADR-019).
 
 ## W-ABT.2 Public API Surface
 
@@ -44,7 +44,7 @@ CREATE INDEX IF NOT EXISTS idx_about_sections_page ON about_sections(page);
 
 Follows `routes/resume.rs`: shared `query_sections(db, page)` helper returns `Vec<AboutSection>`.
 Two handlers (`about_me`, `about_repo`) each call the helper with their page discriminator and
-render their respective Askama template.
+return JSON consumed by the React SPA frontend.
 
 ### UX
 
@@ -105,7 +105,7 @@ render their respective Askama template.
 ## W-ABT.6 Cross-References
 
 - → W-UI (ui-service framework)
-- → W-RSM (resume pattern reference for DB queries + Askama templates)
+- → W-RSM (resume pattern reference for DB queries + JSON API)
 - → ADR-002 (SQLite on EFS)
 - → ADR-010 (upsert re-seed convention — about_sections already has UNIQUE(slug))
 - → ADR-013 (React SPA — about page content served via JSON to SPA)

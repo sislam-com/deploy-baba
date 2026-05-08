@@ -67,8 +67,7 @@ utoipa        = { version = "4", features = ["axum_extras"] }
 axum          = "0.7"
 lambda_http   = "0.13"          # Lambda ↔ Axum adapter
 tower-http    = { version = "0.5", features = ["cors", "trace"] }
-askama        = "0.12"          # Compile-time templates → embedded in binary
-askama_axum   = "0.4"
+# Askama removed by ADR-019 — UI now rendered by React SPA in web/
 utoipa-rapidoc = "4"            # RapiDoc at /docs
 anyhow        = "1"             # OK in binary (not library)
 tracing       = "0.1"

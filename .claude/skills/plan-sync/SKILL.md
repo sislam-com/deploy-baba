@@ -29,15 +29,41 @@ Just invoke `/plan-sync` — no arguments needed. Optionally scope the drift che
 
 When this skill is invoked:
 
-### Step 1 — Parallel audit
+### Step 0 — Scope to changed files (cost optimization)
 
-Launch two subagents in a single message (parallel):
+Before launching subagents, determine what actually changed:
+
+1. Read `.agent-cache/index.json` to get the cached `git.sha`.
+2. Run: `git diff --name-only <cached_sha> HEAD` (or `HEAD~5 HEAD` if cache is missing).
+3. Filter the changed files to identify:
+   - **changed_modules**: plan module files in `plans/modules/` that changed
+   - **changed_source**: source paths (`crates/`, `services/`, `infra/`, `web/`, `xtask/`) that changed
+   - **changed_adrs**: ADR files in `plans/adr/` that changed
+4. Map changed source paths to their plan domain codes (e.g. `services/ui/` → W-UI, `crates/rag-core/` → W-RAG).
+5. Build the scoped audit lists:
+   - **modules_to_check**: union of changed_modules + modules whose source paths changed
+   - **adrs_to_check**: union of changed_adrs + ADRs referenced by modules_to_check
+
+**If no plan-relevant files changed** (no plans/, no source, no infra, no .claude/):
+Print "No plan-relevant changes since last cache — skipping audit." and stop.
+
+### Step 1 — Scoped parallel audit
+
+Launch two subagents in a single message (parallel), passing the scoped lists:
 ```
-Agent(subagent_type="plan-doctor",   prompt="Run full audit")
-Agent(subagent_type="drift-detector", prompt="<scope from args, or 'full sweep'>")
+Agent(subagent_type="plan-doctor",   prompt="Audit only these modules: <modules_to_check>. Check their status, work items, cache drift, and ADR back-references. Skip all other modules.")
+Agent(subagent_type="drift-detector", prompt="Audit only these ADRs: <adrs_to_check>. Skip all others.")
 ```
+
+If `adrs_to_check` is empty, skip the drift-detector agent entirely.
+If a specific ADR was passed as an argument (e.g. `/plan-sync ADR-015`), use that as the sole scope for drift-detector.
 
 Wait for both to complete. Collect their markdown reports.
+
+### Step 1.5 — Early exit
+
+If both agents report zero findings, print "Plan system clean — no fixes needed." and stop.
+Do not proceed to Steps 2-6.
 
 ### Step 2 — Auto-fix: status table
 

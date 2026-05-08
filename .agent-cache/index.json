@@ -2,7 +2,7 @@
   "_meta": {
     "description": "Global agent cache for deploy-baba. Claude reads this on startup to avoid re-exploring unchanged code.",
     "generated_by": "just cache-refresh",
-    "last_updated": "2026-05-04",
+    "last_updated": "2026-05-08",
     "schema_version": "1.0.0",
     "usage": "Check git.sha against `git rev-parse HEAD`. If match: use cached data. If mismatch: re-scan changed components only, then update this file."
   },
@@ -16,7 +16,20 @@
     "ADR-007": "OpenTofu over Terraform — MPL-2.0; `tofu` CLI; drop-in HCL compatible (Accepted)",
     "ADR-008": "Cognito Authentication — implicit grant, JWKS from env var, HttpOnly cookie, dev-mode bypass",
     "ADR-009": "API Gateway HTTP API for POST /api/contact — OAC body hash workaround (DRL-FUA-3)",
-    "ADR-010": "SQLite Upsert as the Canonical Re-Seed Convention — INSERT … ON CONFLICT(natural_key) DO UPDATE SET …; bans INSERT OR IGNORE, INSERT OR REPLACE, split UPDATE+INSERT"
+    "ADR-010": "SQLite Upsert as the Canonical Re-Seed Convention — INSERT … ON CONFLICT(natural_key) DO UPDATE SET …; bans INSERT OR IGNORE, INSERT OR REPLACE, split UPDATE+INSERT",
+    "ADR-011": "Synchronous Email Lambda Invocation with Typed Response Propagation",
+    "ADR-012": "OpenAPI SSOT + Public/Admin Spec Split",
+    "ADR-013": "Admin Dashboard Dark Theme Convention",
+    "ADR-014": "Resume Professional Summary Sourced from DB (about_sections.me-bio)",
+    "ADR-015": "LLM Provider Abstraction + Grounding Contract",
+    "ADR-016": "RAG Architecture — FTS5 BM25, 6 corpora, grounded generation",
+    "ADR-017": "AI-Assisted Development Lifecycle (AI-DLC)",
+    "ADR-018": "Anti-rot Agents for the AI-DLC",
+    "ADR-019": "React/Vite SPA Replaces Server-Side Askama Templates (Accepted 2026-04-30)",
+    "ADR-020": "GitHub Actions CI with OIDC",
+    "ADR-021": "Automated Release Tagging via xtask",
+    "ADR-022": "Developer First-Run Environment",
+    "ADR-023": "Agentic Tool-Dispatch Architecture"
   },
   "crates": {
     "api-core": {
@@ -37,7 +50,7 @@
         "default",
         "validation"
       ],
-      "git_sha_at_scan": "b89e8b39e6b2a9d37f96e6c3b5b8d03e8c7603fe",
+      "git_sha_at_scan": "6133fe250a79c534d411896cd7f94053d447a9f2",
       "key_files": [
         "src/lib.rs"
       ],
@@ -58,7 +71,7 @@
       ],
       "description": "GraphQL schema generator implementing api-core traits",
       "features": [],
-      "git_sha_at_scan": "b89e8b39e6b2a9d37f96e6c3b5b8d03e8c7603fe",
+      "git_sha_at_scan": "6133fe250a79c534d411896cd7f94053d447a9f2",
       "key_files": [
         "src/lib.rs"
       ],
@@ -79,7 +92,7 @@
       ],
       "description": "gRPC/Protocol Buffer schema generator implementing api-core traits",
       "features": [],
-      "git_sha_at_scan": "b89e8b39e6b2a9d37f96e6c3b5b8d03e8c7603fe",
+      "git_sha_at_scan": "6133fe250a79c534d411896cd7f94053d447a9f2",
       "key_files": [
         "src/lib.rs"
       ],
@@ -103,7 +116,7 @@
       ],
       "description": "Multi-format API specification merging with conflict resolution",
       "features": [],
-      "git_sha_at_scan": "b89e8b39e6b2a9d37f96e6c3b5b8d03e8c7603fe",
+      "git_sha_at_scan": "6133fe250a79c534d411896cd7f94053d447a9f2",
       "key_files": [
         "src/lib.rs"
       ],
@@ -126,7 +139,7 @@
       ],
       "description": "OpenAPI 3.0 specification generator implementing api-core traits",
       "features": [],
-      "git_sha_at_scan": "b89e8b39e6b2a9d37f96e6c3b5b8d03e8c7603fe",
+      "git_sha_at_scan": "6133fe250a79c534d411896cd7f94053d447a9f2",
       "key_files": [
         "src/lib.rs"
       ],
@@ -151,7 +164,7 @@
         "default",
         "validation"
       ],
-      "git_sha_at_scan": "b89e8b39e6b2a9d37f96e6c3b5b8d03e8c7603fe",
+      "git_sha_at_scan": "6133fe250a79c534d411896cd7f94053d447a9f2",
       "key_files": [
         "src/lib.rs"
       ],
@@ -170,7 +183,7 @@
       "dependents": [],
       "description": "JSON implementation of config-core universal traits",
       "features": [],
-      "git_sha_at_scan": "b89e8b39e6b2a9d37f96e6c3b5b8d03e8c7603fe",
+      "git_sha_at_scan": "6133fe250a79c534d411896cd7f94053d447a9f2",
       "key_files": [
         "src/lib.rs"
       ],
@@ -191,7 +204,7 @@
       ],
       "description": "TOML implementation of config-core universal traits",
       "features": [],
-      "git_sha_at_scan": "b89e8b39e6b2a9d37f96e6c3b5b8d03e8c7603fe",
+      "git_sha_at_scan": "6133fe250a79c534d411896cd7f94053d447a9f2",
       "key_files": [
         "src/lib.rs"
       ],
@@ -210,7 +223,7 @@
       "dependents": [],
       "description": "YAML implementation of config-core universal traits",
       "features": [],
-      "git_sha_at_scan": "b89e8b39e6b2a9d37f96e6c3b5b8d03e8c7603fe",
+      "git_sha_at_scan": "6133fe250a79c534d411896cd7f94053d447a9f2",
       "key_files": [
         "src/lib.rs"
       ],
@@ -233,7 +246,7 @@
         "default",
         "config (optional: config-core)"
       ],
-      "git_sha_at_scan": "b89e8b39e6b2a9d37f96e6c3b5b8d03e8c7603fe",
+      "git_sha_at_scan": "6133fe250a79c534d411896cd7f94053d447a9f2",
       "key_files": [
         "src/lib.rs"
       ],
@@ -247,7 +260,7 @@
     "backup": "S3 via EventBridge schedule",
     "engine": "SQLite (rusqlite 0.32 bundled)",
     "file": "deploy-baba.db",
-    "git_sha_at_scan": "b89e8b39e6b2a9d37f96e6c3b5b8d03e8c7603fe",
+    "git_sha_at_scan": "6133fe250a79c534d411896cd7f94053d447a9f2",
     "latest_migrations": [
       "012_update_about_sections (W-ABT — superseded split convention; ADR-010 upsert applies to new migrations)",
       "013_align_linkedin_profile (W-LINK — ADR-010 upsert to update LinkedIn URL)",
@@ -259,15 +272,15 @@
     "upsert_convention": "ADR-010 — INSERT … ON CONFLICT(natural_key) DO UPDATE SET …; banned: INSERT OR IGNORE, INSERT OR REPLACE, split UPDATE+INSERT"
   },
   "git": {
-    "branch": "feat/rag-extend",
-    "last_commit": "Initial integration with API data",
+    "branch": "fix/rag-index",
+    "last_commit": "agent and skill optimizations",
     "remote": "git@github.com:shantopagla/deploy-baba.git",
-    "sha": "b89e8b39e6b2a9d37f96e6c3b5b8d03e8c7603fe",
-    "short_sha": "b89e8b3"
+    "sha": "6133fe250a79c534d411896cd7f94053d447a9f2",
+    "short_sha": "6133fe2"
   },
   "infra": {
     "aws_region": "us-east-1",
-    "git_sha_at_scan": "b89e8b39e6b2a9d37f96e6c3b5b8d03e8c7603fe",
+    "git_sha_at_scan": "6133fe250a79c534d411896cd7f94053d447a9f2",
     "key_resources": [
       "Lambda Function URL (ADR-003, no API Gateway)",
       "EFS for SQLite persistence (ADR-002)",
@@ -323,10 +336,10 @@
     "config_loading": "stack.toml via config-toml crate (local only, not committed)",
     "error_handling": "thiserror in library crates, anyhow allowed in binaries/xtask",
     "infra_codegen": "Rust types in infra-types drive OpenTofu resource definitions",
-    "template_engine": "askama (compile-time Jinja2-like) + askama_axum integration"
+    "web_framework": "axum 0.7 (JSON API) + React/Vite SPA in web/ (ADR-019)"
   },
   "plans": {
-    "adr_count": 10,
+    "adr_count": 23,
     "adr_dir": "plans/adr/",
     "conventions": "plans/CONVENTIONS.md",
     "cross_cutting_dir": "plans/cross-cutting/",
@@ -335,7 +348,7 @@
         "W-SYNC.4.2, .4.3, .4.5 — Audit UNIQUE constraints; implement live-DB pull path (Option B); backfill first sync migration",
         "W-XT.4.2 — Remove or wire up EnvironmentInterpolator",
         "W-OTF.4.1–4.7 — OpenTofu migration",
-        "W-AUTH.POST-FIX — CloudFront OAC body hash mismatch blocks dashboard edit forms"
+        "W-RAG — RAG knowledgebase content accuracy"
       ],
       "P2": [
         "W-DX.3 per-crate READMEs",
@@ -351,24 +364,26 @@
     },
     "drift_dir": "plans/drift/",
     "index": "plans/INDEX.md",
-    "module_count": 20,
+    "module_count": 30,
     "modules_dir": "plans/modules/"
   },
   "project": {
-    "adr_count": 10,
+    "adr_count": 23,
     "description": "Zero-cost Rust portfolio and deployment automation platform hosted on AWS Lambda",
     "license": "MIT OR Apache-2.0",
     "name": "deploy-baba",
     "plans_index": "plans/INDEX.md",
     "rust_edition": "2021",
     "rust_msrv": "1.75",
-    "status": "~90% complete",
+    "status": "~93% complete",
     "task_runner": "just",
     "tech_stack": [
       "rust",
       "aws-lambda",
       "axum",
-      "askama",
+      "react",
+      "vite",
+      "typescript",
       "opentofu",
       "sqlite-efs",
       "aws-cognito"
@@ -382,9 +397,9 @@
       "cognito_pool_id": "us-east-1_I7c15vLHE",
       "crate_name": "deploy-baba-ui",
       "database": "rusqlite on EFS (ADR-002)",
-      "description": "Portfolio site and live API demo — the Lambda binary",
+      "description": "Pure JSON API server + SPA static asset host — the Lambda binary (ADR-019)",
       "framework": "axum 0.7",
-      "git_sha_at_scan": "b89e8b39e6b2a9d37f96e6c3b5b8d03e8c7603fe",
+      "git_sha_at_scan": "6133fe250a79c534d411896cd7f94053d447a9f2",
       "key_files": [
         "src/main.rs",
         "src/router.rs",
@@ -401,12 +416,23 @@
       "routes_added": "GET /api/admin/db-dump (W-SYNC.4.3) — VACUUM INTO snapshot, Cognito-gated, returns application/octet-stream",
       "routes_dir": "src/routes",
       "runtime": "aws-lambda (lambda_http) + local axum server (dual-mode via ADR-004)",
-      "status": "DONE (auth WIP)",
-      "templates_dir": "src/templates"
+      "spa_dir": "web/",
+      "status": "DONE (auth WIP)"
     }
+  },
+  "web": {
+    "description": "React/Vite SPA — all UI rendering (ADR-019)",
+    "path": "web/",
+    "plan_domain": "W-WEB",
+    "status": "DONE",
+    "tech": "Vite 6 + React 18 + TypeScript strict + Tailwind CSS 3"
   },
   "workspace": {
     "members": [
+      "crates/llm-core",
+      "crates/llm-anthropic",
+      "crates/rag-core",
+      "crates/rag-sqlite",
       "crates/config-core",
       "crates/config-toml",
       "crates/config-yaml",
@@ -418,6 +444,8 @@
       "crates/api-merger",
       "crates/infra-types",
       "services/ui",
+      "services/email",
+      "services/llm-proxy",
       "xtask",
       "examples/01_multi_format_config",
       "examples/02_api_spec_generation",
@@ -427,7 +455,7 @@
   },
   "xtask": {
     "description": "Internal CLI plumbing — NEVER invoke directly, use `just` (ADR-001)",
-    "git_sha_at_scan": "b89e8b39e6b2a9d37f96e6c3b5b8d03e8c7603fe",
+    "git_sha_at_scan": "6133fe250a79c534d411896cd7f94053d447a9f2",
     "open_issues": [
       "W-XT.4.2: Remove or wire up EnvironmentInterpolator (dead code)",
       "W-XT.4.3: Implement just infra-bootstrap (creates S3 + DynamoDB + SSM)"

@@ -23,8 +23,11 @@ zero-cost abstraction model:
 1. **Monomorphization over dynamic dispatch** — traits are generic parameters, not
    `dyn Trait`, unless the use case genuinely requires runtime polymorphism.
 
-2. **Compile-time template embedding** — `services/ui/` uses Askama, which compiles
-   HTML templates into the binary. Zero runtime file I/O for serving pages.
+2. **Compile-time template embedding** — `services/ui/` originally used Askama for
+   compile-time HTML templates. [Superseded by ADR-019 (2026-04-30): HTML is now
+   rendered by a React/Vite SPA in `web/`; `services/ui` serves JSON only. The
+   zero-cost principle still holds — the SPA produces content-hashed static assets
+   served from S3/EFS with no runtime overhead.]
 
 3. **No hidden allocations** — public API surfaces avoid unnecessary `String` copies;
    prefer `&str` and `Cow<'_, str>` at boundaries.

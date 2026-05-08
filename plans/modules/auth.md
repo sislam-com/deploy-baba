@@ -245,9 +245,9 @@ W-AUTH.4.22 (dashboard.rs refactor — 6 handlers + template structs)
 | W-AUTH.4.9 | Update `services/ui/src/main.rs` | DONE | Init AuthConfig, construct AppState, pass to router::build |
 | W-AUTH.4.10 | Create `services/ui/src/routes/auth.rs` | DONE | login redirect, callback (code exchange + cookie), logout |
 | W-AUTH.4.11 | Create `services/ui/src/routes/api/admin.rs` | DONE | Full CRUD: POST/PUT/DELETE for jobs, job_details, competencies, evidence |
-| W-AUTH.4.12 | Create `services/ui/src/routes/dashboard.rs` | DONE | Minimal handler — serves DashboardTemplate (Askama) |
-| W-AUTH.4.13 | Create `services/ui/templates/dashboard.html` | DONE | Tailwind master/detail; JS fetches public APIs; submits to admin API |
-| W-AUTH.4.14 | Add login button to `services/ui/templates/base.html` nav | DONE | `<a href="/auth/login">Login</a>` alongside existing nav links |
+| W-AUTH.4.12 | Create `services/ui/src/routes/dashboard.rs` | DONE | Originally Askama; now React SPA per ADR-019 |
+| W-AUTH.4.13 | Create `services/ui/templates/dashboard.html` | DONE | [Superseded by ADR-019 — replaced by React components in web/] |
+| W-AUTH.4.14 | Add login button to `services/ui/templates/base.html` nav | DONE | [Superseded by ADR-019 — nav now in React Layout.tsx] |
 | W-AUTH.4.15 | Wire all new routes into `services/ui/src/router.rs` | DONE | `/auth/*`, `/dashboard` (protected), `/api/admin/*` (protected) |
 | W-AUTH.4.16 | Create `plans/modules/auth.md` | DONE | This file |
 | W-AUTH.4.17 | Create `plans/adr/ADR-008-cognito-authentication.md` | DONE | Decision record |
@@ -256,12 +256,12 @@ W-AUTH.4.22 (dashboard.rs refactor — 6 handlers + template structs)
 | W-AUTH.4.20 | Fix Lambda 504 — lazy JWKS fetch with 5s timeout | SUPERSEDED | Deferred fetch still failed (VPC has no NAT Gateway). Replaced by W-AUTH.4.21. |
 | W-AUTH.4.21 | Fix Cognito callback 504 — implicit grant + JWKS from env var | DONE | `allowed_oauth_flows=["implicit"]`; `allow_admin_create_user_only=true` (no self-signup); `data "http" cognito_jwks`; `COGNITO_JWKS` env var; HTML callback page + `/auth/set-session` endpoint; zero Lambda outbound calls |
 | W-AUTH.4.22 | Refactor `dashboard.rs` — split into 6 handlers + template structs | DONE | Home (counts), Jobs list, Job detail, Job new, Competencies list, Competency detail |
-| W-AUTH.4.23 | Create `templates/dashboard_home.html` — summary tiles with counts | DONE | Extends base.html; 4 tiles linking to list views |
-| W-AUTH.4.24 | Create `templates/dashboard_jobs_list.html` — job master list | DONE | Breadcrumb nav; rows link to `/dashboard/jobs/{slug}` |
-| W-AUTH.4.25 | Create `templates/dashboard_job_detail.html` — job detail + sub-records | DONE | Type-ahead nav, editable job form, inline job_details forms, inline evidence forms |
-| W-AUTH.4.26 | Create `templates/dashboard_competencies_list.html` + `dashboard_competency_detail.html` | DONE | List + detail views for competencies with linked evidence |
+| W-AUTH.4.23 | Create `templates/dashboard_home.html` — summary tiles with counts | DONE | [Superseded by ADR-019 — now web/src/routes/dashboard/index.tsx] |
+| W-AUTH.4.24 | Create `templates/dashboard_jobs_list.html` — job master list | DONE | [Superseded by ADR-019 — now web/src/routes/dashboard/Jobs.tsx] |
+| W-AUTH.4.25 | Create `templates/dashboard_job_detail.html` — job detail + sub-records | DONE | [Superseded by ADR-019 — now web/src/routes/dashboard/JobDetail.tsx] |
+| W-AUTH.4.26 | Create `templates/dashboard_competencies_list.html` + `dashboard_competency_detail.html` | DONE | [Superseded by ADR-019 — now web/src/routes/dashboard/Competencies.tsx + CompetencyDetail.tsx] |
 | W-AUTH.4.27 | Update `router.rs` — mount 6 dashboard routes with auth middleware | DONE | Replace single `/dashboard` route; literal `/new` before `/:slug` |
-| W-AUTH.4.28 | Delete `templates/dashboard.html` monolith | DONE | Replaced by 5 new templates |
+| W-AUTH.4.28 | Delete `templates/dashboard.html` monolith | DONE | [Superseded by ADR-019 — all templates deleted; React SPA in web/] |
 | W-AUTH.4.29 | Add about sections dashboard pages + admin CRUD | DONE | `/dashboard/about`, `/dashboard/about/new`, `/dashboard/about/:slug`; `POST/PUT/DELETE /api/admin/about` |
 | W-AUTH.4.30 | Add social links dashboard pages + admin CRUD | DONE | `/dashboard/social-links`, `/dashboard/social-links/new`, `/dashboard/social-links/:id`; `POST/PUT/DELETE /api/admin/social-links` |
 

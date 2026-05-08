@@ -1,0 +1,28 @@
+[package]
+name = "portfolio-rag-mcp"
+version = "0.1.0"
+edition = "2021"
+description = "MCP server for portfolio RAG system integration"
+
+[[bin]]
+name = "portfolio-rag-mcp"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# MCP server dependencies
+# Note: Using mock MCP for now - replace with actual MCP SDK when available
+async-trait = "0.1"
+
+# Database dependencies
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+# Utility dependencies
+uuid = { version = "1.0", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
