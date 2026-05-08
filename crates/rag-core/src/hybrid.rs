@@ -89,7 +89,7 @@ impl<R: Retriever, P: PortfolioDataProvider> Retriever for HybridRetriever<R, P>
         }
 
         // Portfolio-related query: inject live data first, then fill remaining with FTS
-        let fts_limit = if top_k > 5 { top_k - 5 } else { 0 };
+        let fts_limit = top_k.saturating_sub(5);
         let fts_results = if fts_limit > 0 {
             self.fts.retrieve(query, fts_limit).await?
         } else {

@@ -103,7 +103,7 @@ pub async fn query_rag(rag: &PortfolioRAG, args: Value) -> Result<Value> {
         }
         Err(e) => {
             error!("RAG query failed: {}", e);
-            return Err(anyhow::anyhow!("RAG query failed: {}", e));
+            Err(anyhow::anyhow!("RAG query failed: {}", e))
         }
     }
 }
@@ -133,7 +133,7 @@ pub fn get_corpus_stats(rag: &PortfolioRAG, args: Value) -> Result<Value> {
         })),
         Err(e) => {
             error!("Corpus stats failed: {}", e);
-            return Err(anyhow::anyhow!("Corpus stats failed: {}", e));
+            Err(anyhow::anyhow!("Corpus stats failed: {}", e))
         }
     }
 }
@@ -166,7 +166,7 @@ pub async fn search_portfolio(rag: &PortfolioRAG, args: Value) -> Result<Value> 
         }
         Err(e) => {
             error!("Portfolio search failed: {}", e);
-            return Err(anyhow::anyhow!("Portfolio search failed: {}", e));
+            Err(anyhow::anyhow!("Portfolio search failed: {}", e))
         }
     }
 }
