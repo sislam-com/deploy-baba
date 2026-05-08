@@ -40,11 +40,20 @@ impl<R: Retriever, P: PortfolioDataProvider> HybridRetriever<R, P> {
 
         // Extract entity type and slug for proper URL generation
         let (entity_type, slug) = if val.get("company").is_some() && val.get("title").is_some() {
-            ("job", val.get("slug").and_then(|s| s.as_str()).unwrap_or(""))
+            (
+                "job",
+                val.get("slug").and_then(|s| s.as_str()).unwrap_or(""),
+            )
         } else if val.get("name").is_some() && val.get("icon").is_some() {
-            ("competency", val.get("slug").and_then(|s| s.as_str()).unwrap_or(""))
+            (
+                "competency",
+                val.get("slug").and_then(|s| s.as_str()).unwrap_or(""),
+            )
         } else if val.get("heading").is_some() && val.get("body").is_some() {
-            ("about", val.get("slug").and_then(|s| s.as_str()).unwrap_or(""))
+            (
+                "about",
+                val.get("slug").and_then(|s| s.as_str()).unwrap_or(""),
+            )
         } else {
             ("unknown", "")
         };
@@ -204,7 +213,10 @@ mod tests {
         );
         // Live chunks should come first
         if results.len() >= 2 {
-            assert_eq!(results[0].git_sha, "live", "first result should be live data");
+            assert_eq!(
+                results[0].git_sha, "live",
+                "first result should be live data"
+            );
         }
     }
 

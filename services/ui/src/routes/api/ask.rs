@@ -214,16 +214,18 @@ pub async fn ask(
             let url = if c.kind == "portfolio" && c.sha == "live" {
                 // Generate UI URLs for portfolio sources
                 // Format: portfolio://{entity_type}/{slug} or portfolio://{entity_type}
-                if let Some((entity_type, slug)) = c.path.strip_prefix("portfolio://").and_then(|s| {
-                    let parts: Vec<&str> = s.splitn(2, '/').collect();
-                    if parts.len() == 2 {
-                        Some((parts[0], parts[1]))
-                    } else if parts.len() == 1 {
-                        Some((parts[0], ""))
-                    } else {
-                        None
-                    }
-                }) {
+                if let Some((entity_type, slug)) =
+                    c.path.strip_prefix("portfolio://").and_then(|s| {
+                        let parts: Vec<&str> = s.splitn(2, '/').collect();
+                        if parts.len() == 2 {
+                            Some((parts[0], parts[1]))
+                        } else if parts.len() == 1 {
+                            Some((parts[0], ""))
+                        } else {
+                            None
+                        }
+                    })
+                {
                     match entity_type {
                         "job" => format!("/?view=timeline#{}", slug),
                         "competency" => format!("/?view=capabilities#{}", slug),

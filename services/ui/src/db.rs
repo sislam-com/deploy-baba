@@ -190,9 +190,11 @@ impl PortfolioDataProvider for Db {
         let mut jobs_with_details = Vec::new();
         for (slug, mut job_val) in jobs_json {
             let job_id: Option<i64> = conn
-                .query_row("SELECT id FROM jobs WHERE slug = ?1", rusqlite::params![&slug], |row| {
-                    row.get(0)
-                })
+                .query_row(
+                    "SELECT id FROM jobs WHERE slug = ?1",
+                    rusqlite::params![&slug],
+                    |row| row.get(0),
+                )
                 .ok();
 
             if let Some(jid) = job_id {
@@ -309,9 +311,11 @@ impl PortfolioDataProvider for Db {
         let mut competencies_with_evidence = Vec::new();
         for (slug, mut comp_val) in competencies_json {
             let comp_id: Option<i64> = conn
-                .query_row("SELECT id FROM competencies WHERE slug = ?1", rusqlite::params![&slug], |row| {
-                    row.get(0)
-                })
+                .query_row(
+                    "SELECT id FROM competencies WHERE slug = ?1",
+                    rusqlite::params![&slug],
+                    |row| row.get(0),
+                )
                 .ok();
 
             if let Some(cid) = comp_id {

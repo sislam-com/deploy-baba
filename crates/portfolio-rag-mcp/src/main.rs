@@ -78,7 +78,12 @@ async fn main() -> Result<()> {
                     }
                     Ok(Err(e)) => {
                         error!("Error handling request: {}", e);
-                        send_error_response(&mut stdout, request_id, INTERNAL_ERROR, e.to_string())?;
+                        send_error_response(
+                            &mut stdout,
+                            request_id,
+                            INTERNAL_ERROR,
+                            e.to_string(),
+                        )?;
                     }
                     Err(_) => {
                         error!("Request processing timeout");
@@ -131,7 +136,11 @@ async fn handle_request(rag: &PortfolioRAG, request: &str) -> Result<String> {
         .chars()
         .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.')
     {
-        return Err(anyhow::anyhow!("{}: Invalid method name: {}", METHOD_NOT_FOUND, method));
+        return Err(anyhow::anyhow!(
+            "{}: Invalid method name: {}",
+            METHOD_NOT_FOUND,
+            method
+        ));
     }
 
     let id = request.get("id").cloned();
@@ -178,7 +187,11 @@ async fn handle_request(rag: &PortfolioRAG, request: &str) -> Result<String> {
 
             // Validate tool name characters
             if !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
-                return Err(anyhow::anyhow!("{}: Invalid tool name: {}", METHOD_NOT_FOUND, name));
+                return Err(anyhow::anyhow!(
+                    "{}: Invalid tool name: {}",
+                    METHOD_NOT_FOUND,
+                    name
+                ));
             }
 
             // Validate arguments if present
@@ -198,20 +211,27 @@ async fn handle_request(rag: &PortfolioRAG, request: &str) -> Result<String> {
 
             let result = match name {
                 "query_rag" => {
-                    let args = arguments.ok_or_else(|| anyhow::anyhow!("{}: Missing arguments", INVALID_PARAMS))?;
+                    let args = arguments
+                        .ok_or_else(|| anyhow::anyhow!("{}: Missing arguments", INVALID_PARAMS))?;
                     tools::query_rag(rag, args).await?
                 }
                 "list_corpora" => tools::list_corpora(rag)?,
                 "get_corpus_stats" => {
-                    let args = arguments.ok_or_else(|| anyhow::anyhow!("{}: Missing arguments", INVALID_PARAMS))?;
+                    let args = arguments
+                        .ok_or_else(|| anyhow::anyhow!("{}: Missing arguments", INVALID_PARAMS))?;
                     tools::get_corpus_stats(rag, args)?
                 }
                 "search_portfolio" => {
-                    let args = arguments.ok_or_else(|| anyhow::anyhow!("{}: Missing arguments", INVALID_PARAMS))?;
+                    let args = arguments
+                        .ok_or_else(|| anyhow::anyhow!("{}: Missing arguments", INVALID_PARAMS))?;
                     tools::search_portfolio(rag, args).await?
                 }
                 _ => {
-                    return Err(anyhow::anyhow!("{}: Unknown tool: {}", METHOD_NOT_FOUND, name));
+                    return Err(anyhow::anyhow!(
+                        "{}: Unknown tool: {}",
+                        METHOD_NOT_FOUND,
+                        name
+                    ));
                 }
             };
 
@@ -222,7 +242,11 @@ async fn handle_request(rag: &PortfolioRAG, request: &str) -> Result<String> {
             });
             Ok(serde_json::to_string(&response)?)
         }
-        _ => Err(anyhow::anyhow!("{}: Unknown method: {}", METHOD_NOT_FOUND, method)),
+        _ => Err(anyhow::anyhow!(
+            "{}: Unknown method: {}",
+            METHOD_NOT_FOUND,
+            method
+        )),
     }
 }
 
