@@ -5,31 +5,18 @@
 //! Oversize entities are split with the standard sliding-window strategy.
 
 use crate::types::Chunk;
+use serde_json::Value;
 
 const MAX_TOKENS: usize = 800;
 const OVERLAP_WORDS: usize = 50;
 
-pub fn chunk(path: &str, content: &str) -> Vec<Chunk> {
-    let entities: Vec<serde_json::Value> = match serde_json::from_str(content) {
-        Ok(v) => v,
-        Err(_) => return Vec::new(),
-    };
-
-    let mut chunks = Vec::new();
-    let mut ord = 0usize;
-
-    for entity in &entities {
-        let (text, meta) = entity_to_prose(entity);
-        if text.is_empty() {
-            continue;
-        }
-        emit_chunks(path, &text, meta, &mut ord, &mut chunks);
-    }
-
-    chunks
+/// Convert a single portfolio entity (job, competency, about, or social) to readable prose.
+/// Used by both the chunker (for indexing) and HybridRetriever (for live data).
+pub fn entity_to_prose(entity: &Value) -> String {
+    entity_to_prose_with_meta(entity).0
 }
 
-fn entity_to_prose(entity: &serde_json::Value) -> (String, serde_json::Value) {
+fn entity_to_prose_with_meta(entity: &Value) -> (String, Value) {
     if entity.get("company").is_some() && entity.get("title").is_some() {
         return job_to_prose(entity);
     }
@@ -45,7 +32,27 @@ fn entity_to_prose(entity: &serde_json::Value) -> (String, serde_json::Value) {
     (String::new(), serde_json::json!({}))
 }
 
-fn job_to_prose(job: &serde_json::Value) -> (String, serde_json::Value) {
+pub fn chunk(path: &str, content: &str) -> Vec<Chunk> {
+    let entities: Vec<serde_json::Value> = match serde_json::from_str(content) {
+        Ok(v) => v,
+        Err(_) => return Vec::new(),
+    };
+
+    let mut chunks = Vec::new();
+    let mut ord = 0usize;
+
+    for entity in &entities {
+        let (text, meta) = entity_to_prose_with_meta(entity);
+        if text.is_empty() {
+            continue;
+        }
+        emit_chunks(path, &text, meta, &mut ord, &mut chunks);
+    }
+
+    chunks
+}
+
+pub fn job_to_prose(job: &Value) -> (String, Value) {
     let title = job["title"].as_str().unwrap_or("");
     let company = job["company"].as_str().unwrap_or("");
     let start = job["start_date"].as_str().unwrap_or("?");
@@ -81,7 +88,7 @@ fn job_to_prose(job: &serde_json::Value) -> (String, serde_json::Value) {
     (text, meta)
 }
 
-fn competency_to_prose(comp: &serde_json::Value) -> (String, serde_json::Value) {
+pub fn competency_to_prose(comp: &Value) -> (String, Value) {
     let name = comp["name"].as_str().unwrap_or("");
     let description = comp["description"].as_str().unwrap_or("");
     let slug = comp["slug"].as_str().unwrap_or("");
@@ -119,7 +126,7 @@ fn competency_to_prose(comp: &serde_json::Value) -> (String, serde_json::Value) 
     (text, meta)
 }
 
-fn about_to_prose(about: &serde_json::Value) -> (String, serde_json::Value) {
+pub fn about_to_prose(about: &Value) -> (String, Value) {
     let heading = about["heading"].as_str().unwrap_or("");
     let body = about["body"].as_str().unwrap_or("");
     let slug = about["slug"].as_str().unwrap_or("");
@@ -129,7 +136,7 @@ fn about_to_prose(about: &serde_json::Value) -> (String, serde_json::Value) {
     (text, meta)
 }
 
-fn social_to_prose(social: &serde_json::Value) -> (String, serde_json::Value) {
+pub fn social_to_prose(social: &Value) -> (String, Value) {
     let platform = social["platform"].as_str().unwrap_or("");
     let url = social["url"].as_str().unwrap_or("");
 

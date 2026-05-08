@@ -1,3 +1,4 @@
+use crate::chunk::portfolio::entity_to_prose;
 use crate::portfolio::PortfolioDataProvider;
 use crate::types::RankedChunk;
 use crate::{RagError, Retriever};
@@ -34,15 +35,41 @@ impl<R: Retriever, P: PortfolioDataProvider> HybridRetriever<R, P> {
     }
 
     fn value_to_chunk(val: &serde_json::Value, ord: usize) -> RankedChunk {
-        let content = match serde_json::to_string_pretty(val) {
-            Ok(s) => s,
-            Err(_) => val.to_string(),
+        // Convert portfolio entity to readable prose instead of raw JSON
+        let content = entity_to_prose(val);
+
+        // Extract entity type and slug for proper URL generation
+        let (entity_type, slug) = if val.get("company").is_some() && val.get("title").is_some() {
+            (
+                "job",
+                val.get("slug").and_then(|s| s.as_str()).unwrap_or(""),
+            )
+        } else if val.get("name").is_some() && val.get("icon").is_some() {
+            (
+                "competency",
+                val.get("slug").and_then(|s| s.as_str()).unwrap_or(""),
+            )
+        } else if val.get("heading").is_some() && val.get("body").is_some() {
+            (
+                "about",
+                val.get("slug").and_then(|s| s.as_str()).unwrap_or(""),
+            )
+        } else {
+            ("unknown", "")
         };
+
+        // Store metadata in source_path for URL generation
+        let source_path = if slug.is_empty() {
+            format!("portfolio://{}", entity_type)
+        } else {
+            format!("portfolio://{}/{}", entity_type, slug)
+        };
+
         RankedChunk {
             chunk_id: -(ord as i64 + 1),
             document_id: -1,
             source_kind: "portfolio".to_string(),
-            source_path: "live://portfolio".to_string(),
+            source_path,
             git_sha: "live".to_string(),
             ord: ord as i64,
             content,
@@ -54,15 +81,20 @@ impl<R: Retriever, P: PortfolioDataProvider> HybridRetriever<R, P> {
 #[async_trait]
 impl<R: Retriever, P: PortfolioDataProvider> Retriever for HybridRetriever<R, P> {
     async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<RankedChunk>, RagError> {
-        let fts_results = self.fts.retrieve(query, top_k).await?;
+        let should_inject_portfolio = Self::query_matches_portfolio(query);
 
-        let has_portfolio_chunks = fts_results
-            .iter()
-            .any(|c| c.source_kind == "portfolio" || c.source_kind == "openapi");
-
-        if !has_portfolio_chunks && !Self::query_matches_portfolio(query) {
-            return Ok(fts_results);
+        if !should_inject_portfolio {
+            // Pure codebase query - just return FTS results
+            return self.fts.retrieve(query, top_k).await;
         }
+
+        // Portfolio-related query: inject live data first, then fill remaining with FTS
+        let fts_limit = top_k.saturating_sub(5);
+        let fts_results = if fts_limit > 0 {
+            self.fts.retrieve(query, fts_limit).await?
+        } else {
+            Vec::new()
+        };
 
         let mut live_chunks = Vec::new();
         let mut ord = 0usize;
@@ -85,8 +117,9 @@ impl<R: Retriever, P: PortfolioDataProvider> Retriever for HybridRetriever<R, P>
             ord += 1;
         }
 
-        let mut merged = fts_results;
-        for chunk in live_chunks {
+        // Prioritize live portfolio data, then add FTS results up to top_k
+        let mut merged = live_chunks;
+        for chunk in fts_results {
             if merged.len() >= top_k {
                 break;
             }
@@ -161,7 +194,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn portfolio_query_injects_live_chunks() {
+    async fn portfolio_query_prioritizes_live_chunks() {
         let hybrid = HybridRetriever {
             fts: StubRetriever {
                 chunks: vec![make_fts_chunk("rust", "fn main() {}")],
@@ -173,11 +206,18 @@ mod tests {
             .retrieve("what jobs does the owner have?", 20)
             .await
             .unwrap();
-        assert!(results.len() > 1, "should have FTS + live chunks");
+        assert!(results.len() >= 2, "should have live chunks");
         assert!(
             results.iter().any(|c| c.git_sha == "live"),
             "should include live portfolio chunks"
         );
+        // Live chunks should come first
+        if results.len() >= 2 {
+            assert_eq!(
+                results[0].git_sha, "live",
+                "first result should be live data"
+            );
+        }
     }
 
     #[tokio::test]

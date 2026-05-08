@@ -7,6 +7,8 @@ interface Citation {
   path: string
   kind: string
   sha: string
+  url: string
+  ord: number
 }
 
 interface AskResult {
@@ -22,35 +24,51 @@ const KIND_ICON: Record<string, string> = {
   hcl: '🏗',
   plan: '📋',
   cache: '💾',
+  portfolio: '💼',
 }
 
-const EXAMPLES = [
-  'Why SQLite instead of PostgreSQL?',
-  'How does Lambda load secrets at cold start?',
-  'How does the PoW challenge protect the contact form?',
-  'What is the RAG pipeline and how does it work?',
-  'How is Cognito authentication implemented?',
-  'What are the ADRs for infrastructure decisions?',
+const RECRUITER_QUESTIONS = [
+  { value: '', label: 'Select a question...' },
+  { value: 'What are your primary skills and technical expertise?', label: 'What are your primary skills?' },
+  { value: 'Tell me about your experience with AI/LLM systems and RAG pipelines', label: 'AI/LLM systems experience' },
+  { value: 'What is your experience with cloud infrastructure and AWS?', label: 'Cloud infrastructure experience' },
+  { value: 'Describe your technical leadership and team management experience', label: 'Technical leadership experience' },
+  { value: 'What platforms and products have you built end-to-end?', label: 'Products built end-to-end' },
+  { value: 'How does the RAG pipeline in this portfolio project work?', label: 'How the RAG pipeline works' },
+  { value: 'What are the key architecture decisions in this portfolio?', label: 'Key architecture decisions' },
+  { value: 'Why was SQLite chosen over PostgreSQL for this project?', label: 'SQLite vs PostgreSQL decision' },
+  { value: 'How is authentication implemented in this portfolio?', label: 'Authentication implementation' },
 ]
 
-function CitationBadge({ index, path, kind, sha }: { index: number; path: string; kind: string; sha: string }) {
+function CitationBadge({ index, path, kind, url }: { index: number; path: string; kind: string; url: string }) {
+  const isPortfolio = kind === 'portfolio'
+  const displayPath = isPortfolio ? path.replace('portfolio://', '').replace('/', ' → ') : path
+
   return (
     <li className="flex items-start gap-2 text-xs text-gray-500">
       <span className="text-gray-600 font-mono mt-0.5">[{index + 1}]</span>
-      <span>
+      <span className="flex-1">
         {KIND_ICON[kind] ?? '📄'}{' '}
-        <span className="font-mono text-gray-400">{path}</span>
-        <span className="text-gray-600 ml-1">sha:{sha.slice(0, 7)}</span>
+        {isPortfolio ? (
+          <a href={url} className="font-mono text-cyan-400 hover:text-cyan-300 hover:underline">
+            {displayPath}
+          </a>
+        ) : (
+          <a href={url} target="_blank" rel="noopener noreferrer" className="font-mono text-cyan-400 hover:text-cyan-300 hover:underline">
+            {path}
+          </a>
+        )}
       </span>
     </li>
   )
 }
 
 export default function Ask() {
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState('Tell me about your experience with AI/LLM systems and RAG pipelines')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<AskResult | null>(null)
+  const [selectedQuestion, setSelectedQuestion] = useState('Tell me about your experience with AI/LLM systems and RAG pipelines')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   async function handleSubmit(e: FormEvent) {
@@ -90,8 +108,10 @@ export default function Ask() {
     }
   }
 
-  function fillQuery(text: string) {
-    setQuery(text)
+  function handleQuestionChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const selected = e.target.value
+    setSelectedQuestion(selected)
+    setQuery(selected)
     textareaRef.current?.focus()
   }
 
@@ -101,138 +121,153 @@ export default function Ask() {
         <title>Ask — Sharful Islam</title>
       </Helmet>
 
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="mb-10">
-          <h1 className="text-4xl font-bold text-white mb-2">Ask the Codebase</h1>
-          <p className="text-gray-400">
-            Ask anything about this portfolio project — architecture decisions, how features
-            work, why something was built a certain way. Answers are grounded in the actual
-            source code, infrastructure, and design documents.
-          </p>
-          <p className="text-gray-600 text-sm mt-2">
-            Powered by Claude + SQLite FTS5 retrieval over Rust source, OpenTofu HCL, and ADRs.
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="query" className="block text-sm font-medium text-gray-300 mb-1">
-              Your question
-            </label>
-            <textarea
-              ref={textareaRef}
-              id="query"
-              rows={3}
-              required
-              maxLength={1000}
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              placeholder="e.g. How does Lambda load secrets at cold start? Why SQLite instead of PostgreSQL?"
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white
-                         placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500
-                         focus:border-transparent transition resize-none"
-            />
-          </div>
-
-          <div className="flex items-center gap-4">
-            <button
-              type="submit"
-              disabled={loading}
-              className="bg-cyan-600 hover:bg-cyan-500 disabled:bg-gray-700 disabled:cursor-not-allowed
-                         text-white font-semibold py-2.5 px-6 rounded-lg transition focus:outline-none
-                         focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 focus:ring-offset-gray-900"
-            >
-              Ask
-            </button>
-            {loading && (
-              <span className="text-sm text-gray-500">
-                Retrieving sources and generating answer…
-              </span>
-            )}
-          </div>
-        </form>
-
-        {error && (
-          <div className="mt-6 px-4 py-3 rounded-lg text-sm font-medium bg-red-900/60 border border-red-700 text-red-300">
-            {error}
-          </div>
-        )}
-
-        {result && (
-          <div className="mt-8 space-y-6">
-            <div className="bg-gray-800/60 border border-gray-700 rounded-xl p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <span className="text-xs font-semibold uppercase tracking-wider text-cyan-400">Answer</span>
-                <span className="text-xs text-gray-600">· {result.model}</span>
-              </div>
-              <div className="ask-prose text-sm">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={{
-                    p: ({ children }) => <p className="my-2 leading-relaxed text-gray-200">{children}</p>,
-                    h1: ({ children }) => <h1 className="text-xl font-bold text-white mt-5 mb-2">{children}</h1>,
-                    h2: ({ children }) => <h2 className="text-lg font-semibold text-gray-100 mt-4 mb-2">{children}</h2>,
-                    h3: ({ children }) => <h3 className="text-base font-semibold text-gray-200 mt-3 mb-1">{children}</h3>,
-                    ul: ({ children }) => <ul className="list-disc list-inside my-2 space-y-1 text-gray-300">{children}</ul>,
-                    ol: ({ children }) => <ol className="list-decimal list-inside my-2 space-y-1 text-gray-300">{children}</ol>,
-                    li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-                    code: ({ className, children, ...rest }) => {
-                      const isBlock = className?.startsWith('language-')
-                      return isBlock ? (
-                        <code className="block bg-gray-900 text-green-300 text-xs p-4 rounded-lg overflow-x-auto font-mono my-3" {...rest}>
-                          {children}
-                        </code>
-                      ) : (
-                        <code className="bg-gray-700 text-cyan-300 text-xs px-1.5 py-0.5 rounded font-mono" {...rest}>
-                          {children}
-                        </code>
-                      )
-                    },
-                    pre: ({ children }) => <pre className="bg-gray-900 border border-gray-700 rounded-lg overflow-x-auto my-3">{children}</pre>,
-                    blockquote: ({ children }) => (
-                      <blockquote className="border-l-2 border-cyan-500 pl-4 text-gray-400 my-3 italic">{children}</blockquote>
-                    ),
-                    strong: ({ children }) => <strong className="text-gray-100 font-semibold">{children}</strong>,
-                    a: ({ href, children }) => (
-                      <a href={href} className="text-cyan-400 underline hover:text-cyan-300">{children}</a>
-                    ),
-                  }}
-                >
-                  {result.answer.replace(/\[source (\d+)\]/g, '**[source $1]**')}
-                </ReactMarkdown>
-              </div>
-            </div>
-
-            {result.citations.length > 0 && (
-              <div>
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Sources</h3>
-                <ul className="space-y-2">
-                  {result.citations.map((c, i) => (
-                    <CitationBadge key={i} index={i} {...c} />
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            <p className="text-xs text-gray-600">
-              {result.input_tokens} in · {result.output_tokens} out
+      <div className="min-h-screen bg-gray-900">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          {/* Compact header */}
+          <div className="mb-4">
+            <h1 className="text-2xl font-bold text-white">Ask</h1>
+            <p className="text-gray-400 text-xs sm:text-sm">
+              Questions about this portfolio and the codebase are answered with source citations.
             </p>
           </div>
-        )}
 
-        <div className="mt-12">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-600 mb-4">Try asking</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {EXAMPLES.map(ex => (
-              <button
-                key={ex}
-                onClick={() => fillQuery(ex)}
-                className="text-left bg-gray-800/40 border border-gray-700 hover:border-gray-500
-                           rounded-lg px-4 py-3 text-sm text-gray-400 hover:text-gray-200 transition"
-              >
-                {ex}
-              </button>
-            ))}
+          {/* Two-column layout on larger screens */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+            {/* Left column - Form */}
+            <div className="space-y-3">
+              <form id="ask-form" onSubmit={handleSubmit} className="space-y-3">
+                <div>
+                  <label htmlFor="question-select" className="block text-xs font-medium text-gray-300 mb-1">
+                    Common questions
+                  </label>
+                  <select
+                    id="question-select"
+                    value={selectedQuestion}
+                    onChange={handleQuestionChange}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm
+                               focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition"
+                  >
+                    {RECRUITER_QUESTIONS.map(q => (
+                      <option key={q.value} value={q.value}>
+                        {q.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="query" className="block text-xs font-medium text-gray-300 mb-1">
+                    Your question
+                  </label>
+                  <textarea
+                    ref={textareaRef}
+                    id="query"
+                    rows={2}
+                    required
+                    maxLength={1000}
+                    value={query}
+                    onChange={e => setQuery(e.target.value)}
+                    placeholder="Or type your own question..."
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm
+                               placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500
+                               focus:border-transparent transition resize-none"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-cyan-600 hover:bg-cyan-500 disabled:bg-gray-700 disabled:cursor-not-allowed
+                             text-white font-semibold py-2 px-4 rounded-lg transition focus:outline-none
+                             focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 focus:ring-offset-gray-900 text-sm"
+                >
+                  {loading ? 'Asking...' : 'Ask'}
+                </button>
+              </form>
+
+              {error && (
+                <div className="px-3 py-2 rounded-lg text-xs font-medium bg-red-900/60 border border-red-700 text-red-300">
+                  {error}
+                </div>
+              )}
+            </div>
+
+            {/* Right column - Response */}
+            <div className="lg:max-h-[70vh] lg:overflow-y-auto">
+              {result && (
+                <div className="space-y-3">
+                  <div className="bg-gray-800/60 border border-gray-700 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-cyan-400">Answer</span>
+                      <span className="text-xs text-gray-600">· {result.model}</span>
+                    </div>
+                    <div className="ask-prose text-xs sm:text-sm max-h-[40vh] overflow-y-auto">
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          p: ({ children }) => <p className="my-1.5 leading-relaxed text-gray-200">{children}</p>,
+                          h1: ({ children }) => <h1 className="text-lg font-bold text-white mt-3 mb-1.5">{children}</h1>,
+                          h2: ({ children }) => <h2 className="text-base font-semibold text-gray-100 mt-2.5 mb-1">{children}</h2>,
+                          h3: ({ children }) => <h3 className="text-sm font-semibold text-gray-200 mt-2 mb-0.5">{children}</h3>,
+                          ul: ({ children }) => <ul className="list-disc list-inside my-1.5 space-y-0.5 text-gray-300">{children}</ul>,
+                          ol: ({ children }) => <ol className="list-decimal list-inside my-1.5 space-y-0.5 text-gray-300">{children}</ol>,
+                          li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                          code: ({ className, children, ...rest }) => {
+                            const isBlock = className?.startsWith('language-')
+                            return isBlock ? (
+                              <code className="block bg-gray-900 text-green-300 text-xs p-3 rounded-lg overflow-x-auto font-mono my-2" {...rest}>
+                                {children}
+                              </code>
+                            ) : (
+                              <code className="bg-gray-700 text-cyan-300 text-xs px-1 py-0.5 rounded font-mono" {...rest}>
+                                {children}
+                              </code>
+                            )
+                          },
+                          pre: ({ children }) => <pre className="bg-gray-900 border border-gray-700 rounded-lg overflow-x-auto my-2">{children}</pre>,
+                          blockquote: ({ children }) => (
+                            <blockquote className="border-l-2 border-cyan-500 pl-3 text-gray-400 my-2 italic">{children}</blockquote>
+                          ),
+                          strong: ({ children }) => <strong className="text-gray-100 font-semibold">{children}</strong>,
+                          a: ({ href, children }) => (
+                            <a href={href} className="text-cyan-400 underline hover:text-cyan-300">{children}</a>
+                          ),
+                        }}
+                      >
+                        {result.answer.replace(/\[source (\d+)\]/g, '**[source $1]**')}
+                      </ReactMarkdown>
+                    </div>
+                  </div>
+
+                  {result.citations.length > 0 && (
+                    <div className="bg-gray-800/40 border border-gray-700 rounded-lg p-3">
+                      <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Sources</h3>
+                      <ul className="space-y-1.5">
+                        {result.citations.map((c, i) => (
+                          <CitationBadge key={i} index={i} {...c} />
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <p className="text-xs text-gray-600">
+                    {result.input_tokens} in · {result.output_tokens} out
+                  </p>
+                </div>
+              )}
+
+              {!result && !loading && (
+                <div className="bg-gray-800/30 border border-gray-700 rounded-lg p-6 text-center">
+                  <p className="text-gray-500 text-sm">Select a question or type your own to get started</p>
+                </div>
+              )}
+
+              {loading && (
+                <div className="bg-gray-800/30 border border-gray-700 rounded-lg p-6 text-center">
+                  <p className="text-gray-500 text-sm">Retrieving sources and generating answer…</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

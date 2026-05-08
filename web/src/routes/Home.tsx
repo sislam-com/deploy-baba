@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
+import Ask from './Ask'
 
 interface Job {
   id: number
@@ -83,7 +84,7 @@ function JobCard({ job }: { job: Job }) {
   }
 
   return (
-    <div className="relative sm:pl-12">
+    <div className="relative sm:pl-12" id={job.slug}>
       <div className="absolute left-2.5 top-6 w-3 h-3 rounded-full bg-cyan-400 ring-2 ring-gray-900 hidden sm:block" />
 
       <div
@@ -178,10 +179,11 @@ function CompetencyCard({ comp, onJobClick }: { comp: Competency; onJobClick: (s
   }
 
   return (
-    <div
-      className="bg-gray-800 rounded-lg border border-gray-700 hover:border-cyan-500/50 transition cursor-pointer"
-      onClick={toggle}
-    >
+    <div id={comp.slug}>
+      <div
+        className="bg-gray-800 rounded-lg border border-gray-700 hover:border-cyan-500/50 transition cursor-pointer"
+        onClick={toggle}
+      >
       <div className="p-6">
         <div className="flex items-start gap-3 mb-3">
           {comp.icon && <span className="text-2xl">{comp.icon}</span>}
@@ -230,6 +232,7 @@ function CompetencyCard({ comp, onJobClick }: { comp: Competency; onJobClick: (s
           )}
         </div>
       )}
+      </div>
     </div>
   )
 }
@@ -240,7 +243,8 @@ export default function Home() {
   const [downloadOpen, setDownloadOpen] = useState(false)
   const downloadRef = useRef<HTMLDivElement>(null)
   const [searchParams, setSearchParams] = useSearchParams()
-  const view = searchParams.get('view') === 'capabilities' ? 'capabilities' : 'timeline'
+  const view = searchParams.get('view') === 'timeline' ? 'timeline' :
+                searchParams.get('view') === 'capabilities' ? 'capabilities' : 'ask'
 
   useEffect(() => {
     fetch('/api/resume')
@@ -260,8 +264,8 @@ export default function Home() {
     return () => document.removeEventListener('click', handleClick)
   }, [])
 
-  function setView(v: 'timeline' | 'capabilities') {
-    setSearchParams(v === 'timeline' ? {} : { view: 'capabilities' }, { replace: true })
+  function setView(v: 'timeline' | 'capabilities' | 'ask') {
+    setSearchParams(v === 'ask' ? {} : { view: v }, { replace: true })
   }
 
   function handleJobClick(slug: string) {
@@ -307,6 +311,16 @@ export default function Home() {
                   }`}
                 >
                   ⚡ Capabilities
+                </button>
+                <button
+                  onClick={() => setView('ask')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+                    view === 'ask'
+                      ? 'bg-cyan-600/20 text-cyan-400'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  🤖 Ask AI
                 </button>
               </div>
 
@@ -395,6 +409,12 @@ export default function Home() {
               ))}
             </div>
           </div>
+        </section>
+      )}
+
+      {view === 'ask' && (
+        <section className="py-12">
+          <Ask />
         </section>
       )}
     </>

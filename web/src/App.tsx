@@ -6,7 +6,6 @@ const Home = lazy(() => import('./routes/Home'))
 const AboutMe = lazy(() => import('./routes/AboutMe'))
 const AboutRepo = lazy(() => import('./routes/AboutRepo'))
 const Contact = lazy(() => import('./routes/Contact'))
-const Ask = lazy(() => import('./routes/Ask'))
 const NotFound = lazy(() => import('./routes/NotFound'))
 
 const DashboardLayout = lazy(() => import('./routes/dashboard/Layout'))
@@ -38,7 +37,6 @@ export default function App() {
           <Route path="/about/me" element={<AboutMe />} />
           <Route path="/about/repo" element={<AboutRepo />} />
           <Route path="/contact" element={<Contact />} />
-          <Route path="/ask" element={<Ask />} />
           <Route path="*" element={<NotFound />} />
         </Route>
 

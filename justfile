@@ -120,7 +120,7 @@ infra-verify DOMAIN="sislam.com":
 
 # Run the portfolio site locally on :3000, serving the pre-built SPA from web/dist/.
 # Run `just web-build` first if web/dist/ is missing or stale.
-# For hot-reloading frontend dev, use `just dev-stack` instead (Vite on :5173 + API on :3000).
+# For hot-reloading frontend dev, use `just dev-stack` instead (Vite on :3000 + API on :3001).
 ui:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -139,7 +139,9 @@ ui-run:
         echo "web/dist/ missing — building SPA first..."
         just web-build
     fi
-    cargo run --package deploy-baba-ui
+    eval "$(just dev-env)"
+    env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN \
+        cargo run --package deploy-baba-ui
 
 # Build the UI binary only (fast check)
 ui-build:
@@ -215,7 +217,7 @@ dev-doctor:
 
 # ── Web / SPA (Vite + React) ──────────────────────────────────────────────────
 
-# Start Vite dev server on :5173 with /api proxy to :3000
+# Start Vite dev server on :3000 with /api proxy to :3001
 web:
     pnpm --dir web dev
 
@@ -235,7 +237,7 @@ web-typecheck:
 web-lint:
     pnpm --dir web run lint
 
-# Regenerate src/api/types.gen.ts from the running local server (requires just ui on :3000).
+# Regenerate src/api/types.gen.ts from the running local server (requires just ui on :3001).
 # Prefer web-types-offline for CI and offline use.
 web-types:
     pnpm --dir web run types
@@ -248,12 +250,12 @@ api-spec:
 web-types-offline: api-spec
     pnpm --dir web exec openapi-typescript openapi.json -o src/api/types.gen.ts
 
-# Start both the Rust API server (:3000) and Vite dev server (:5173) in parallel
+# Start both the Rust API server (:3001) and Vite dev server (:3000) in parallel
 dev-stack:
     #!/usr/bin/env bash
     set -euo pipefail
     trap 'kill 0' SIGINT SIGTERM EXIT
-    env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN just ui &
+    env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN just ui-run &
     just web &
     wait
 

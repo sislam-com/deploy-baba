@@ -210,11 +210,45 @@ pub async fn ask(
     let citations: Vec<AskCitation> = bundle
         .citations
         .iter()
-        .map(|c| AskCitation {
-            kind: c.kind.clone(),
-            path: c.path.clone(),
-            sha: c.sha.clone(),
-            ord: c.ord,
+        .map(|c| {
+            let url = if c.kind == "portfolio" && c.sha == "live" {
+                // Generate UI URLs for portfolio sources
+                // Format: portfolio://{entity_type}/{slug} or portfolio://{entity_type}
+                if let Some((entity_type, slug)) =
+                    c.path.strip_prefix("portfolio://").and_then(|s| {
+                        let parts: Vec<&str> = s.splitn(2, '/').collect();
+                        if parts.len() == 2 {
+                            Some((parts[0], parts[1]))
+                        } else if parts.len() == 1 {
+                            Some((parts[0], ""))
+                        } else {
+                            None
+                        }
+                    })
+                {
+                    match entity_type {
+                        "job" => format!("/?view=timeline#{}", slug),
+                        "competency" => format!("/?view=capabilities#{}", slug),
+                        "about" => "/?view=timeline".to_string(),
+                        _ => "/?view=timeline".to_string(),
+                    }
+                } else {
+                    "/?view=timeline".to_string()
+                }
+            } else {
+                // GitHub URLs for code sources
+                format!(
+                    "https://github.com/shantopagla/deploy-baba/blob/{}/{}",
+                    c.sha, c.path
+                )
+            };
+            AskCitation {
+                kind: c.kind.clone(),
+                path: c.path.clone(),
+                sha: c.sha.clone(),
+                ord: c.ord,
+                url,
+            }
         })
         .collect();
 

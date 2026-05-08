@@ -1,10 +1,12 @@
 use anyhow::Result;
+use rag_sqlite::RagStore;
 use rusqlite::Connection;
 use serde_json::Value;
+use std::sync::Arc;
 use tracing::info;
 
 pub struct PortfolioRAG {
-    db: Connection,
+    rag_store: Arc<RagStore>,
     corpora: Vec<String>,
 }
 
@@ -18,12 +20,13 @@ impl PortfolioRAG {
 
         info!("Initializing Portfolio RAG with database: {}", db_path);
 
-        // Connect to SQLite database
-        let db = Connection::open(&db_path)?;
+        // Connect to SQLite database and create RAG store
+        let conn = Connection::open(&db_path)?;
+        let rag_store = Arc::new(RagStore::new(conn)?);
 
         // Initialize RAG system
         let mut rag = Self {
-            db,
+            rag_store,
             corpora: Vec::new(),
         };
 
@@ -48,70 +51,39 @@ impl PortfolioRAG {
             "plans".to_string(),
         ];
 
-        // Initialize RAG tables if they don't exist
-        self.initialize_rag_tables()?;
+        // RagStore handles schema migration automatically
+        info!("RAG schema initialized by RagStore");
 
         Ok(())
     }
 
-    fn initialize_rag_tables(&self) -> Result<()> {
-        // Create RAG-related tables if they don't exist
-        let queries = vec![
-            "CREATE TABLE IF NOT EXISTS rag_chunks (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                corpus TEXT NOT NULL,
-                content TEXT NOT NULL,
-                metadata TEXT,
-                embedding BLOB,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )",
-            "CREATE TABLE IF NOT EXISTS rag_search_index (
-                chunk_id INTEGER,
-                corpus TEXT,
-                content_fts TEXT,
-                FOREIGN KEY (chunk_id) REFERENCES rag_chunks (id)
-            )",
-            "CREATE VIRTUAL TABLE IF NOT EXISTS rag_fts USING fts5(
-                corpus, 
-                content, 
-                content=rag_search_index, 
-                content_rowid=rowid
-            )",
-        ];
-
-        for query in queries {
-            self.db.execute(query, [])?;
-        }
-
-        Ok(())
-    }
-
-    pub fn query(&self, query: &str, corpus_filter: Option<&str>) -> Result<Vec<Value>> {
+    pub async fn query(&self, query: &str, corpus_filter: Option<&str>) -> Result<Vec<Value>> {
         info!(
             "Querying RAG: '{}' (corpus filter: {:?})",
             query, corpus_filter
         );
 
-        // For now, return mock results since the RAG system isn't fully populated
-        let mock_results = vec![
-            serde_json::json!({
-                "id": 1,
-                "corpus": "architecture_decisions",
-                "content": "ADR-015: LLM Provider Abstraction + Grounding Contract",
-                "metadata": "{\"adr\": \"ADR-015\", \"title\": \"LLM Provider Abstraction\"}",
-                "rank": 0.95
-            }),
-            serde_json::json!({
-                "id": 2,
-                "corpus": "documentation",
-                "content": "The deploy-baba project uses a zero-cost philosophy with boring infrastructure",
-                "metadata": "{\"type\": \"project_overview\"}",
-                "rank": 0.87
-            }),
-        ];
+        let kinds: Option<Vec<&str>> = corpus_filter.map(|c| vec![c]);
+        let chunks = self
+            .rag_store
+            .retrieve_filtered(query, 10, kinds.as_deref())
+            .map_err(|e| anyhow::anyhow!("RAG retrieval failed: {}", e))?;
 
-        info!("RAG query returned {} results", mock_results.len());
-        Ok(mock_results)
+        let results = chunks
+            .into_iter()
+            .map(|c| {
+                serde_json::json!({
+                    "id": c.chunk_id,
+                    "corpus": c.source_kind,
+                    "source_path": c.source_path,
+                    "content": c.content,
+                    "score": c.score,
+                })
+            })
+            .collect::<Vec<_>>();
+
+        info!("RAG query returned {} results", results.len());
+        Ok(results)
     }
 
     pub fn get_corpora(&self) -> Vec<String> {
