@@ -1,4 +1,4 @@
-import { useState, useRef, FormEvent } from 'react'
+import { useState, useRef, FormEvent, useEffect } from 'react'
 import { Helmet } from 'react-helmet-async'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -7,6 +7,8 @@ interface Citation {
   path: string
   kind: string
   sha: string
+  url: string
+  ord: number
 }
 
 interface AskResult {
@@ -22,25 +24,40 @@ const KIND_ICON: Record<string, string> = {
   hcl: '🏗',
   plan: '📋',
   cache: '💾',
+  portfolio: '💼',
 }
 
-const EXAMPLES = [
-  'Why SQLite instead of PostgreSQL?',
-  'How does Lambda load secrets at cold start?',
-  'How does the PoW challenge protect the contact form?',
-  'What is the RAG pipeline and how does it work?',
-  'How is Cognito authentication implemented?',
-  'What are the ADRs for infrastructure decisions?',
+const RECRUITER_QUESTIONS = [
+  { value: '', label: 'Select a question...' },
+  { value: 'What are your primary skills and technical expertise?', label: 'What are your primary skills?' },
+  { value: 'Tell me about your experience with AI/LLM systems and RAG pipelines', label: 'AI/LLM systems experience' },
+  { value: 'What is your experience with cloud infrastructure and AWS?', label: 'Cloud infrastructure experience' },
+  { value: 'Describe your technical leadership and team management experience', label: 'Technical leadership experience' },
+  { value: 'What platforms and products have you built end-to-end?', label: 'Products built end-to-end' },
+  { value: 'How does the RAG pipeline in this portfolio project work?', label: 'How the RAG pipeline works' },
+  { value: 'What are the key architecture decisions in this portfolio?', label: 'Key architecture decisions' },
+  { value: 'Why was SQLite chosen over PostgreSQL for this project?', label: 'SQLite vs PostgreSQL decision' },
+  { value: 'How is authentication implemented in this portfolio?', label: 'Authentication implementation' },
 ]
 
-function CitationBadge({ index, path, kind, sha }: { index: number; path: string; kind: string; sha: string }) {
+function CitationBadge({ index, path, kind, url }: { index: number; path: string; kind: string; url: string }) {
+  const isPortfolio = kind === 'portfolio'
+  const displayPath = isPortfolio ? path.replace('portfolio://', '').replace('/', ' → ') : path
+
   return (
     <li className="flex items-start gap-2 text-xs text-gray-500">
       <span className="text-gray-600 font-mono mt-0.5">[{index + 1}]</span>
-      <span>
+      <span className="flex-1">
         {KIND_ICON[kind] ?? '📄'}{' '}
-        <span className="font-mono text-gray-400">{path}</span>
-        <span className="text-gray-600 ml-1">sha:{sha.slice(0, 7)}</span>
+        {isPortfolio ? (
+          <a href={url} className="font-mono text-cyan-400 hover:text-cyan-300 hover:underline">
+            {displayPath}
+          </a>
+        ) : (
+          <a href={url} target="_blank" rel="noopener noreferrer" className="font-mono text-cyan-400 hover:text-cyan-300 hover:underline">
+            {path}
+          </a>
+        )}
       </span>
     </li>
   )
@@ -51,7 +68,22 @@ export default function Ask() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<AskResult | null>(null)
+  const [selectedQuestion, setSelectedQuestion] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Auto-trigger the most pertinent question on first load
+  useEffect(() => {
+    if (!result && !loading && !error) {
+      const defaultQuestion = 'What are your primary skills and technical expertise?'
+      setQuery(defaultQuestion)
+      setSelectedQuestion(defaultQuestion)
+      // Auto-submit after a short delay
+      setTimeout(() => {
+        const form = document.getElementById('ask-form') as HTMLFormElement
+        if (form) form.requestSubmit()
+      }, 500)
+    }
+  }, [])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -90,8 +122,10 @@ export default function Ask() {
     }
   }
 
-  function fillQuery(text: string) {
-    setQuery(text)
+  function handleQuestionChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const selected = e.target.value
+    setSelectedQuestion(selected)
+    setQuery(selected)
     textareaRef.current?.focus()
   }
 
@@ -102,19 +136,33 @@ export default function Ask() {
       </Helmet>
 
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="mb-10">
-          <h1 className="text-4xl font-bold text-white mb-2">Ask the Codebase</h1>
-          <p className="text-gray-400">
-            Ask anything about this portfolio project — architecture decisions, how features
-            work, why something was built a certain way. Answers are grounded in the actual
-            source code, infrastructure, and design documents.
-          </p>
-          <p className="text-gray-600 text-sm mt-2">
-            Powered by Claude + SQLite FTS5 retrieval over Rust source, OpenTofu HCL, and ADRs.
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-white mb-2">Ask</h1>
+          <p className="text-gray-400 text-sm">
+            Questions about this portfolio and the codebase are answered with source citations.
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form id="ask-form" onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="question-select" className="block text-sm font-medium text-gray-300 mb-2">
+              Common questions
+            </label>
+            <select
+              id="question-select"
+              value={selectedQuestion}
+              onChange={handleQuestionChange}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white
+                         focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition"
+            >
+              {RECRUITER_QUESTIONS.map(q => (
+                <option key={q.value} value={q.value}>
+                  {q.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div>
             <label htmlFor="query" className="block text-sm font-medium text-gray-300 mb-1">
               Your question
@@ -127,7 +175,7 @@ export default function Ask() {
               maxLength={1000}
               value={query}
               onChange={e => setQuery(e.target.value)}
-              placeholder="e.g. How does Lambda load secrets at cold start? Why SQLite instead of PostgreSQL?"
+              placeholder="Or type your own question..."
               className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white
                          placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500
                          focus:border-transparent transition resize-none"
@@ -142,13 +190,8 @@ export default function Ask() {
                          text-white font-semibold py-2.5 px-6 rounded-lg transition focus:outline-none
                          focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 focus:ring-offset-gray-900"
             >
-              Ask
+              {loading ? 'Asking...' : 'Ask'}
             </button>
-            {loading && (
-              <span className="text-sm text-gray-500">
-                Retrieving sources and generating answer…
-              </span>
-            )}
           </div>
         </form>
 
@@ -219,22 +262,6 @@ export default function Ask() {
             </p>
           </div>
         )}
-
-        <div className="mt-12">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-600 mb-4">Try asking</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {EXAMPLES.map(ex => (
-              <button
-                key={ex}
-                onClick={() => fillQuery(ex)}
-                className="text-left bg-gray-800/40 border border-gray-700 hover:border-gray-500
-                           rounded-lg px-4 py-3 text-sm text-gray-400 hover:text-gray-200 transition"
-              >
-                {ex}
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
     </>
   )

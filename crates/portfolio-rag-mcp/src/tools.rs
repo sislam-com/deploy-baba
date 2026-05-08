@@ -80,7 +80,7 @@ pub fn list_tools() -> Vec<Tool> {
     ]
 }
 
-pub fn query_rag(rag: &PortfolioRAG, args: Value) -> Result<Value> {
+pub async fn query_rag(rag: &PortfolioRAG, args: Value) -> Result<Value> {
     let query = args
         .get("query")
         .and_then(|v| v.as_str())
@@ -90,7 +90,7 @@ pub fn query_rag(rag: &PortfolioRAG, args: Value) -> Result<Value> {
 
     info!("RAG query request: '{}' (corpus: {:?})", query, corpus);
 
-    match rag.query(query, corpus) {
+    match rag.query(query, corpus).await {
         Ok(results) => {
             let response = serde_json::json!({
                 "success": true,
@@ -103,12 +103,7 @@ pub fn query_rag(rag: &PortfolioRAG, args: Value) -> Result<Value> {
         }
         Err(e) => {
             error!("RAG query failed: {}", e);
-            Ok(serde_json::json!({
-                "success": false,
-                "error": e.to_string(),
-                "query": query,
-                "corpus_filter": corpus
-            }))
+            return Err(anyhow::anyhow!("RAG query failed: {}", e));
         }
     }
 }
@@ -138,16 +133,12 @@ pub fn get_corpus_stats(rag: &PortfolioRAG, args: Value) -> Result<Value> {
         })),
         Err(e) => {
             error!("Corpus stats failed: {}", e);
-            Ok(serde_json::json!({
-                "success": false,
-                "error": e.to_string(),
-                "corpus": corpus
-            }))
+            return Err(anyhow::anyhow!("Corpus stats failed: {}", e));
         }
     }
 }
 
-pub fn search_portfolio(rag: &PortfolioRAG, args: Value) -> Result<Value> {
+pub async fn search_portfolio(rag: &PortfolioRAG, args: Value) -> Result<Value> {
     let query = args
         .get("query")
         .and_then(|v| v.as_str())
@@ -159,7 +150,7 @@ pub fn search_portfolio(rag: &PortfolioRAG, args: Value) -> Result<Value> {
 
     // For now, use the basic RAG query
     // In a full implementation, this would include semantic search with embeddings
-    match rag.query(query, None) {
+    match rag.query(query, None).await {
         Ok(mut results) => {
             // Limit results
             results.truncate(limit as usize);
@@ -175,12 +166,7 @@ pub fn search_portfolio(rag: &PortfolioRAG, args: Value) -> Result<Value> {
         }
         Err(e) => {
             error!("Portfolio search failed: {}", e);
-            Ok(serde_json::json!({
-                "success": false,
-                "error": e.to_string(),
-                "query": query,
-                "limit": limit
-            }))
+            return Err(anyhow::anyhow!("Portfolio search failed: {}", e));
         }
     }
 }

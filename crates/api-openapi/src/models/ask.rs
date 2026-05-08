@@ -40,6 +40,8 @@ pub struct AskCitation {
     pub sha: String,
     /// Ordinal position of this chunk within the source file.
     pub ord: i64,
+    /// GitHub URL to the source file at the specific commit.
+    pub url: String,
 }
 
 impl ApiModel for AskCitation {
@@ -52,6 +54,7 @@ impl ApiModel for AskCitation {
             path: "plans/modules/secrets-manager.md".to_string(),
             sha: "abc1234".to_string(),
             ord: 3,
+            url: "https://github.com/shantopagla/deploy-baba/blob/abc1234/plans/modules/secrets-manager.md".to_string(),
         }
     }
 }

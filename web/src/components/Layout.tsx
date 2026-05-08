@@ -36,14 +36,6 @@ export default function Layout() {
                 About
               </NavLink>
               <NavLink
-                to="/ask"
-                className={({ isActive }) =>
-                  `text-sm transition ${isActive ? 'text-white' : 'text-gray-300 hover:text-white'}`
-                }
-              >
-                Ask
-              </NavLink>
-              <NavLink
                 to="/contact"
                 className={({ isActive }) =>
                   `text-sm transition ${isActive ? 'text-white' : 'text-gray-300 hover:text-white'}`

@@ -12,7 +12,7 @@ use std::process::Command;
 use super::ResumeFormat;
 
 const HEADER: &str = "# Sharful Islam
-**SaaS/PaaS engineer with a passion for building custom, scalable systems · 20+ Years**
+**AI Systems & Platform Engineer · Rust · RAG · LLM · AWS · 20+ Years**
 
 contact-sislam@sislam.com · [GitHub](https://github.com/shantopagla) · [LinkedIn](https://www.linkedin.com/in/sharfulislam/) · [sislam.com](https://sislam.com)
 
@@ -228,16 +228,9 @@ fn load_me_bio(conn: &Connection) -> anyhow::Result<String> {
 }
 
 /// Static fallback summary used when `--ai` is absent or the API call fails.
-fn polish_bio_to_summary_static(_raw_bio: &str) -> String {
-    "## Professional Summary\n\n\
-SaaS/PaaS engineer with 20+ years building custom, scalable systems \
-that solve complex role-based and hierarchical data problems. Designs \
-and delivers high-impact backend services, APIs, and cloud infrastructure \
-across simulation, DCIM, SDS, and e-commerce platforms. \
-Currently driving an AI-augmented development workflow end-to-end on a \
-zero-cost Rust + AWS Lambda portfolio portal, exploring how human–AI \
-pairing reshapes the full software lifecycle.\n\n"
-        .to_string()
+/// Uses the raw_bio sourced from the DB (about_sections.me-bio) directly.
+fn polish_bio_to_summary_static(raw_bio: &str) -> String {
+    format!("## Professional Summary\n\n{}\n\n", raw_bio)
 }
 
 /// Calls Claude to rephrase `raw_bio` into a polished resume Professional Summary section.

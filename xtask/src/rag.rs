@@ -374,20 +374,21 @@ fn query_competencies(conn: &Connection) -> anyhow::Result<Vec<serde_json::Value
     for mut comp in comps {
         let slug = comp["slug"].as_str().unwrap_or("").to_string();
         let mut hl_stmt = conn.prepare(
-            "SELECT ch.highlight_text, j.company FROM competency_highlights ch
-             LEFT JOIN jobs j ON ch.job_id = j.id
-             WHERE ch.competency_id = (SELECT id FROM competencies WHERE slug = ?1)
-             ORDER BY ch.sort_order ASC",
+            "SELECT jd.detail_text, j.company FROM competency_evidence ce
+             LEFT JOIN jobs j ON ce.job_id = j.id
+             LEFT JOIN job_details jd ON ce.detail_id = jd.id
+             WHERE ce.competency_id = (SELECT id FROM competencies WHERE slug = ?1)
+             ORDER BY ce.sort_order ASC",
         )?;
         let highlights: Vec<serde_json::Value> = hl_stmt
             .query_map([&slug], |row| {
                 Ok(serde_json::json!({
-                    "highlight_text": row.get::<_, String>(0)?,
+                    "text": row.get::<_, Option<String>>(0)?,
                     "company": row.get::<_, Option<String>>(1)?,
                 }))
             })?
             .collect::<Result<Vec<_>, _>>()?;
-        comp["highlights"] = serde_json::json!(highlights);
+        comp["evidence"] = serde_json::json!(highlights);
         result.push(comp);
     }
 

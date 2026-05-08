@@ -16,13 +16,9 @@ anyhow = "1.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
-# MCP server dependencies
-# Note: Using mock MCP for now - replace with actual MCP SDK when available
-async-trait = "0.1"
+# RAG infrastructure
+rag-core = { path = "../rag-core" }
+rag-sqlite = { path = "../rag-sqlite" }
 
 # Database dependencies
 rusqlite = { version = "0.32", features = ["bundled"] }
-
-# Utility dependencies
-uuid = { version = "1.0", features = ["v4"] }
-chrono = { version = "0.4", features = ["serde"] }
