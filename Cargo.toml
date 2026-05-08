@@ -15,6 +15,7 @@ members = [
     "crates/api-grpc",
     "crates/api-merger",
     "crates/infra-types",
+    "crates/portfolio-rag-mcp",
     "services/ui",
     "services/email",
     "services/llm-proxy",
