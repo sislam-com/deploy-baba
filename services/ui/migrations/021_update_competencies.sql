@@ -1,6 +1,8 @@
 -- Migration 021: Replace competencies with actual top skills (ADR-010)
 -- Evidence will be rebuilt when Challenges CRUD is implemented.
 
+BEGIN;
+
 DELETE FROM competency_evidence;
 DELETE FROM competencies;
 
@@ -33,3 +35,5 @@ INSERT INTO competencies (slug, name, description, icon, sort_order) VALUES
  'Technical Leadership & Delivery',
  'Director-level platform operations, GUI Manager, Tech Lead — onshore/offshore teams, client relationships, architectural decision-making',
  NULL, 7);
+
+COMMIT;
