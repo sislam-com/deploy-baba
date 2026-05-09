@@ -32,13 +32,22 @@ pub async fn get_resume_data(State(db): State<Arc<Db>>) -> Result<Json<ResumeDat
         )
         .unwrap_or_default();
 
-    let summary = conn
+    let summary_text = conn
         .query_row(
             "SELECT body FROM about_sections WHERE slug = 'me-summary'",
             [],
             |row| row.get::<_, String>(0),
         )
         .unwrap_or_else(|_| bio.clone());
+
+    // Use summary as title, with hardcoded name
+    let name = "Sharful Islam".to_string();
+    let title = if summary_text.is_empty() {
+        "AI Systems Engineer".to_string()
+    } else {
+        summary_text
+    };
+    let summary = String::new();
 
     let mut stmt = conn
         .prepare(
@@ -92,6 +101,8 @@ pub async fn get_resume_data(State(db): State<Arc<Db>>) -> Result<Json<ResumeDat
     let social_links = load_social_links(&conn);
 
     Ok(Json(ResumeData {
+        name,
+        title,
         bio,
         summary,
         jobs,

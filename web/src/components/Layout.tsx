@@ -1,11 +1,67 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
+import SvgIcon from './SvgIcon'
 
 interface SocialLink {
-  id: number
-  platform: string
   url: string
   label: string
+}
+
+const SOCIAL_ICON_MAP: Record<string, string> = {
+  linkedin: 'linkedin',
+  github: 'github',
+}
+
+function NavIcon({
+  to,
+  icon,
+  label,
+  external,
+}: {
+  to: string
+  icon: string
+  label: string
+  external?: boolean
+}) {
+  const cls = "p-2 rounded-lg transition"
+
+  if (external) {
+    return (
+      <div className="group relative">
+        <a
+          href={to}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`${cls} text-gray-400 hover:text-white`}
+          title={label}
+        >
+          <SvgIcon name={icon} className="w-5 h-5" />
+        </a>
+        <span className="absolute top-full mt-1 left-1/2 -translate-x-1/2 px-2 py-1 text-xs text-white bg-gray-700 rounded
+                         opacity-0 group-hover:opacity-100 transition pointer-events-none whitespace-nowrap z-50">
+          {label}
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="group relative">
+      <NavLink
+        to={to}
+        className={({ isActive }) =>
+          `${cls} ${isActive ? 'text-cyan-400' : 'text-gray-400 hover:text-white'}`
+        }
+        title={label}
+      >
+        <SvgIcon name={icon} className="w-5 h-5" />
+      </NavLink>
+      <span className="absolute top-full mt-1 left-1/2 -translate-x-1/2 px-2 py-1 text-xs text-white bg-gray-700 rounded
+                       opacity-0 group-hover:opacity-100 transition pointer-events-none whitespace-nowrap z-50">
+        {label}
+      </span>
+    </div>
+  )
 }
 
 export default function Layout() {
@@ -26,40 +82,20 @@ export default function Layout() {
             <Link to="/" className="text-xl font-bold text-cyan-400 hover:text-cyan-300 transition">
               Sharful Islam
             </Link>
-            <div className="flex items-center space-x-6">
-              <NavLink
-                to="/about/me"
-                className={({ isActive }) =>
-                  `text-sm transition ${isActive ? 'text-white' : 'text-gray-300 hover:text-white'}`
-                }
-              >
-                About
-              </NavLink>
-              <NavLink
-                to="/contact"
-                className={({ isActive }) =>
-                  `text-sm transition ${isActive ? 'text-white' : 'text-gray-300 hover:text-white'}`
-                }
-              >
-                Contact
-              </NavLink>
-              <a href="/docs" className="text-sm text-gray-300 hover:text-white transition">
-                API Docs
-              </a>
+            <div className="flex items-center gap-3">
+              <NavIcon to="/about/me" icon="user" label="About" />
+              <NavIcon to="/contact" icon="envelope" label="Contact" />
+              <NavIcon to="/docs" icon="document-text" label="API Docs" external />
               {socialLinks.map(link => (
-                <a
-                  key={link.id}
-                  href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-gray-300 hover:text-white transition"
-                >
-                  {link.label}
-                </a>
+                <NavIcon
+                  key={link.url}
+                  to={link.url}
+                  icon={SOCIAL_ICON_MAP[link.label.toLowerCase()] ?? 'document'}
+                  label={link.label}
+                  external
+                />
               ))}
-              <a href="/auth/login" className="text-sm text-gray-300 hover:text-white transition">
-                Login
-              </a>
+              <NavIcon to="/auth/login" icon="key" label="Login" external />
             </div>
           </div>
         </div>
@@ -74,7 +110,7 @@ export default function Layout() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
             <div>
               <h3 className="text-lg font-semibold mb-4 text-cyan-400">Sharful Islam</h3>
-              <p className="text-gray-400 text-sm">Full-Stack SaaS Engineer · Portfolio</p>
+              <p className="text-gray-400 text-sm">AI Systems Engineer &middot; Portfolio</p>
             </div>
             <div>
               <h3 className="text-lg font-semibold mb-4 text-cyan-400">Links</h3>

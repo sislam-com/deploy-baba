@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import Ask from './Ask'
+import SvgIcon from '../components/SvgIcon'
 
 interface Job {
   id: number
@@ -26,6 +27,8 @@ interface Competency {
 }
 
 interface ResumeData {
+  name: string
+  title: string
   bio: string
   summary: string
   jobs: Job[]
@@ -54,6 +57,55 @@ const CATEGORY_LABELS: Record<string, string> = {
   achievement: 'Achievements',
   responsibility: 'Responsibilities',
   'sub-engagement': 'Client Engagements',
+}
+
+const COMPETENCY_ICON_MAP: Record<string, string> = {
+  'platform-architecture': 'server',
+  'cloud-infrastructure': 'cloud',
+  'frontend-engineering': 'monitor',
+  'ai-augmented-dev': 'cpu',
+  'ai-llm-systems': 'brain',
+  'technical-leadership': 'users',
+  'saas-product': 'rocket',
+}
+
+function StatPill({ value, label }: { value: string; label: string }) {
+  return (
+    <div className="flex flex-col items-center">
+      <span className="text-lg sm:text-xl font-bold text-white">{value}</span>
+      <span className="text-xs text-gray-500 uppercase tracking-wider">{label}</span>
+    </div>
+  )
+}
+
+function TechStrip({ jobs }: { jobs: Job[] }) {
+  const tags = useMemo(() => {
+    const freq: Record<string, number> = {}
+    for (const job of jobs) {
+      for (const tech of job.tech_stack ?? []) {
+        freq[tech] = (freq[tech] ?? 0) + 1
+      }
+    }
+    return Object.entries(freq)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 12)
+      .map(([name]) => name)
+  }, [jobs])
+
+  return (
+    <div className="flex justify-center gap-2 flex-wrap scrollbar-hide">
+      {tags.map((tag, i) => (
+        <span
+          key={tag}
+          className="text-xs px-3 py-1 rounded-full border border-gray-700 text-gray-300 bg-gray-800/50
+                     whitespace-nowrap animate-fadeIn"
+          style={{ animationDelay: `${300 + i * 40}ms` }}
+        >
+          {tag}
+        </span>
+      ))}
+    </div>
+  )
 }
 
 function JobCard({ job }: { job: Job }) {
@@ -137,7 +189,7 @@ function JobCard({ job }: { job: Job }) {
                   <ul className="space-y-2">
                     {items.map(item => (
                       <li key={item.id} className="flex gap-2 text-gray-300 text-sm">
-                        <span className="text-cyan-400 mt-0.5 shrink-0">▸</span>
+                        <span className="text-cyan-400 mt-0.5 shrink-0">{'▸'}</span>
                         <span>{item.detail_text}</span>
                       </li>
                     ))}
@@ -186,7 +238,10 @@ function CompetencyCard({ comp, onJobClick }: { comp: Competency; onJobClick: (s
       >
       <div className="p-6">
         <div className="flex items-start gap-3 mb-3">
-          {comp.icon && <span className="text-2xl">{comp.icon}</span>}
+          <SvgIcon
+            name={COMPETENCY_ICON_MAP[comp.slug] ?? 'diamond'}
+            className="w-6 h-6 text-cyan-400 shrink-0 mt-0.5"
+          />
           <div>
             <h3 className="text-lg font-semibold text-white">{comp.name}</h3>
             {comp.description && (
@@ -213,14 +268,14 @@ function CompetencyCard({ comp, onJobClick }: { comp: Competency; onJobClick: (s
                     className="text-sm font-semibold text-cyan-400 hover:text-cyan-300 transition mb-2 block"
                     onClick={() => onJobClick(group.slug)}
                   >
-                    {company} →
+                    {company} {'→'}
                   </button>
                   <ul className="space-y-1.5">
                     {group.items.map(ev => {
                       const text = ev.highlight_text ?? ev.detail_text ?? ''
                       return text ? (
                         <li key={ev.id} className="flex gap-2 text-gray-300 text-sm">
-                          <span className="text-cyan-400 mt-0.5 shrink-0">▸</span>
+                          <span className="text-cyan-400 mt-0.5 shrink-0">{'▸'}</span>
                           <span>{text}</span>
                         </li>
                       ) : null
@@ -264,6 +319,36 @@ export default function Home() {
     return () => document.removeEventListener('click', handleClick)
   }, [])
 
+  const heroStats = useMemo(() => {
+    if (!resume) return null
+
+    const startDates = resume.jobs.map(j => {
+      const [y, m] = j.start_date.split('-').map(Number)
+      return new Date(y, (m ?? 1) - 1).getTime()
+    })
+    const endDates = resume.jobs.map(j => {
+      if (!j.end_date) return Date.now()
+      const [y, m] = j.end_date.split('-').map(Number)
+      return new Date(y, (m ?? 1) - 1).getTime()
+    })
+    const years = Math.floor(
+      (Math.max(...endDates) - Math.min(...startDates)) / (365.25 * 24 * 60 * 60 * 1000)
+    )
+
+    const freq: Record<string, number> = {}
+    for (const job of resume.jobs) {
+      for (const tech of job.tech_stack ?? []) {
+        freq[tech] = (freq[tech] ?? 0) + 1
+      }
+    }
+    const topTech = Object.entries(freq)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([name]) => name)
+
+    return { years, skillCount: resume.competencies.length, topTech }
+  }, [resume])
+
   function setView(v: 'timeline' | 'capabilities' | 'ask') {
     setSearchParams(v === 'ask' ? {} : { view: v }, { replace: true })
   }
@@ -279,99 +364,136 @@ export default function Home() {
   return (
     <>
       <Helmet>
-        <title>Sharful Islam — Portfolio</title>
+        <title>Portfolio</title>
       </Helmet>
 
-      <section className="bg-gradient-to-b from-gray-800 to-gray-900 py-12">
+      {/* Hero */}
+      <section className="bg-gradient-to-b from-gray-800 to-gray-900 pt-12 pb-8">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
-            <div>
-              <h1 className="text-4xl font-bold text-white mb-1">Sharful Islam</h1>
-              <p className="text-cyan-400 text-lg">Full-Stack SaaS Engineer · 20+ years</p>
+          {/* Name + Title */}
+          <div className="text-center animate-fadeInUp">
+            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-white tracking-tight">
+              {resume?.name ?? ' '}
+            </h1>
+            <p className="text-xl sm:text-2xl text-cyan-400 font-medium mt-2">
+              {resume?.title ?? ' '}
+            </p>
+            {resume?.bio && (
+              <p className="text-base sm:text-lg text-gray-400 mt-4 max-w-2xl mx-auto leading-relaxed">
+                {resume.bio.split('.').slice(0, 2).join('.').trim()}.
+              </p>
+            )}
+          </div>
+
+          {/* Stats strip */}
+          {heroStats && (
+            <div
+              className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 mt-8 animate-fadeInUp"
+              style={{ animationDelay: '150ms' }}
+            >
+              <StatPill value={`${heroStats.years}+`} label="years" />
+              <span className="text-gray-700 text-2xl font-thin hidden sm:inline">|</span>
+              <StatPill value={`${heroStats.skillCount}`} label="core skills" />
+              <span className="text-gray-700 text-2xl font-thin hidden sm:inline">|</span>
+              <StatPill value={heroStats.topTech.join(' · ')} label="top tech" />
+            </div>
+          )}
+
+          {/* Tech strip */}
+          {resume && (
+            <div className="mt-6 animate-fadeIn" style={{ animationDelay: '300ms' }}>
+              <TechStrip jobs={resume.jobs} />
+            </div>
+          )}
+
+          {/* Tabs + Download */}
+          <div
+            className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-8 animate-fadeIn"
+            style={{ animationDelay: '400ms' }}
+          >
+            <div className="flex items-center bg-gray-800/80 rounded-full p-1 border border-gray-700">
+              <button
+                onClick={() => setView('timeline')}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition ${
+                  view === 'timeline'
+                    ? 'bg-cyan-600/20 text-cyan-400 shadow-sm shadow-cyan-500/10'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <SvgIcon name="calendar" className="w-4 h-4" />
+                Timeline
+              </button>
+              <button
+                onClick={() => setView('capabilities')}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition ${
+                  view === 'capabilities'
+                    ? 'bg-cyan-600/20 text-cyan-400 shadow-sm shadow-cyan-500/10'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <SvgIcon name="bolt" className="w-4 h-4" />
+                Capabilities
+              </button>
+              <button
+                onClick={() => setView('ask')}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition ${
+                  view === 'ask'
+                    ? 'bg-cyan-600/20 text-cyan-400 shadow-sm shadow-cyan-500/10'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <SvgIcon name="chat" className="w-4 h-4" />
+                Ask AI
+              </button>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-center gap-3">
-              <div className="flex items-center bg-gray-800 rounded-lg p-1 border border-gray-700">
-                <button
-                  onClick={() => setView('timeline')}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition ${
-                    view === 'timeline'
-                      ? 'bg-cyan-600/20 text-cyan-400'
-                      : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  📅 Timeline
-                </button>
-                <button
-                  onClick={() => setView('capabilities')}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition ${
-                    view === 'capabilities'
-                      ? 'bg-cyan-600/20 text-cyan-400'
-                      : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  ⚡ Capabilities
-                </button>
-                <button
-                  onClick={() => setView('ask')}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition ${
-                    view === 'ask'
-                      ? 'bg-cyan-600/20 text-cyan-400'
-                      : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  🤖 Ask AI
-                </button>
-              </div>
-
-              <div className="relative" ref={downloadRef}>
-                <button
-                  onClick={() => setDownloadOpen(o => !o)}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium
-                             bg-cyan-600 hover:bg-cyan-500 text-white transition"
-                >
-                  Download Resume
-                  <span className="text-xs">{downloadOpen ? '▴' : '▾'}</span>
-                </button>
-                {downloadOpen && (
-                  <div className="absolute right-0 mt-2 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10 overflow-hidden">
-                    <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500 border-b border-gray-700">
-                      PDF
-                    </div>
-                    <a
-                      href="/resume/sharful-islam-resume-chronological.pdf"
-                      download
-                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition"
-                    >
-                      Chronological
-                    </a>
-                    <a
-                      href="/resume/sharful-islam-resume-functional.pdf"
-                      download
-                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition"
-                    >
-                      Functional (by skill)
-                    </a>
-                    <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500 border-t border-b border-gray-700">
-                      DOCX
-                    </div>
-                    <a
-                      href="/resume/sharful-islam-resume-chronological.docx"
-                      download
-                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition"
-                    >
-                      Chronological
-                    </a>
-                    <a
-                      href="/resume/sharful-islam-resume-functional.docx"
-                      download
-                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition"
-                    >
-                      Functional (by skill)
-                    </a>
+            <div className="relative" ref={downloadRef}>
+              <button
+                onClick={() => setDownloadOpen(o => !o)}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium
+                           bg-cyan-600 hover:bg-cyan-500 text-white transition"
+              >
+                Download Resume
+                <span className="text-xs">{downloadOpen ? '▴' : '▾'}</span>
+              </button>
+              {downloadOpen && (
+                <div className="absolute right-0 mt-2 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10 overflow-hidden">
+                  <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500 border-b border-gray-700">
+                    PDF
                   </div>
-                )}
-              </div>
+                  <a
+                    href="/resume/sharful-islam-resume-chronological.pdf"
+                    download
+                    className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition"
+                  >
+                    Chronological
+                  </a>
+                  <a
+                    href="/resume/sharful-islam-resume-functional.pdf"
+                    download
+                    className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition"
+                  >
+                    Functional (by skill)
+                  </a>
+                  <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500 border-t border-b border-gray-700">
+                    DOCX
+                  </div>
+                  <a
+                    href="/resume/sharful-islam-resume-chronological.docx"
+                    download
+                    className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition"
+                  >
+                    Chronological
+                  </a>
+                  <a
+                    href="/resume/sharful-islam-resume-functional.docx"
+                    download
+                    className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition"
+                  >
+                    Functional (by skill)
+                  </a>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -389,8 +511,13 @@ export default function Home() {
             <div className="relative">
               <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-700 hidden sm:block" />
               <div className="space-y-6">
-                {resume.jobs.map(job => (
-                  <div key={job.id} data-job-slug={job.slug}>
+                {resume.jobs.map((job, i) => (
+                  <div
+                    key={job.id}
+                    data-job-slug={job.slug}
+                    className="animate-fadeInUp"
+                    style={{ animationDelay: `${i * 80}ms` }}
+                  >
                     <JobCard job={job} />
                   </div>
                 ))}
@@ -404,8 +531,14 @@ export default function Home() {
         <section className="py-12">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {resume.competencies.map(comp => (
-                <CompetencyCard key={comp.id} comp={comp} onJobClick={handleJobClick} />
+              {resume.competencies.map((comp, i) => (
+                <div
+                  key={comp.id}
+                  className="animate-scaleIn"
+                  style={{ animationDelay: `${i * 60}ms` }}
+                >
+                  <CompetencyCard comp={comp} onJobClick={handleJobClick} />
+                </div>
               ))}
             </div>
           </div>
@@ -413,8 +546,8 @@ export default function Home() {
       )}
 
       {view === 'ask' && (
-        <section className="py-12">
-          <Ask />
+        <section className="py-8 animate-fadeIn">
+          <Ask embedded />
         </section>
       )}
     </>
