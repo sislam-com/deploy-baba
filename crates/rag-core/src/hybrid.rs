@@ -21,6 +21,18 @@ const PORTFOLIO_KEYWORDS: &[&str] = &[
     "career",
     "company",
     "position",
+    "authentication",
+    "auth",
+    "cognito",
+    "login",
+    "architecture",
+    "implement",
+    "design",
+    "infrastructure",
+    "deploy",
+    "lambda",
+    "database",
+    "sqlite",
 ];
 
 pub struct HybridRetriever<R, P> {
@@ -88,10 +100,12 @@ impl<R: Retriever, P: PortfolioDataProvider> Retriever for HybridRetriever<R, P>
             return self.fts.retrieve(query, top_k).await;
         }
 
-        // Portfolio-related query: inject live data first, then fill remaining with FTS
-        let fts_limit = top_k.saturating_sub(5);
-        let fts_results = if fts_limit > 0 {
-            self.fts.retrieve(query, fts_limit).await?
+        // Portfolio-related query: inject capped live data, guarantee FTS budget
+        let portfolio_budget = top_k.min(5);
+        let fts_budget = top_k.saturating_sub(portfolio_budget);
+
+        let fts_results = if fts_budget > 0 {
+            self.fts.retrieve(query, fts_budget).await?
         } else {
             Vec::new()
         };
@@ -117,14 +131,11 @@ impl<R: Retriever, P: PortfolioDataProvider> Retriever for HybridRetriever<R, P>
             ord += 1;
         }
 
-        // Prioritize live portfolio data, then add FTS results up to top_k
+        live_chunks.truncate(portfolio_budget);
+
         let mut merged = live_chunks;
-        for chunk in fts_results {
-            if merged.len() >= top_k {
-                break;
-            }
-            merged.push(chunk);
-        }
+        merged.extend(fts_results);
+        merged.truncate(top_k);
 
         Ok(merged)
     }
@@ -230,7 +241,7 @@ mod tests {
         };
 
         let results = hybrid
-            .retrieve("how does the Lambda deploy process run?", 20)
+            .retrieve("how does the error handling macro expand?", 20)
             .await
             .unwrap();
         assert_eq!(
@@ -255,5 +266,47 @@ mod tests {
 
         let results = hybrid.retrieve("what experience?", 3).await.unwrap();
         assert!(results.len() <= 3, "should not exceed top_k");
+    }
+
+    #[tokio::test]
+    async fn portfolio_budget_capped_fts_always_included() {
+        let fts_chunks: Vec<_> = (0..8)
+            .map(|i| make_fts_chunk("rust", &format!("fts chunk {}", i)))
+            .collect();
+        let hybrid = HybridRetriever {
+            fts: StubRetriever {
+                chunks: fts_chunks,
+            },
+            portfolio: StubPortfolio,
+        };
+
+        let results = hybrid.retrieve("what skills?", 10).await.unwrap();
+        let live_count = results.iter().filter(|c| c.git_sha == "live").count();
+        let fts_count = results.iter().filter(|c| c.git_sha != "live").count();
+        assert!(live_count <= 5, "portfolio chunks must be capped at 5");
+        assert!(fts_count > 0, "FTS chunks must always be included");
+    }
+
+    #[tokio::test]
+    async fn auth_query_triggers_portfolio_injection() {
+        let hybrid = HybridRetriever {
+            fts: StubRetriever {
+                chunks: vec![make_fts_chunk("rust", "cognito auth handler")],
+            },
+            portfolio: StubPortfolio,
+        };
+
+        let results = hybrid
+            .retrieve("how is authentication implemented?", 10)
+            .await
+            .unwrap();
+        assert!(
+            results.iter().any(|c| c.git_sha == "live"),
+            "auth query should inject portfolio context"
+        );
+        assert!(
+            results.iter().any(|c| c.git_sha != "live"),
+            "auth query should also include FTS code chunks"
+        );
     }
 }

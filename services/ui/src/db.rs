@@ -86,6 +86,10 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "020_fix_me_summary_content",
         include_str!("../migrations/020_fix_me_summary_content.sql"),
     ),
+    (
+        "021_update_competencies",
+        include_str!("../migrations/021_update_competencies.sql"),
+    ),
 ];
 
 /// Re-exported from `api_openapi::models::social` — the canonical SSOT.

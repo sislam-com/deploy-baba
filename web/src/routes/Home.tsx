@@ -60,13 +60,13 @@ const CATEGORY_LABELS: Record<string, string> = {
 }
 
 const COMPETENCY_ICON_MAP: Record<string, string> = {
-  'platform-architecture': 'server',
-  'cloud-infrastructure': 'cloud',
-  'frontend-engineering': 'monitor',
-  'ai-augmented-dev': 'cpu',
-  'ai-llm-systems': 'brain',
+  'rust-systems': 'cpu',
+  'aws-cloud': 'cloud',
+  'ai-llm': 'brain',
+  'platform-automation': 'rocket',
+  'fullstack-saas': 'monitor',
+  'multitenant-arch': 'server',
   'technical-leadership': 'users',
-  'saas-product': 'rocket',
 }
 
 function StatPill({ value, label }: { value: string; label: string }) {
@@ -82,8 +82,9 @@ function TechStrip({ jobs }: { jobs: Job[] }) {
   const tags = useMemo(() => {
     const freq: Record<string, number> = {}
     for (const job of jobs) {
+      const weight = 1 / (job.sort_order || 1)
       for (const tech of job.tech_stack ?? []) {
-        freq[tech] = (freq[tech] ?? 0) + 1
+        freq[tech] = (freq[tech] ?? 0) + weight
       }
     }
     return Object.entries(freq)
@@ -337,8 +338,9 @@ export default function Home() {
 
     const freq: Record<string, number> = {}
     for (const job of resume.jobs) {
+      const weight = 1 / (job.sort_order || 1)
       for (const tech of job.tech_stack ?? []) {
-        freq[tech] = (freq[tech] ?? 0) + 1
+        freq[tech] = (freq[tech] ?? 0) + weight
       }
     }
     const topTech = Object.entries(freq)
