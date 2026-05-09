@@ -157,6 +157,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | DRL-2026-04-03-contact-form | 2026-04-03 | Contact Form + SES Email Lambda implementation | 4 entries, resolved |
 | DRL-2026-04-03-pow-apigateway | 2026-04-03 | POST+PoW via API Gateway — replaces GET+query params | OAC body hash workaround, ADR-009 |
 | DRL-2026-04-03-secrets-manager | 2026-04-03 | W-SEC/W-CTF: POW_SECRET + cognito_temp_password migrated from Lambda env vars to AWS Secrets Manager | Code complete; deploy: `just infra-apply` + `just secret-put pow-secret` + `just lambda-deploy` |
+| DRL-2026-05-08-migration-019-upsert | 2026-05-08 | Migration 019 uses banned INSERT OR IGNORE instead of ADR-010 upsert pattern | 1 entry, RESOLVED |
 | DRL-2026-04-07-ses-sandbox-ack | 2026-04-07 | SES sandbox blocks ack emails to unverified recipients | **RESOLVED 2026-04-08** — production access granted; W-CTF.4.13 DONE; SES_ACK_FROM_EMAIL restored |
 | DRL-2026-04-08-api-openapi-orphan | 2026-04-08 | api-openapi was orphaned from services/ui (W-APIO SSOT) | **RESOLVED 2026-04-08** — SSOT refactor complete; 29 models, dual-spec, 84 tests |
 | DRL-2026-05-01-infra-plan-blockers | 2026-05-01 | Three HCL bugs blocked `just infra-plan` (duplicate caller_identity, duplicate file_system_config, missing lifecycle filter) | **RESOLVED 2026-05-01** — all fixed; plan clean |

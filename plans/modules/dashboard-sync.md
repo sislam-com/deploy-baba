@@ -142,6 +142,7 @@ sqlite3 deploy-baba.db \
 - → ADR-006 (EFS + SQLite + S3 backup — live DB location and backup plumbing)
 - → ADR-010 (upsert re-seed convention — the canonical pattern this module operationalises)
 - → W-RSM (jobs, job_details, competencies, competency_evidence — source tables)
+- → DRL-2026-05-08-migration-019-upsert (migration pattern violation caught by sync-dashboard-data skill)
 - → W-ABT (about_sections — source table; UNIQUE(slug) already in place)
 - → W-SL (social_links — source table; UNIQUE(platform) already in place)
 - → W-CTF (contact tables — convention applies even if not editable via dashboard today)

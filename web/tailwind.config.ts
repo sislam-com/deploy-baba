@@ -5,7 +5,6 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Dark theme tokens from ADR-013
         surface: {
           900: '#0f172a',
           800: '#1e293b',
@@ -17,6 +16,25 @@ export default {
           500: '#06b6d4',
           600: '#0891b2',
         },
+      },
+      keyframes: {
+        fadeInUp: {
+          '0%': { opacity: '0', transform: 'translateY(20px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        scaleIn: {
+          '0%': { opacity: '0', transform: 'scale(0.95)' },
+          '100%': { opacity: '1', transform: 'scale(1)' },
+        },
+      },
+      animation: {
+        fadeInUp: 'fadeInUp 0.5s ease-out backwards',
+        fadeIn: 'fadeIn 0.4s ease-out backwards',
+        scaleIn: 'scaleIn 0.3s ease-out backwards',
       },
     },
   },

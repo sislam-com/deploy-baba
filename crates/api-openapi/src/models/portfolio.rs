@@ -5,10 +5,12 @@ use super::{ApiModel, Competency, Job, SocialLink};
 
 /// Combined resume payload returned by `GET /api/resume`.
 ///
-/// Bundles bio, jobs, competencies, and social links so the SPA home page
+/// Bundles name, title, bio, jobs, competencies, and social links so the SPA home page
 /// can render the full resume with a single fetch.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ResumeData {
+    pub name: String,
+    pub title: String,
     pub bio: String,
     pub summary: String,
     pub jobs: Vec<Job>,
@@ -22,6 +24,8 @@ impl ApiModel for ResumeData {
     }
     fn example() -> Self {
         Self {
+            name: "Sharful Islam".to_string(),
+            title: "AI Systems Engineer".to_string(),
             bio: "Rust engineer focused on zero-cost AWS deployments.".to_string(),
             summary: "Senior Rust engineer with 8 years of cloud-native experience.".to_string(),
             jobs: vec![Job::example()],
