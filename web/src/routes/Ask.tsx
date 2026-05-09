@@ -29,6 +29,7 @@ const KIND_ICON_MAP: Record<string, string> = {
 }
 
 const RECRUITER_QUESTIONS = [
+  { value: 'Paste a job description below, and I\'ll explain how my experience aligns with the role.', label: 'Match to a role', featured: true },
   { value: 'What are your primary skills and technical expertise?', label: 'Primary skills' },
   { value: 'Tell me about your experience with AI/LLM systems and RAG pipelines', label: 'AI/LLM experience' },
   { value: 'What is your experience with cloud infrastructure and AWS?', label: 'Cloud & AWS' },
@@ -64,7 +65,7 @@ function CitationBadge({ index, path, kind, url }: { index: number; path: string
 }
 
 export default function Ask({ embedded = false }: { embedded?: boolean }) {
-  const [query, setQuery] = useState('Tell me about your experience with AI/LLM systems and RAG pipelines')
+  const [query, setQuery] = useState(RECRUITER_QUESTIONS[0].value)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<AskResult | null>(null)
@@ -125,21 +126,26 @@ export default function Ask({ embedded = false }: { embedded?: boolean }) {
           <div>
             <span className="block text-xs font-medium text-gray-400 mb-2">Common questions</span>
             <div className="flex flex-wrap gap-2">
-              {RECRUITER_QUESTIONS.map((q, i) => (
-                <button
-                  key={q.value}
-                  type="button"
-                  onClick={() => { setQuery(q.value); textareaRef.current?.focus() }}
-                  className={`text-xs px-3 py-1.5 rounded-full border transition cursor-pointer animate-fadeIn ${
-                    query === q.value
-                      ? 'border-cyan-500 text-cyan-400 bg-cyan-600/10'
-                      : 'border-gray-700 text-gray-400 hover:text-cyan-400 hover:border-cyan-500/50 bg-gray-800/50'
-                  }`}
-                  style={{ animationDelay: `${i * 40}ms` }}
-                >
-                  {q.label}
-                </button>
-              ))}
+              {RECRUITER_QUESTIONS.map((q, i) => {
+                const featured = 'featured' in q && q.featured
+                return (
+                  <button
+                    key={q.value}
+                    type="button"
+                    onClick={() => { setQuery(q.value); textareaRef.current?.focus() }}
+                    className={`text-xs px-3 py-1.5 rounded-full border transition cursor-pointer animate-fadeIn ${
+                      query === q.value
+                        ? 'border-cyan-500 text-cyan-400 bg-cyan-600/10'
+                        : featured
+                          ? 'border-cyan-600 text-cyan-400 hover:bg-cyan-600/10 bg-gray-800/50'
+                          : 'border-gray-700 text-gray-400 hover:text-cyan-400 hover:border-cyan-500/50 bg-gray-800/50'
+                    }`}
+                    style={{ animationDelay: `${i * 40}ms` }}
+                  >
+                    {q.label}
+                  </button>
+                )
+              })}
             </div>
           </div>
 
@@ -151,9 +157,9 @@ export default function Ask({ embedded = false }: { embedded?: boolean }) {
               <textarea
                 ref={textareaRef}
                 id="query"
-                rows={2}
+                rows={4}
                 required
-                maxLength={1000}
+                maxLength={6000}
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 placeholder="Or type your own question..."

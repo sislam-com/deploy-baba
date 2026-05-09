@@ -214,7 +214,9 @@ injects this contract via `PromptBundle.system_prompt`.
 | W-RAG.8.2 | Add `retrieve_filtered()` with optional `source_kind IN (...)` clause | DONE | `crates/rag-sqlite/src/lib.rs`; `source_kind IN` filter; 2 tests |
 | W-RAG.9.1 | `PortfolioDataProvider` trait in `rag-core` for live DB queries at ask-time | DONE | `crates/rag-core/src/portfolio.rs`; `serde_json::Value` return |
 | W-RAG.9.2 | Implement `PortfolioDataProvider` for `Db` (reuse existing SQL queries) | DONE | `services/ui/src/db.rs`; `#[async_trait] impl PortfolioDataProvider for Db` |
-| W-RAG.9.3 | `HybridRetriever` combining FTS + live portfolio virtual chunks | DONE | `crates/rag-core/src/hybrid.rs`; 3 tests; `source_kind="portfolio"`, `git_sha="live"` |
+| W-RAG.9.3 | `HybridRetriever` combining FTS + live portfolio virtual chunks | DONE | `crates/rag-core/src/hybrid.rs`; 5 tests; `source_kind="portfolio"`, `git_sha="live"` |
+| W-RAG.9.5 | Fix portfolio injection crowding — cap live chunks to `top_k.min(5)`, guarantee FTS budget | DONE (2026-05-09) | Was filling all `top_k` slots with 24+ live entities, zero FTS; now max 5 portfolio + remainder FTS |
+| W-RAG.9.6 | Add architecture-aware keywords to `PORTFOLIO_KEYWORDS` | DONE (2026-05-09) | 12 new terms: authentication, auth, cognito, login, architecture, implement, design, infrastructure, deploy, lambda, database, sqlite |
 | W-RAG.9.4 | Wire `HybridRetriever` into ask handler replacing raw `RagStore` | DONE | `services/ui/src/routes/api/ask.rs`; `Arc<RagStore>` + `Arc<Db>` → `HybridRetriever` |
 | W-RAG.10.1 | Define portfolio tools in llm-proxy (`list_jobs`, `get_job_details`, etc.) | DONE | `services/llm-proxy/src/tools.rs`; 4 tools mapping to portfolio API endpoints |
 | W-RAG.10.2 | `PortfolioToolExecutor` implementing `ToolExecutor` via HTTP to UI Lambda | DONE | `services/llm-proxy/src/tool_executor.rs`; `PORTFOLIO_API_BASE_URL` env var |
