@@ -274,9 +274,7 @@ mod tests {
             .map(|i| make_fts_chunk("rust", &format!("fts chunk {}", i)))
             .collect();
         let hybrid = HybridRetriever {
-            fts: StubRetriever {
-                chunks: fts_chunks,
-            },
+            fts: StubRetriever { chunks: fts_chunks },
             portfolio: StubPortfolio,
         };
 
