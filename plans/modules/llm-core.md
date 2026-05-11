@@ -216,7 +216,7 @@ is injected at startup in `main.rs`.
 | W-LLM.4.1 | Scaffold `crates/llm-core`: `Cargo.toml` (workspace member, zero vendor deps), `src/lib.rs` (trait surface, associated types, error enum), `src/grounding.rs` (prompt-assembly helpers), `src/testing.rs` (stub provider) | DONE | 8 tests pass (6 unit + 2 doc); `cargo clippy -D warnings` clean |
 | W-LLM.4.2 | Scaffold `crates/llm-anthropic`: `Cargo.toml` (dep on llm-core + reqwest), `src/lib.rs` (`AnthropicProvider` impl, constructor injection, model constants) | DONE | Direct HTTP against Anthropic Messages API; clippy clean |
 | W-LLM.4.3 | Add `crates/llm-core` + `crates/llm-anthropic` to `[workspace.members]` in root `Cargo.toml`; add `async-trait` to workspace deps; add path entries to `[workspace.dependencies]` | DONE | Workspace plumbing; `services/ui` feature wiring deferred to W-RST PR |
-| W-LLM.4.4 | Per-crate README files for `llm-core` and `llm-anthropic` (W-DX.3 alignment) | TODO | Describes trait, feature flags, secret name |
+| W-LLM.4.4 | Per-crate README files for `llm-core` and `llm-anthropic` (W-DX.3 alignment) | DONE | MIT license for both crates; describes traits, feature flags, secret name |
 | W-LLM.4.5 | `llm-anthropic` integration tests: `provider_id_is_anthropic`, `default_model_is_haiku` (CI-safe); `live_generate_*` (3 `#[ignore]` tests, run via `just test-llm PROFILE`) | DONE (2026-04-15) | |
 | W-LLM.4.6 | **Future**: `crates/llm-openai`, `crates/llm-bedrock`, `crates/llm-ollama`, `crates/llm-gemini` — additional `LlmProvider` adapters. Not scheduled. | DEFERRED | |
 | W-LLM.4.7 | **Future**: `crates/llm-fastembed` — local ONNX `EmbeddingProvider` impl. Ships alongside W-RST.4.11. ADR-016 created at that point. | DEFERRED | |

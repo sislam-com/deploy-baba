@@ -2,6 +2,7 @@
 //!
 //! Orchestrates deployments to Lambda, ECS, and other targets
 
+use crate::rag;
 use clap::Subcommand;
 
 pub mod docker;
@@ -76,7 +77,7 @@ pub enum DeployAction {
 }
 
 pub async fn execute(action: DeployAction) -> anyhow::Result<()> {
-    match action {
+    let result = match action {
         DeployAction::Lambda { function, profile } => lambda::deploy(function, profile).await,
         DeployAction::Ecs { cluster, service } => ecs::deploy(cluster, service).await,
         DeployAction::Docker { platform, tag } => docker::build(&platform, tag).await,
@@ -113,7 +114,25 @@ pub async fn execute(action: DeployAction) -> anyhow::Result<()> {
                 };
             spa::deploy_spa(profile, env_cfg, &sha, skip_wait).await
         }
+    };
+
+    if let Err(ref e) = result {
+        println!("❌ Deployment failed: {}", e);
+        println!("🔍 Querying RAG for diagnosis...");
+        match rag::diagnose_failure(&e.to_string()).await {
+            Ok(suggestions) => {
+                println!("💡 RAG diagnosis suggestions:");
+                for suggestion in suggestions {
+                    println!("  • {}", suggestion);
+                }
+            }
+            Err(diag_err) => {
+                println!("⚠️  RAG diagnosis failed: {}", diag_err);
+            }
+        }
     }
+
+    result
 }
 
 fn git_head_sha() -> anyhow::Result<String> {

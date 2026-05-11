@@ -1,5 +1,5 @@
 # W-DX: dx-justfile (justfile + docs + examples)
-**Path:** `justfile`, `docs/`, `examples/` | **Status:** WIP
+**Path:** `justfile`, `docs/`, `examples/` | **Status:** WIP (READMEs DONE, examples TODO)
 **Depends on:** W-XT (justfile calls xtask) | **Depended on by:** (developer-facing)
 
 ---
@@ -167,16 +167,16 @@ MIT OR Apache-2.0
 Status:
 | Crate | README | Notes |
 |-------|--------|-------|
-| config-core | TODO | |
-| config-toml | TODO | |
-| config-yaml | TODO | |
-| config-json | TODO | |
-| api-core | TODO | |
-| api-openapi | TODO | |
-| api-graphql | TODO | |
-| api-grpc | TODO | |
-| api-merger | TODO | |
-| infra-types | TODO | |
+| config-core | DONE | MIT license |
+| config-toml | DONE | MIT license |
+| config-yaml | DONE | MIT license |
+| config-json | DONE | MIT license |
+| api-core | DONE | MIT license |
+| api-openapi | DONE | MIT license |
+| api-graphql | DONE | MIT license |
+| api-grpc | DONE | MIT license |
+| api-merger | DONE | MIT license |
+| infra-types | DONE | MIT license | |
 
 ### W-DX.3.2 Examples (TODO)
 

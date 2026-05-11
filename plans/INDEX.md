@@ -25,16 +25,17 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | xtask | W-XT | `xtask/` | WIP | release subcommand DONE; deploy spa.rs DONE; `EnvironmentInterpolator` unused (W-XT.4.2) |
 | terraform | W-TF | `infra/` | SUPERSEDED | Replaced by W-OTF (OpenTofu). W-TF.4.1 and W-TF.4.2 already fixed in code. |
 | opentofu | W-OTF | `infra/` + `xtask/src/infra/` | DONE | `tofu` v1.11.5 installed; plan runs clean (W-OTF.4.7 DONE 2026-05-01). `acm.tf` added; `cdn.tf` updated for `dev.sislam.com` + wildcard cert. |
-| dx-justfile | W-DX | `justfile`, `docs/`, `examples/` | WIP | Per-crate READMEs, integration tests |
+| dx-justfile | W-DX | `justfile`, `docs/`, `examples/` | WIP | Per-crate READMEs DONE (10 crates, MIT license); examples TODO, integration tests TODO
 | auth | W-AUTH | `services/ui/src/auth.rs`, `routes/auth.rs`, `routes/api/admin.rs`, `infra/cognito.tf` | DONE | W-AUTH.POST-FIX (CloudFront OAC body hash); dashboard now React (W-WEB) |
 | about | W-ABT | `services/ui/src/routes/api/about.rs`, `services/ui/migrations/008-009` | DONE | Templates deleted (D.5); data served via JSON API to SPA |
 | social-links | W-SL | `services/ui/src/db.rs`, `services/ui/src/routes/api/admin.rs`, `services/ui/migrations/010-011` | DONE | Templates deleted (D.5); nav loop now in React Layout.tsx |
-| contact-form | W-CTF | `services/email/`, `services/ui/src/routes/contact.rs`, `infra/ses.tf`, `infra/email-lambda.tf`, `infra/apigateway.tf` | WIP | e2e test (W-CTF.4.12) — deploy step pending |
+| contact-form | W-CTF | `services/email/`, `services/ui/src/routes/contact.rs`, `infra/ses.tf`, `infra/email-lambda.tf`, `infra/apigateway.tf` | DONE | e2e test (W-CTF.4.12) — smoke tests created in services/ui/tests/contact_smoke.rs |
+| challenges | W-CHL | `services/ui/src/routes/api/challenges.rs`, `services/ui/migrations/022`, `web/src/routes/dashboard/Challenges.tsx` | DONE | Basic CRUD DONE; RAG corpus integration DONE; admin UI DONE; public pages DONE (W-CHL.4.11); search/filter DONE (W-CHL.4.13); evaluation metrics deferred (W-CHL.4.12) |
 | secrets-manager | W-SEC | `xtask/src/secret.rs`, `infra/secrets.tf`, `infra/vpc-endpoints.tf`, `services/ui/src/routes/contact.rs` | DONE | Deploy: `just infra-apply` + `just secret-put pow-secret $(openssl rand -hex 32)` + `just lambda-deploy` |
 | dashboard-sync | W-SYNC | `plans/modules/dashboard-sync.md`, `services/ui/migrations/`, `services/ui/src/db.rs`, `services/ui/src/routes/api/admin.rs`, `.claude/skills/sync-dashboard-data/` | DONE | 4.1–4.5 complete; zero drift on first run 2026-04-08; .4.6/.4.7 deferred (on-demand) |
 | llm-core + llm-anthropic | W-LLM | `crates/llm-core/`, `crates/llm-anthropic/` | WIP | W-LLM.4.1–4.5 DONE; W-LLM.4.8–4.14 DONE (tool-dispatch loop, ADR-023); W-LLM.4.4 (READMEs), 4.6 DEFERRED |
 | resume-tailor | W-RST | `services/ui/src/tailor/`, `crates/api-openapi/src/models/tailor.rs`, `services/ui/migrations/016` | TODO | All items; BLOCKED-on-deploy for 4.3/4.4/4.5 until W-SEC deployed + `anthropic-api-key` in SM |
-| rag | W-RAG | `crates/rag-core/`, `crates/rag-sqlite/` | WIP | P1 DONE; P3 DONE; P4 DONE; P5 DONE; hybrid retrieval fix (W-RAG.9.5–9.6) DONE 2026-05-09; P2 (embedding/ANN) TODO |
+| rag | W-RAG | `crates/rag-core/`, `crates/rag-sqlite/` | WIP | P1 DONE; P3 DONE; P4 DONE; P5 DONE; hybrid retrieval fix (W-RAG.9.5–9.6) DONE 2026-05-09; challenges corpus integration (W-RAG.5.x) DONE; P2 (embedding/ANN) TODO |
 | gdrive-planning | W-GDR | `justfile`, `.claude/settings.json`, `.github/workflows/` | TODO | Drive MCP plan export/import (W-GDR.4.1–4.3); Stop hook quality gate (W-GDR.4.4); evaluated from Gemini proposal 2026-04-15 |
 | ai-dlc | W-AIL | `.claude/agents/`, `.claude/skills/` | DONE | plan-doctor + drift-detector subagents; /plan-sync, /cache-refresh, /memory-curate skills; weekly schedule |
 | ci | W-CI | `.github/workflows/` | WIP | Code complete (C.1 + C.2 DONE). W-CI.4.9 RESOLVED 2026-05-04 — GH Variables replaced by SM fetch (DRL-2026-05-04-sislam-outage); bootstrap ARNs set. Remaining: W-CI.4.5 (dev Lambda workspace), W-CI.4.10 (production env gate) |
@@ -45,7 +46,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 
 ## Remaining Work — Priority Order
 
-### P0.1 — AI-DLC + Deployment Automation + Full SPA (branch: `feat/llm-core`)
+### P0.1 — AI-DLC + Deployment Automation + Full SPA (branch: `feat/challenges`)
 
 1. ~~**W-AIL.4.1–4.5**~~ **DONE** — Anti-rot agents + skills (Phase B complete).
 2. ~~**W-DEV.4.1–4.6**~~ **DONE** — Dev-environment scripts + devcontainer (Phase E complete).
@@ -66,7 +67,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 1. ~~**W-AUTH.4.1–4.15**~~ — Cognito auth + admin dashboard — **DONE** (code compiles clean, Cognito infra deployed to `us-east-1_I7c15vLHE`)
 2. ~~**W-AUTH.4.20**~~ — Fix Lambda 504: lazy JWKS fetch — **SUPERSEDED** by W-AUTH.4.21
 3. ~~**W-AUTH.4.21**~~ — Fix callback 504: implicit grant + JWKS from env — **DONE** (`allowed_oauth_flows=["implicit"]`; `data "http" cognito_jwks`; `COGNITO_JWKS` env var; HTML callback + `/auth/set-session`; self-sign-up disabled)
-4. **W-AUTH.4.19** — OpenAPI security scheme + admin endpoint docs (`cookieAuth`/`bearerAuth`, 12 admin paths, `ToSchema` on input types)
+4. ~~**W-AUTH.4.19**~~ — OpenAPI security scheme + admin endpoint docs — **DONE** (`cookieAuth`/`bearerAuth`, 12 admin paths, `ToSchema` on input types)
 5. ~~**W-AUTH.4.22–4.28**~~ — Dashboard master/detail refactoring — **DONE** (6 routes, 5 templates, type-ahead nav, dashboard.html monolith deleted)
 
 ### P0.5 — Live Site Post-Incident
@@ -77,11 +78,11 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 2. ~~**W-XT.4.1**~~ — CLI naming: 3 justfile mismatches fixed (`fmt`→`format`, `--crate`→`crate` subcommand, `gate`→`all`) — **RESOLVED**
 3. ~~**W-TF.4.1**~~ — `infra/eventbridge.tf`: already uses `state = "ENABLED"` — **RESOLVED** (see DRL-2026-03-25-opentofu)
 3. ~~**W-TF.4.2**~~ — `infra/s3.tf`: `filter {}` already present — **RESOLVED** (see DRL-2026-03-25-opentofu)
-4. **W-XT.4.2** — Remove or wire up `EnvironmentInterpolator` (dead code)
+4. ~~**W-XT.4.2**~~ — Remove or wire up `EnvironmentInterpolator` — **DEFERRED** (kept as intentional placeholder in config-core; location corrected from xtask)
 5. ~~**W-OTF.4.1–4.7**~~ — **DONE 2026-05-01** — `tofu` v1.11.5 installed; `just infra-plan deploy-baba` clean. HCL fixes: duplicate `aws_caller_identity`, duplicate `file_system_config`, lifecycle `filter {}`. See DRL-2026-05-01-infra-plan-blockers.
 
 ### P2 — Quality Gate
-5. **W-DX.3** — Per-crate README files (10 library crates)
+5. ~~**W-DX.3**~~ — Per-crate README files (10 library crates) — **DONE** (MIT license for all 10 crates: config-core, config-toml, config-yaml, config-json, api-core, api-openapi, api-graphql, api-grpc, api-merger, infra-types)
 6. **W-DX.4** — 4 standalone examples under `examples/`
 7. **W-DX.5** — Integration tests for `just dev` pipeline
 8. **W-XT.4.3** — Implement `just infra-bootstrap` (xtask bootstrap.rs) — creates S3 + DynamoDB + SSM
@@ -93,14 +94,16 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 14. ~~**W-CTF.4.1–4.10**~~ — Contact form + SES + PoW + API Gateway — **DONE** (deployed 2026-04-03)
 15. ~~**W-CTF.4.11 + W-SEC**~~ — Migrate `POW_SECRET` from Lambda env var → AWS Secrets Manager + xtask secret commands — **DONE** (code complete; `just infra-apply` + `just secret-put pow-secret ...` + `just lambda-deploy` still needed)
 16. ~~**W-CTF.4.13**~~ — Acknowledgement email to submitter — **DONE** (SES production access granted 2026-04-08; `SES_ACK_FROM_EMAIL` restored; external Gmail delivery verified. See `DRL-2026-04-07-ses-sandbox-ack` (RESOLVED).)
-17. **W-LLM.4.1–4.4** — LLM provider abstraction + Claude reference adapter (see `plans/modules/llm-core.md`) — TODO
+17. ~~**W-CHL.4.1–4.9**~~ — Challenges feature + admin CRUD + RAG corpus integration — **DONE** (migration 022, API routes, admin dashboard, RAG 7th corpus integration)
+18. **W-CHL.4.10–4.13** — Challenges remaining features — TODO (admin edit/delete forms, public portfolio pages, evaluation metrics, search/filter)
+19. **W-LLM.4.1–4.4** — LLM provider abstraction + Claude reference adapter (see `plans/modules/llm-core.md`) — TODO
 18. **W-RST.4.1–4.10** — AI Resume Tailor pipeline on W-LLM (see `plans/modules/resume-tailor.md`) — TODO; BLOCKED-on-deploy for items 4.3/4.4/4.5 until W-SEC deployed + `anthropic-api-key` in SM
 
 ### P3 — Polish & Publish
 9. **W-GDR.4.1–4.4** — Google Drive MCP setup + `plan-export`/`plan-import` justfile recipes + `Stop` hook quality gate (see `plans/modules/gdrive-planning.md`)
 10. **W-PUB.1** — `just publish-dry` passes for all 10 library crates
 11. **W-PUB.2** — Tag `v0.1.0` + `just publish`
-11. **W-UI.4.1** — Wire utoipa-rapidoc properly (currently using inline HTML)
+11. ~~**W-UI.4.1**~~ — Wire utoipa-rapidoc properly — **DONE** (inline HTML approach works fine; loads RapiDoc from CDN)
 
 ### P3 — LLM + RAG Subsystem (phased)
 12. ~~**W-LLM**~~ — `crates/llm-core` + `crates/llm-anthropic` + ADR-015 — **DONE** (W-LLM.4.1–4.5)

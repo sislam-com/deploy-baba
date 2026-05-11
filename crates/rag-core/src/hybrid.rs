@@ -33,6 +33,10 @@ const PORTFOLIO_KEYWORDS: &[&str] = &[
     "lambda",
     "database",
     "sqlite",
+    "challenge",
+    "challenges",
+    "project",
+    "projects",
 ];
 
 pub struct HybridRetriever<R, P> {
@@ -131,6 +135,12 @@ impl<R: Retriever, P: PortfolioDataProvider> Retriever for HybridRetriever<R, P>
             ord += 1;
         }
 
+        let challenges = self.portfolio.get_challenges_summary().await?;
+        for val in &challenges {
+            live_chunks.push(Self::value_to_chunk(val, ord));
+            ord += 1;
+        }
+
         live_chunks.truncate(portfolio_budget);
 
         let mut merged = live_chunks;
@@ -187,6 +197,16 @@ mod tests {
             Ok(vec![serde_json::json!({
                 "heading": "Bio",
                 "body": "Senior engineer",
+            })])
+        }
+        async fn get_challenges_summary(&self) -> Result<Vec<serde_json::Value>, RagError> {
+            Ok(vec![serde_json::json!({
+                "entity_type": "challenge",
+                "title": "Test Project",
+                "slug": "test-project",
+                "description": "A test challenge project",
+                "tech_stack": "Rust,React",
+                "category": "fullstack",
             })])
         }
     }

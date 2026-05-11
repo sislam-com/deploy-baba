@@ -181,6 +181,8 @@ pub async fn ask(
         ));
     }
 
+    let pipeline_start = Instant::now();
+
     // Clamp top_k
     let top_k = req.top_k.clamp(1, 20);
 
@@ -266,6 +268,45 @@ pub async fn ask(
         .await?
     };
 
+    let latency_ms = pipeline_start.elapsed().as_millis() as i64;
+    let groundedness = rag_core::eval::score_groundedness(&proxy_resp.content);
+
+    let ip_hash = anonymize_ip(&ip);
+
+    let citations_json = serde_json::to_string(&citations).ok();
+    let chunks_json = serde_json::to_string(
+        &chunks
+            .iter()
+            .map(|c| {
+                serde_json::json!({
+                    "kind": c.source_kind,
+                    "path": c.source_path,
+                    "score": c.score,
+                })
+            })
+            .collect::<Vec<_>>(),
+    )
+    .ok();
+
+    if let Ok(conn) = db.conn.lock() {
+        let _ = conn.execute(
+            "INSERT INTO rag_query_log (query, answer, citations_json, chunks_json, model, input_tokens, output_tokens, latency_ms, groundedness, ip_hash)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            rusqlite::params![
+                req.query,
+                proxy_resp.content,
+                citations_json,
+                chunks_json,
+                proxy_resp.model,
+                proxy_resp.input_tokens,
+                proxy_resp.output_tokens,
+                latency_ms,
+                groundedness,
+                ip_hash,
+            ],
+        );
+    }
+
     Ok(Json(AskResponse {
         answer: proxy_resp.content,
         citations,
@@ -348,6 +389,23 @@ async fn generate_direct(
         tools_used: vec![],
         turns: 1,
     })
+}
+
+fn anonymize_ip(ip: &str) -> String {
+    if let Ok(addr) = ip.parse::<std::net::IpAddr>() {
+        match addr {
+            std::net::IpAddr::V4(v4) => {
+                let o = v4.octets();
+                format!("{}.{}.{}.0", o[0], o[1], o[2])
+            }
+            std::net::IpAddr::V6(v6) => {
+                let s = v6.segments();
+                format!("{:x}:{:x}:{:x}::0", s[0], s[1], s[2])
+            }
+        }
+    } else {
+        "unknown".to_string()
+    }
 }
 
 pub fn router() -> axum::Router<crate::state::AppState> {

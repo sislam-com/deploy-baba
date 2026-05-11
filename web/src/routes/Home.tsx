@@ -26,6 +26,20 @@ interface Competency {
   sort_order: number
 }
 
+interface Challenge {
+  id: number
+  slug: string
+  title: string
+  job_id: number | null
+  description: string
+  short_description: string | null
+  tech_stack: string[] | null
+  category: string | null
+  url: string | null
+  featured: boolean
+  sort_order: number
+}
+
 interface ResumeData {
   name: string
   title: string
@@ -33,6 +47,7 @@ interface ResumeData {
   summary: string
   jobs: Job[]
   competencies: Competency[]
+  challenges: Challenge[]
 }
 
 interface JobDetail {
@@ -293,14 +308,71 @@ function CompetencyCard({ comp, onJobClick }: { comp: Competency; onJobClick: (s
   )
 }
 
+function ChallengeCard({ challenge: ch, jobs }: { challenge: Challenge; jobs: Job[] }) {
+  const linkedJob = ch.job_id ? jobs.find(j => j.id === ch.job_id) : null
+
+  return (
+    <div className="group bg-gray-800/60 border border-gray-700 rounded-xl p-5 hover:border-cyan-500/30 transition-all">
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <h3 className="text-lg font-semibold text-white leading-tight">{ch.title}</h3>
+        {ch.category && (
+          <span className="shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full
+                           bg-gray-700 text-gray-400 uppercase tracking-wider">
+            {ch.category}
+          </span>
+        )}
+      </div>
+
+      {linkedJob && (
+        <p className="text-xs text-gray-500 mb-2">
+          at {linkedJob.company}
+        </p>
+      )}
+
+      <p className="text-sm text-gray-300 leading-relaxed mb-4">
+        {ch.short_description ?? ch.description}
+      </p>
+
+      {ch.tech_stack && ch.tech_stack.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {ch.tech_stack.map(tech => (
+            <span
+              key={tech}
+              className="text-[10px] font-medium px-2 py-0.5 rounded-full
+                         bg-cyan-900/30 text-cyan-400 border border-cyan-800/40"
+            >
+              {tech}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {ch.url && (
+        <a
+          href={ch.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 transition mt-1"
+        >
+          View project {'→'}
+        </a>
+      )}
+    </div>
+  )
+}
+
 export default function Home() {
   const [resume, setResume] = useState<ResumeData | null>(null)
   const [loading, setLoading] = useState(true)
   const [downloadOpen, setDownloadOpen] = useState(false)
   const downloadRef = useRef<HTMLDivElement>(null)
   const [searchParams, setSearchParams] = useSearchParams()
-  const view = searchParams.get('view') === 'timeline' ? 'timeline' :
-                searchParams.get('view') === 'capabilities' ? 'capabilities' : 'ask'
+  const [categoryFilter, setCategoryFilter] = useState<string>('all')
+  const [featuredFilter, setFeaturedFilter] = useState<boolean>(false)
+  const viewParam = searchParams.get('view')
+  const view = viewParam === 'timeline' ? 'timeline' :
+               viewParam === 'capabilities' ? 'capabilities' :
+               viewParam === 'challenges' ? 'challenges' : 'ask'
 
   useEffect(() => {
     fetch('/api/resume')
@@ -351,7 +423,22 @@ export default function Home() {
     return { years, skillCount: resume.competencies.length, topTech }
   }, [resume])
 
-  function setView(v: 'timeline' | 'capabilities' | 'ask') {
+  const filteredChallenges = useMemo(() => {
+    if (!resume) return []
+    return resume.challenges.filter(ch => {
+      if (categoryFilter !== 'all' && ch.category !== categoryFilter) return false
+      if (featuredFilter && !ch.featured) return false
+      return true
+    })
+  }, [resume, categoryFilter, featuredFilter])
+
+  const categories = useMemo(() => {
+    if (!resume) return ['all']
+    const unique = new Set(resume.challenges.map(ch => ch.category).filter(Boolean) as string[])
+    return ['all', ...Array.from(unique).sort()]
+  }, [resume])
+
+  function setView(v: 'timeline' | 'capabilities' | 'challenges' | 'ask') {
     setSearchParams(v === 'ask' ? {} : { view: v }, { replace: true })
   }
 
@@ -435,6 +522,17 @@ export default function Home() {
               >
                 <SvgIcon name="bolt" className="w-4 h-4" />
                 Capabilities
+              </button>
+              <button
+                onClick={() => setView('challenges')}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition ${
+                  view === 'challenges'
+                    ? 'bg-cyan-600/20 text-cyan-400 shadow-sm shadow-cyan-500/10'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <SvgIcon name="briefcase" className="w-4 h-4" />
+                Challenges
               </button>
               <button
                 onClick={() => setView('ask')}
@@ -542,6 +640,51 @@ export default function Home() {
                   <CompetencyCard comp={comp} onJobClick={handleJobClick} />
                 </div>
               ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {resume && view === 'challenges' && (
+        <section className="py-12">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex flex-wrap items-center gap-4 mb-6">
+              <select
+                value={categoryFilter}
+                onChange={e => setCategoryFilter(e.target.value)}
+                className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-cyan-500 focus:outline-none"
+              >
+                {categories.map(cat => (
+                  <option key={cat} value={cat}>
+                    {cat === 'all' ? 'All Categories' : cat}
+                  </option>
+                ))}
+              </select>
+              <label className="flex items-center gap-2 text-sm text-gray-400">
+                <input
+                  type="checkbox"
+                  checked={featuredFilter}
+                  onChange={e => setFeaturedFilter(e.target.checked)}
+                  className="w-4 h-4 rounded bg-gray-800 border-gray-700 text-cyan-600 focus:ring-cyan-500"
+                />
+                Featured only
+              </label>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {filteredChallenges.map((ch, i) => (
+                <div
+                  key={ch.id}
+                  className="animate-scaleIn"
+                  style={{ animationDelay: `${i * 60}ms` }}
+                >
+                  <ChallengeCard challenge={ch} jobs={resume.jobs} />
+                </div>
+              ))}
+              {filteredChallenges.length === 0 && (
+                <p className="text-gray-500 col-span-2 text-center py-12">
+                  {resume.challenges.length === 0 ? 'No challenges yet.' : 'No challenges match your filters.'}
+                </p>
+              )}
             </div>
           </div>
         </section>

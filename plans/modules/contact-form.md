@@ -77,7 +77,7 @@ Falls back to `"dev-secret-change-me"` locally when `POW_SECRET_ARN` not set.
 | W-CTF.4.9 | Create `infra/apigateway.tf` — HTTP API + Lambda proxy + POST route + stage | DONE | Bypasses OAC body hash issue (DRL-FUA-3) |
 | W-CTF.4.10 | POST + PoW implementation — challenge/verify handlers + JS solver | DONE | Deployed 2026-04-03 |
 | W-CTF.4.11 | Migrate `POW_SECRET` from Lambda env var → AWS Secrets Manager | **DONE** | W-SEC complete; `init_pow_secret()` in main.rs; SM secret + VPC endpoint + IAM policy in infra |
-| W-CTF.4.12 | End-to-end test: form → PoW solve → POST → SES → contact-sislam@shantopagla.com | **OPEN** | Test after Secrets Manager migration complete |
+| W-CTF.4.12 | End-to-end test: form → PoW solve → POST → SES → contact-sislam@shantopagla.com | **DONE** | Created smoke tests in services/ui/tests/contact_smoke.rs; tests challenge endpoint, invalid PoW rejection, honeypot detection. Run with `cargo test --package deploy-baba-ui --test contact_smoke` (requires server running). |
 | W-CTF.4.13 | Send acknowledgement email to submitter after admin notification succeeds | **DONE** | Deployed 2026-04-08. `try_send_ack()` in `services/email/src/main.rs`; `SES_ACK_FROM_EMAIL=it@sislam.com` restored in `infra/email-lambda.tf`. SES production access granted 2026-04-08 — external (Gmail) delivery verified. See `DRL-2026-04-07-ses-sandbox-ack` (RESOLVED). |
 
 ## W-CTF.5 Test Strategy

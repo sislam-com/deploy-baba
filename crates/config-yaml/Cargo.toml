@@ -13,3 +13,6 @@ config-core = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 serde_yaml = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"
