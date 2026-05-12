@@ -191,9 +191,9 @@ fn test_generate_and_validate_validation_failure() {
 // Test 9: SpecFormat Display implementation
 #[test]
 fn test_spec_format_display() {
-    assert_eq!(format!("{}", SpecFormat::OpenApi), "openapi");
-    assert_eq!(format!("{}", SpecFormat::GraphQL), "graphql");
-    assert_eq!(format!("{}", SpecFormat::Grpc), "grpc");
+    assert_eq!(format!("{}", SpecFormat::OpenApi), "OpenAPI");
+    assert_eq!(format!("{}", SpecFormat::GraphQL), "GraphQL");
+    assert_eq!(format!("{}", SpecFormat::Grpc), "gRPC");
 }
 
 // Test 10: SpecFormat equality
