@@ -116,6 +116,11 @@ src/
 | W-WEB.4.9 | Remove Askama from services/ui/Cargo.toml; delete templates/ | DONE | Phase D.5; 15 templates deleted; `cargo tree | grep askama` → empty |
 | W-WEB.4.10 | Vitest smoke tests (≥1 per route, ≥1 API mock) | WIP | Smoke test exists; per-route tests deferred (P3) |
 | W-WEB.4.11 | `pnpm --dir web run typecheck` clean (strict) | DONE | Passes with strict mode |
+| W-WEB.4.12 | Homepage visual redesign — hero section, SVG icons, pill tabs, entrance animations | DONE (2026-05-09) | SvgIcon component (~20 icons); hero with stats/tech strip; staggered fadeInUp/fadeIn/scaleIn animations |
+| W-WEB.4.13 | Nav icon conversion — text links → SVG icon buttons with hover tooltips | DONE (2026-05-09) | `NavIcon` component in Layout.tsx; social icon mapping via label |
+| W-WEB.4.14 | Ask AI — embedded mode, pill-style suggested questions, job-match prompt | DONE (2026-05-09) | `embedded` prop; RECRUITER_QUESTIONS pills; "Match to a role" featured pill at position 0; textarea 4 rows / 6000 char limit |
+| W-WEB.4.15 | Update competencies to 7 actual top skills | DONE (2026-05-09) | Migration 021; rust-systems, aws-cloud, ai-llm, platform-automation, fullstack-saas, multitenant-arch, technical-leadership |
+| W-WEB.4.16 | TechStrip weighted by recency (`1/sort_order`) | DONE (2026-05-09) | Prevents legacy tech (JavaScript, DHTML) from outranking current stack |
 
 ## W-WEB.5 SEO Prerender Follow-up (P3)
 
