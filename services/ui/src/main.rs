@@ -16,7 +16,6 @@ mod openapi;
 mod router;
 mod routes;
 mod state;
-mod tailor;
 
 #[tokio::main]
 async fn main() -> Result<()> {

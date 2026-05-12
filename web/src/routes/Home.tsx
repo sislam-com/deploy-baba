@@ -503,8 +503,9 @@ export default function Home() {
               <button
                 role="tab"
                 aria-selected={view === 'timeline'}
+                aria-label="Timeline"
                 onClick={() => setView('timeline')}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm transition
+                className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-full text-sm transition
                            focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:outline-none ${
                   view === 'timeline'
                     ? 'bg-cyan-600/20 text-cyan-400 font-semibold shadow-sm shadow-cyan-500/10'
@@ -512,13 +513,14 @@ export default function Home() {
                 }`}
               >
                 <SvgIcon name="calendar" className="w-4 h-4" />
-                Timeline
+                <span className="hidden sm:inline">Timeline</span>
               </button>
               <button
                 role="tab"
                 aria-selected={view === 'capabilities'}
+                aria-label="Capabilities"
                 onClick={() => setView('capabilities')}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm transition
+                className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-full text-sm transition
                            focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:outline-none ${
                   view === 'capabilities'
                     ? 'bg-cyan-600/20 text-cyan-400 font-semibold shadow-sm shadow-cyan-500/10'
@@ -526,13 +528,14 @@ export default function Home() {
                 }`}
               >
                 <SvgIcon name="bolt" className="w-4 h-4" />
-                Capabilities
+                <span className="hidden sm:inline">Capabilities</span>
               </button>
               <button
                 role="tab"
                 aria-selected={view === 'challenges'}
+                aria-label="Challenges"
                 onClick={() => setView('challenges')}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm transition
+                className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-full text-sm transition
                            focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:outline-none ${
                   view === 'challenges'
                     ? 'bg-cyan-600/20 text-cyan-400 font-semibold shadow-sm shadow-cyan-500/10'
@@ -540,13 +543,14 @@ export default function Home() {
                 }`}
               >
                 <SvgIcon name="briefcase" className="w-4 h-4" />
-                Challenges
+                <span className="hidden sm:inline">Challenges</span>
               </button>
               <button
                 role="tab"
                 aria-selected={view === 'ask'}
+                aria-label="Ask AI"
                 onClick={() => setView('ask')}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm transition
+                className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-full text-sm transition
                            focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:outline-none ${
                   view === 'ask'
                     ? 'bg-cyan-600/20 text-cyan-400 font-semibold shadow-sm shadow-cyan-500/10'
@@ -554,7 +558,7 @@ export default function Home() {
                 }`}
               >
                 <SvgIcon name="chat" className="w-4 h-4" />
-                Ask AI
+                <span className="hidden sm:inline">Ask AI</span>
               </button>
             </div>
 
@@ -569,7 +573,7 @@ export default function Home() {
                 <SvgIcon name={downloadOpen ? 'chevron-up' : 'chevron-down'} className="w-3.5 h-3.5" />
               </button>
               {downloadOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10 overflow-hidden">
+                <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10 overflow-hidden">
                   <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500 border-b border-gray-700">
                     PDF
                   </div>
