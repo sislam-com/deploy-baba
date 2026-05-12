@@ -91,7 +91,7 @@ description: |
         YamlParser::parse_and_validate(yaml_content).expect("Should parse complex YAML");
 
     assert_eq!(config.app.name, "complex-app");
-    assert_eq!(config.app.debug, true);
+    assert!(config.app.debug);
     assert_eq!(config.servers.len(), 2);
     assert_eq!(config.servers[0].host, "server1.example.com");
     assert_eq!(config.servers[1].port, 8081);
@@ -233,6 +233,6 @@ cache:
     assert_eq!(config.database.host, "localhost");
     assert_eq!(config.database.port, 5432);
     assert_eq!(config.database.name, "mydb");
-    assert_eq!(config.cache.enabled, true);
+    assert!(config.cache.enabled);
     assert_eq!(config.cache.ttl_seconds, 3600);
 }

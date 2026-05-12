@@ -12,7 +12,7 @@ const LOCAL_BASE_URL: &str = "http://localhost:3000";
 async fn test_contact_challenge_endpoint() {
     let client = Client::new();
     let response = client
-        .get(&format!("{}/api/contact/challenge", LOCAL_BASE_URL))
+        .get(format!("{}/api/contact/challenge", LOCAL_BASE_URL))
         .send()
         .await;
 
@@ -49,7 +49,7 @@ async fn test_contact_challenge_endpoint() {
 async fn test_contact_post_endpoint_rejects_invalid_pow() {
     let client = Client::new();
     let response = client
-        .post(&format!("{}/api/contact", LOCAL_BASE_URL))
+        .post(format!("{}/api/contact", LOCAL_BASE_URL))
         .json(&serde_json::json!({
             "name": "Test User",
             "email": "test@example.com",
@@ -82,7 +82,7 @@ async fn test_contact_post_endpoint_rejects_invalid_pow() {
 async fn test_contact_post_endpoint_rejects_honeypot() {
     let client = Client::new();
     let response = client
-        .post(&format!("{}/api/contact", LOCAL_BASE_URL))
+        .post(format!("{}/api/contact", LOCAL_BASE_URL))
         .json(&serde_json::json!({
             "name": "Bot User",
             "email": "bot@example.com",

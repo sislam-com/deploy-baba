@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 
 /// Request for grounded bullet generation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct GenerationRequest {
     /// Job description being tailored for
     pub job_description: String,
@@ -22,6 +23,7 @@ pub struct GenerationRequest {
 
 /// Input bullet for generation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct BulletInput {
     pub job_slug: String,
     pub detail_text: String,
@@ -30,6 +32,7 @@ pub struct BulletInput {
 
 /// Generated response with rewritten bullets.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct GenerationResponse {
     /// Summary of the tailored resume section
     pub summary: String,

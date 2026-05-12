@@ -207,7 +207,7 @@ port = 8081
         TomlParser::parse_and_validate(toml_content).expect("Should parse complex TOML");
 
     assert_eq!(config.app.name, "complex-app");
-    assert_eq!(config.app.debug, true);
+    assert!(config.app.debug);
     assert_eq!(config.servers.len(), 2);
     assert_eq!(config.servers[0].host, "server1.example.com");
     assert_eq!(config.servers[1].port, 8081);

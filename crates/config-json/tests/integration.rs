@@ -82,7 +82,7 @@ fn test_nested_json_parsing() {
 
     assert_eq!(config.config.nested.value, "deep-value");
     assert_eq!(config.config.count, 42);
-    assert_eq!(config.enabled, true);
+    assert!(config.enabled);
 }
 
 // Test 2: File round-trip (tempfile): write JSON, read back, assert equality

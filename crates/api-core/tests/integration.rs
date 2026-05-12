@@ -2,7 +2,7 @@
 //!
 //! Tests ApiSpecGenerator lifecycle, error paths, merge behavior, and serde round-trip.
 
-use api_core::{ApiSpecGenerator, SpecError, SpecFormat, SpecGenerationError, SpecValidationError};
+use api_core::{ApiSpecGenerator, SpecError, SpecFormat, SpecValidationError};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -26,7 +26,7 @@ impl ApiSpecGenerator for TestGenerator {
 
     fn generate_spec(schema: TestSchema) -> Result<TestSpec, SpecError> {
         if schema.title.is_empty() {
-            return Err(SpecError::Generation("Title cannot be empty".to_string()));
+            return Err(SpecError::GenerationFailed("Title cannot be empty".to_string()));
         }
         Ok(TestSpec {
             content: format!("{} v{}", schema.title, schema.version),
@@ -76,7 +76,7 @@ fn test_generation_error_path() {
     let result = TestGenerator::generate_spec(invalid_schema);
     assert!(result.is_err(), "Generation should fail for invalid schema");
     match result {
-        Err(SpecError::Generation(msg)) => {
+        Err(SpecError::GenerationFailed(msg)) => {
             assert!(
                 msg.contains("empty"),
                 "Error message should mention empty title"
@@ -180,7 +180,7 @@ fn test_generate_and_validate_validation_failure() {
     match result {
         Err(errors) => {
             assert_eq!(errors.len(), 1, "Should have one validation error");
-            assert_eq!(errors[0].field, "content");
+            assert_eq!(errors[0].path, "content");
         }
         _ => panic!("Expected validation error"),
     }
