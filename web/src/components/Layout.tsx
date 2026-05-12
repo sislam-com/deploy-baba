@@ -32,13 +32,13 @@ function NavIcon({
           href={to}
           target="_blank"
           rel="noopener noreferrer"
-          className={`${cls} text-gray-400 hover:text-white`}
-          title={label}
+          className={`${cls} text-gray-400 hover:text-white focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:outline-none`}
+          aria-label={label}
         >
           <SvgIcon name={icon} className="w-5 h-5" />
         </a>
         <span className="absolute top-full mt-1 left-1/2 -translate-x-1/2 px-2 py-1 text-xs text-white bg-gray-700 rounded
-                         opacity-0 group-hover:opacity-100 transition pointer-events-none whitespace-nowrap z-50">
+                         opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition pointer-events-none whitespace-nowrap z-50">
           {label}
         </span>
       </div>
@@ -50,14 +50,14 @@ function NavIcon({
       <NavLink
         to={to}
         className={({ isActive }) =>
-          `${cls} ${isActive ? 'text-cyan-400' : 'text-gray-400 hover:text-white'}`
+          `${cls} ${isActive ? 'text-cyan-400' : 'text-gray-400 hover:text-white'} focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:outline-none`
         }
-        title={label}
+        aria-label={label}
       >
         <SvgIcon name={icon} className="w-5 h-5" />
       </NavLink>
       <span className="absolute top-full mt-1 left-1/2 -translate-x-1/2 px-2 py-1 text-xs text-white bg-gray-700 rounded
-                       opacity-0 group-hover:opacity-100 transition pointer-events-none whitespace-nowrap z-50">
+                       opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition pointer-events-none whitespace-nowrap z-50">
         {label}
       </span>
     </div>
