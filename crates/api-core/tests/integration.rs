@@ -26,7 +26,9 @@ impl ApiSpecGenerator for TestGenerator {
 
     fn generate_spec(schema: TestSchema) -> Result<TestSpec, SpecError> {
         if schema.title.is_empty() {
-            return Err(SpecError::GenerationFailed("Title cannot be empty".to_string()));
+            return Err(SpecError::GenerationFailed(
+                "Title cannot be empty".to_string(),
+            ));
         }
         Ok(TestSpec {
             content: format!("{} v{}", schema.title, schema.version),
