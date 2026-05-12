@@ -71,7 +71,7 @@ jobs:
 
       - uses: pnpm/action-setup@v5
         with:
-          version: 9
+          version: 10
       - uses: actions/setup-node@v5
         with:
           node-version: '20'
@@ -80,6 +80,12 @@ jobs:
 
       - name: Install web deps
         run: pnpm --dir web install --frozen-lockfile
+
+      - name: Generate OpenAPI spec
+        run: cargo run -q -p api-openapi --bin emit-spec > web/openapi.json
+
+      - name: Generate TypeScript types
+        run: pnpm --dir web exec openapi-typescript openapi.json -o src/api/types.gen.ts
 
       - name: Build SPA
         run: pnpm --dir web run build
