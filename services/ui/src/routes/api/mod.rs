@@ -2,6 +2,7 @@ pub mod about;
 pub mod admin;
 pub mod ask;
 pub mod auth_me;
+pub mod challenges;
 pub mod competencies;
 pub mod crates;
 pub mod demo;
@@ -20,6 +21,7 @@ pub fn router() -> Router<AppState> {
         .nest("/stack", stack::router())
         .nest("/demo", demo::router())
         .nest("/jobs", jobs::router())
+        .nest("/challenges", challenges::router())
         .nest("/competencies", competencies::router())
         .nest("/about", about::router())
         .nest("/social-links", social_links::router())

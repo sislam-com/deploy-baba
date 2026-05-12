@@ -17,6 +17,9 @@ pub fn entity_to_prose(entity: &Value) -> String {
 }
 
 fn entity_to_prose_with_meta(entity: &Value) -> (String, Value) {
+    if entity.get("entity_type").and_then(|v| v.as_str()) == Some("challenge") {
+        return challenge_to_prose(entity);
+    }
     if entity.get("company").is_some() && entity.get("title").is_some() {
         return job_to_prose(entity);
     }
@@ -133,6 +136,28 @@ pub fn about_to_prose(about: &Value) -> (String, Value) {
 
     let text = format!("About — {heading}\n{body}");
     let meta = serde_json::json!({ "entity_type": "about", "slug": slug });
+    (text, meta)
+}
+
+pub fn challenge_to_prose(challenge: &Value) -> (String, Value) {
+    let title = challenge["title"].as_str().unwrap_or("");
+    let description = challenge["description"].as_str().unwrap_or("");
+    let tech = challenge["tech_stack"].as_str().unwrap_or("");
+    let category = challenge["category"].as_str().unwrap_or("");
+    let slug = challenge["slug"].as_str().unwrap_or("");
+
+    let mut text = format!("Project: {title}");
+    if !category.is_empty() {
+        text.push_str(&format!(" [{category}]"));
+    }
+    if !tech.is_empty() {
+        text.push_str(&format!("\nTech: {tech}"));
+    }
+    if !description.is_empty() {
+        text.push_str(&format!("\n{description}"));
+    }
+
+    let meta = serde_json::json!({ "entity_type": "challenge", "slug": slug });
     (text, meta)
 }
 

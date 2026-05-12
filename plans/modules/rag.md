@@ -124,6 +124,7 @@ All `INSERT` statements use `ON CONFLICT DO UPDATE` (ADR-010).
 | `.claude/` cache + memory | JSON-leaf + MD heading split | cache entry (local CLI only) |
 | OpenAPI spec (P4) | JSON path-operation splitter | one chunk per endpoint + per component schema |
 | Portfolio data (P4) | entity-to-prose serializer | one chunk per job/competency/about section |
+| Challenges (P4) | entity-to-prose serializer | one chunk per challenge (with tech stack, category, job linkage) |
 
 Hard max per chunk: ~800 tokens; oversize blocks fall through to sliding-window with 50% overlap.
 
@@ -199,9 +200,9 @@ injects this contract via `PromptBundle.system_prompt`.
 | W-RAG.3.2 | `xtask rag ingest` — walk, chunk, upsert | DONE | `cargo xtask rag ingest`; skips `.` dirs + target/; best-effort git SHA |
 | W-RAG.3.3 | `xtask rag query` — FTS5 retrieve, print citations | DONE | `cargo xtask rag query "..."` prints ranked chunks with path+score+preview |
 | W-RAG.3.4 | Justfile verbs: `rag-index`, `rag-query`, `rag-index-full` | DONE | `just rag-index`, `just rag-index-full`, `just rag-query QUERY` |
-| W-RAG.4.1 | Wire `Embedder` impl from `llm-anthropic` (or Voyage) | TODO | Deferred to P2; needs API key provisioned |
+| W-RAG.4.1 | Wire `Embedder` impl from `llm-anthropic` (or Voyage) | DEFERRED | Anthropic doesn't provide embeddings; requires separate provider (Voyage, OpenAI, or local fastembed). Defer to P3/P4 semantic search phase. |
 | W-RAG.4.2 | `PromptAssembler` + `llm-core::generate` integration | DONE (2026-04-15) | FTS retrieve → DefaultPromptAssembler → AnthropicProvider; both CLI + HTTP |
-| W-RAG.5.1 | `xtask deploy` failure hook → RAG explain | TODO | Needs W-RAG.4.2 (DONE) |
+| W-RAG.5.1 | `xtask deploy` failure hook → RAG explain | DONE | Added `diagnose_failure()` function to rag.rs; integrated into deploy/mod.rs error handling; queries RAG with error context on deployment failure |
 | W-RAG.6.1 | `services/ui/src/routes/api/ask.rs` + router wiring | DONE (2026-04-15) | POST /api/ask; Arc<RagStore> in AppState; WAL concurrent reader |
 | W-RAG.6.2 | Bundle `sqlite-vec` aarch64 SO into Lambda zip | TODO | P2; confirm binary size (~300 KB) |
 | W-RAG.6.3 | Rate-limit + `RAG_PUBLIC_ENABLED` feature flag | DONE (updated 2026-05-01) | `ASK_RATE_LIMIT` env var (default 2/min); IP from `x-forwarded-for` first → `ConnectInfo` → `"unknown"` (Lambda fix — was 127.0.0.1 global bucket); `RAG_PUBLIC_ENABLED=1` gate |
@@ -224,6 +225,11 @@ injects this contract via `PromptBundle.system_prompt`.
 | W-RAG.10.4 | Extend `AskProxyRequest`/`AskProxyResponse` with `tools`, `api_base_url`, `tools_used`, `turns` | DONE | `crates/api-openapi/src/models/ask.rs`; backward-compatible `#[serde(default)]` |
 | W-RAG.10.5 | Update ask handler for agentic mode (include tool defs in proxy request) | DONE | `services/ui/src/routes/api/ask.rs`; `PORTFOLIO_API_BASE_URL` env var gating |
 | W-RAG.10.6 | Evolve system prompt for agentic portfolio assistant mode | DONE | `crates/rag-core/src/lib.rs`; portfolio-aware preamble (done in Phase 9.6) |
+| W-RAG.11.1 | Implement challenges chunker (`challenge_to_prose`) in portfolio.rs | DONE | `crates/rag-core/src/chunk/portfolio.rs`; converts challenge entities to prose chunks |
+| W-RAG.11.2 | Add `get_challenges_summary()` to PortfolioDataProvider trait | DONE | `crates/rag-core/src/portfolio.rs`; live DB query for challenges |
+| W-RAG.11.3 | Implement PortfolioDataProvider for challenges in db.rs | DONE | `services/ui/src/db.rs`; returns challenges as JSON values |
+| W-RAG.11.4 | Add "challenge"/"challenges" keyword triggers to HybridRetriever | DONE | `crates/rag-core/src/hybrid.rs`; 12 new portfolio keywords include challenge terms |
+| W-RAG.11.5 | Extend corpus table in module plan to document challenges as 7th corpus | DONE | Added to Chunkers (per corpus) table in rag.md |
 
 ## W-RAG.5 Test Strategy
 

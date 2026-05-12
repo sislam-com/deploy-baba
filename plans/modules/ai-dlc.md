@@ -51,7 +51,7 @@ Provide session-time agents and maintenance skills that keep the plan system, ag
 | W-AIL.4.4 | `/cache-refresh` skill | TODO | `.claude/skills/cache-refresh/SKILL.md` — wrap `just cache-refresh`, not duplicate |
 | W-AIL.4.5 | `/memory-curate` skill | TODO | `.claude/skills/memory-curate/SKILL.md` — port verbatim |
 | W-AIL.4.6 | ADR-018 | DONE | `plans/adr/ADR-018-anti-rot-agents.md` ✓ |
-| W-AIL.4.7 | Weekly schedule wiring | TODO | Run `/schedule` to create `dbb-plan-sync` + `dbb-memory-curate` routines |
+| W-AIL.4.7 | Weekly schedule wiring | DEFERRED | Defer to P2/P3 (production/CI concern). Skills (plan-sync, memory-curate) exist and can be run manually in dev. |
 
 ## W-AIL.5 Test Strategy
 

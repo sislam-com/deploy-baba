@@ -17,9 +17,10 @@ use crate::routes::api::competencies::Competency;
 use crate::routes::api::jobs::{Job, JobDetail};
 use crate::state::AppState;
 
+use crate::routes::api::challenges::{row_to_challenge, Challenge};
 pub use api_openapi::models::{
-    AboutSectionInput, AboutSectionResponse, CompetencyInput, Evidence, EvidenceInput,
-    JobDetailInput, JobInput, SocialLinkInput, SocialLinkResponse,
+    AboutSectionInput, AboutSectionResponse, ChallengeInput, CompetencyInput, Evidence,
+    EvidenceInput, JobDetailInput, JobInput, SocialLinkInput, SocialLinkResponse,
 };
 
 type ApiResult<T> = Result<T, (StatusCode, String)>;
@@ -831,6 +832,142 @@ pub async fn delete_social_link(
     Ok(StatusCode::NO_CONTENT)
 }
 
+// ── Challenge handlers ───────────────────────────────────────────────────────
+
+const CHALLENGE_SELECT: &str =
+    "id, slug, title, job_id, description, short_description, tech_stack, category, url, image_url, featured, sort_order";
+
+/// Create a new challenge.
+#[utoipa::path(
+    post,
+    path = "/api/admin/challenges",
+    tag = "admin",
+    request_body = ChallengeInput,
+    responses(
+        (status = 201, description = "Challenge created", body = Challenge),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error"),
+    ),
+    security(("cookieAuth" = []), ("bearerAuth" = [])),
+)]
+pub async fn create_challenge(
+    State(db): State<Arc<Db>>,
+    Json(input): Json<ChallengeInput>,
+) -> ApiResult<(StatusCode, Json<Challenge>)> {
+    let conn = db.conn.lock().unwrap();
+    conn.execute(
+        "INSERT INTO challenges (slug, title, job_id, description, short_description, tech_stack, category, url, image_url, featured, sort_order)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+        rusqlite::params![
+            input.slug,
+            input.title,
+            input.job_id,
+            input.description,
+            input.short_description,
+            input.tech_stack,
+            input.category,
+            input.url,
+            input.image_url,
+            input.featured as i64,
+            input.sort_order,
+        ],
+    )
+    .map_err(db_err)?;
+
+    let id = conn.last_insert_rowid();
+    let query = format!("SELECT {} FROM challenges WHERE id = ?1", CHALLENGE_SELECT);
+    let challenge = conn
+        .query_row(&query, rusqlite::params![id], row_to_challenge)
+        .map_err(db_err)?;
+
+    Ok((StatusCode::CREATED, Json(challenge)))
+}
+
+/// Update an existing challenge.
+#[utoipa::path(
+    put,
+    path = "/api/admin/challenges/{id}",
+    tag = "admin",
+    params(("id" = i64, Path, description = "Challenge ID")),
+    request_body = ChallengeInput,
+    responses(
+        (status = 200, description = "Challenge updated", body = Challenge),
+        (status = 404, description = "Challenge not found"),
+        (status = 401, description = "Unauthorized"),
+    ),
+    security(("cookieAuth" = []), ("bearerAuth" = [])),
+)]
+pub async fn update_challenge(
+    State(db): State<Arc<Db>>,
+    Path(id): Path<i64>,
+    Json(input): Json<ChallengeInput>,
+) -> ApiResult<Json<Challenge>> {
+    let conn = db.conn.lock().unwrap();
+    let rows = conn
+        .execute(
+            "UPDATE challenges SET slug=?1, title=?2, job_id=?3, description=?4,
+             short_description=?5, tech_stack=?6, category=?7, url=?8,
+             image_url=?9, featured=?10, sort_order=?11 WHERE id=?12",
+            rusqlite::params![
+                input.slug,
+                input.title,
+                input.job_id,
+                input.description,
+                input.short_description,
+                input.tech_stack,
+                input.category,
+                input.url,
+                input.image_url,
+                input.featured as i64,
+                input.sort_order,
+                id,
+            ],
+        )
+        .map_err(db_err)?;
+
+    if rows == 0 {
+        return Err(not_found(format!("Challenge {} not found", id)));
+    }
+
+    let query = format!("SELECT {} FROM challenges WHERE id = ?1", CHALLENGE_SELECT);
+    let challenge = conn
+        .query_row(&query, rusqlite::params![id], row_to_challenge)
+        .map_err(db_err)?;
+
+    Ok(Json(challenge))
+}
+
+/// Delete a challenge.
+#[utoipa::path(
+    delete,
+    path = "/api/admin/challenges/{id}",
+    tag = "admin",
+    params(("id" = i64, Path, description = "Challenge ID")),
+    responses(
+        (status = 204, description = "Challenge deleted"),
+        (status = 404, description = "Challenge not found"),
+        (status = 401, description = "Unauthorized"),
+    ),
+    security(("cookieAuth" = []), ("bearerAuth" = [])),
+)]
+pub async fn delete_challenge(
+    State(db): State<Arc<Db>>,
+    Path(id): Path<i64>,
+) -> ApiResult<StatusCode> {
+    let conn = db.conn.lock().unwrap();
+    let rows = conn
+        .execute(
+            "DELETE FROM challenges WHERE id = ?1",
+            rusqlite::params![id],
+        )
+        .map_err(db_err)?;
+
+    if rows == 0 {
+        return Err(not_found(format!("Challenge {} not found", id)));
+    }
+    Ok(StatusCode::NO_CONTENT)
+}
+
 // ── DB dump handler ───────────────────────────────────────────────────────────
 
 /// GET /api/admin/db-dump
@@ -895,5 +1032,10 @@ pub fn router() -> Router<AppState> {
         .route(
             "/social-links/:id",
             put(update_social_link).delete(delete_social_link),
+        )
+        .route("/challenges", post(create_challenge))
+        .route(
+            "/challenges/:id",
+            put(update_challenge).delete(delete_challenge),
         )
 }

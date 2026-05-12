@@ -129,4 +129,8 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(list_jobs))
         .route("/:slug", get(get_job))
+        .route(
+            "/:slug/challenges",
+            get(super::challenges::list_challenges_for_job),
+        )
 }

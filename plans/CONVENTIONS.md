@@ -47,6 +47,7 @@ Example: `DRL-2026-03-18-terraform.md`
 | `SL` | social-links | `services/ui/src/db.rs`, `services/ui/src/routes/api/admin.rs`, `services/ui/migrations/010-011` (templates deleted D.5) |
 | `RSM` | resume | `services/ui/src/routes/api/{jobs,competencies,resume}.rs`, `services/ui/migrations/001-007` (route file deleted D.5) |
 | `CTF` | contact-form | `services/email/` + `services/ui/src/routes/contact.rs` + `infra/ses.tf` + `infra/email-lambda.tf` |
+| `CHL` | challenges | `services/ui/src/routes/api/challenges.rs`, `services/ui/migrations/022`, `web/src/routes/dashboard/Challenges.tsx` — portfolio project showcase with RAG corpus integration |
 | `SYNC` | dashboard-sync | `services/ui/migrations/`, `services/ui/src/db.rs`, `.claude/skills/` |
 | `LLM` | llm-core + adapters | `crates/llm-core/`, `crates/llm-anthropic/` — pluggable LLM provider abstraction (trait crate + vendor adapter crates) |
 | `RST` | resume-tailor | `services/ui/src/tailor/`, `crates/api-openapi/src/models/tailor.rs` — JD-driven AI resume tailoring pipeline, consumer of W-LLM; distinct from W-RSM static generator |

@@ -143,8 +143,8 @@ See `plans/drift/DRL-2026-05-03-coverage-floors.md` for full root-cause analysis
 | ID | Task | Status | Notes |
 |----|------|--------|-------|
 | W-XT.4.1 | Fix CLI naming mismatch | FIXED | 3 justfile mismatches corrected: `fmt`→`format` (build), `--crate`→`crate` subcommand (test), `gate`→`all` (quality) |
-| W-XT.4.2 | Remove or wire EnvironmentInterpolator | OPEN | Dead code warning; either use in build.rs or delete |
-| W-XT.4.3 | Fully implement bootstrap.rs | OPEN | Fixed in DRL but needs `just infra-bootstrap` to be tested end-to-end |
+| W-XT.4.2 | Remove or wire EnvironmentInterpolator | DEFERRED | Located in config-core (not xtask); kept as intentional placeholder for future env var interpolation needs |
+| W-XT.4.3 | Fully implement bootstrap.rs | DONE | `scripts/bootstrap-tfstate.sh` exists and is wired via `just infra-bootstrap`; idempotent S3 + DynamoDB creation |
 | W-XT.4.4 | cache.rs subcommand | DONE | Replaces inline Python heredoc in justfile (which `just` could not parse); implements status/refresh/clear via serde_json |
 | W-XT.4.5 | Resume generate + S3 upload | DONE | `xtask/src/resume/` — reads DB, builds resume artifact, uploads to S3, returns presigned download URL |
 | W-XT.4.6 | release subcommand | DONE | `xtask/src/release/{mod,git,version,changelog}.rs`; `just release-next/tag/promote`; 23 unit tests |

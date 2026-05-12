@@ -12,6 +12,7 @@ use anyhow::Context;
 use clap::Subcommand;
 use rag_core::chunk::chunk_file;
 use rag_core::types::SourceKind;
+use rag_core::Retriever;
 use rag_sqlite::RagStore;
 use rusqlite::Connection;
 use std::path::{Path, PathBuf};
@@ -498,6 +499,40 @@ async fn ask_cmd(db_path: &Path, query: &str, top_k: usize, max_tokens: u32) -> 
         resp.input_tokens, resp.output_tokens, resp.model
     );
     Ok(())
+}
+
+/// Diagnose a deployment failure using RAG to find relevant documentation
+///
+/// This function queries the RAG system with context about a deployment failure
+/// to provide automated diagnosis suggestions.
+pub async fn diagnose_failure(error_context: &str) -> anyhow::Result<Vec<String>> {
+    let db_path = std::path::PathBuf::from("deploy-baba.db");
+    let query = format!("deployment failure error: {}", error_context);
+
+    let conn = Connection::open(&db_path)
+        .with_context(|| format!("Failed to open database: {}", db_path.display()))?;
+    let store = RagStore::new(conn).context("Failed to initialise RAG schema")?;
+
+    let results = store
+        .retrieve(&query, 5) // Get top 5 most relevant chunks
+        .await
+        .map_err(|e| anyhow::anyhow!("retrieval failed: {e}"))?;
+
+    if results.is_empty() {
+        return Ok(vec![
+            "No relevant documentation found for this error.".to_string()
+        ]);
+    }
+
+    let suggestions: Vec<String> = results
+        .iter()
+        .map(|chunk| {
+            let preview: String = chunk.content.chars().take(200).collect();
+            format!("{}: {}", chunk.source_path, preview)
+        })
+        .collect();
+
+    Ok(suggestions)
 }
 
 fn git_head_sha(repo_root: &Path) -> anyhow::Result<String> {

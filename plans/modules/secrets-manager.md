@@ -1,5 +1,5 @@
 # W-SEC: AWS Secrets Manager Integration
-**Service:** `xtask/` + `services/ui/` + `infra/` | **Status:** DONE (2026-04-03)
+**Service:** `xtask/` + `services/ui/` + `infra/` | **Status:** DONE (2026-04-03, all secrets deployed 2026-05-09)
 **Depends on:** W-OTF (tofu infra) | **Depended on by:** W-CTF (POW_SECRET)
 
 ## W-SEC.1 Purpose
@@ -88,11 +88,11 @@ fetch eagerly at Lambda cold start in `main.rs`.
 | W-SEC.4.4 | Create `xtask/src/secret.rs` — put/get/list commands | DONE |
 | W-SEC.4.5 | Add `secret-put`, `secret-get`, `secret-list` justfile recipes | DONE |
 | W-SEC.4.6 | Update `contact.rs` to fetch POW_SECRET from SM at cold start via `init_pow_secret()` | DONE |
-| W-SEC.4.7 | `just infra-apply` + `just secret-put pow-secret <value>` + `just lambda-deploy` | OPEN — deploy step |
+| W-SEC.4.7 | `just infra-apply` + `just secret-put pow-secret <value>` + `just lambda-deploy` | DONE (verified via `just secret-list`) |
 | W-SEC.4.8 | Verify: submit contact form → challenge → solve → POST → email received | OPEN — W-CTF.4.12 |
 | W-SEC.4.9 | Add `anthropic-api-key` SM resource + IAM policy + `ANTHROPIC_API_KEY_ARN` Lambda env var | DONE (2026-04-15) |
 | W-SEC.4.10 | Load `anthropic-api-key` at cold start in `services/ui/src/main.rs` via `init_anthropic_key()` + OnceLock | DONE (2026-04-15) |
-| W-SEC.4.11 | `just infra-apply PROFILE` + `just secret-put anthropic-api-key <KEY> PROFILE` + `just lambda-deploy PROFILE` | OPEN — provision step |
+| W-SEC.4.11 | `just infra-apply PROFILE` + `just secret-put anthropic-api-key <KEY> PROFILE` + `just lambda-deploy PROFILE` | DONE (verified via `just secret-list`) |
 
 ### Additional changes beyond original design
 - `infra/secrets.tf` also includes `cognito-temp-password` SM secret (full secret audit)

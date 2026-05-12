@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use super::{ApiModel, Competency, Job, SocialLink};
+use super::{ApiModel, Challenge, Competency, Job, SocialLink};
 
 /// Combined resume payload returned by `GET /api/resume`.
 ///
@@ -16,6 +16,7 @@ pub struct ResumeData {
     pub jobs: Vec<Job>,
     pub competencies: Vec<Competency>,
     pub social_links: Vec<SocialLink>,
+    pub challenges: Vec<Challenge>,
 }
 
 impl ApiModel for ResumeData {
@@ -31,6 +32,7 @@ impl ApiModel for ResumeData {
             jobs: vec![Job::example()],
             competencies: vec![Competency::example()],
             social_links: vec![SocialLink::example()],
+            challenges: vec![Challenge::example()],
         }
     }
 }

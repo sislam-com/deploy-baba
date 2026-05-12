@@ -18,6 +18,8 @@ const About = lazy(() => import('./routes/dashboard/About'))
 const AboutDetail = lazy(() => import('./routes/dashboard/AboutDetail'))
 const SocialLinks = lazy(() => import('./routes/dashboard/SocialLinks'))
 const SocialLinkDetail = lazy(() => import('./routes/dashboard/SocialLinkDetail'))
+const Challenges = lazy(() => import('./routes/dashboard/Challenges'))
+const ChallengeDetail = lazy(() => import('./routes/dashboard/ChallengeDetail'))
 
 function LoadingSpinner() {
   return (
@@ -51,6 +53,8 @@ export default function App() {
           <Route path="about/:id" element={<AboutDetail />} />
           <Route path="social-links" element={<SocialLinks />} />
           <Route path="social-links/:id" element={<SocialLinkDetail />} />
+          <Route path="challenges" element={<Challenges />} />
+          <Route path="challenges/:id" element={<ChallengeDetail />} />
         </Route>
       </Routes>
     </Suspense>

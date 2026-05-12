@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { to: '/dashboard/competencies', label: 'Competencies' },
   { to: '/dashboard/about', label: 'About Sections' },
   { to: '/dashboard/social-links', label: 'Social Links' },
+  { to: '/dashboard/challenges', label: 'Challenges' },
 ]
 
 export default function DashboardLayout() {

@@ -73,6 +73,13 @@ pub const ALL_MODELS: &[(&str, ModelFactory)] = &[
     ("SocialLinkResponse", || {
         serde_json::to_value(SocialLinkResponse::example()).expect("SocialLinkResponse example")
     }),
+    // challenges
+    ("Challenge", || {
+        serde_json::to_value(Challenge::example()).expect("Challenge example")
+    }),
+    ("ChallengeInput", || {
+        serde_json::to_value(ChallengeInput::example()).expect("ChallengeInput example")
+    }),
     // contact
     ("ChallengeResponse", || {
         serde_json::to_value(ChallengeResponse::example()).expect("ChallengeResponse example")

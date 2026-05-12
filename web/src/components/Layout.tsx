@@ -32,13 +32,13 @@ function NavIcon({
           href={to}
           target="_blank"
           rel="noopener noreferrer"
-          className={`${cls} text-gray-400 hover:text-white`}
-          title={label}
+          className={`${cls} text-gray-400 hover:text-white focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:outline-none`}
+          aria-label={label}
         >
           <SvgIcon name={icon} className="w-5 h-5" />
         </a>
         <span className="absolute top-full mt-1 left-1/2 -translate-x-1/2 px-2 py-1 text-xs text-white bg-gray-700 rounded
-                         opacity-0 group-hover:opacity-100 transition pointer-events-none whitespace-nowrap z-50">
+                         opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition pointer-events-none whitespace-nowrap z-50">
           {label}
         </span>
       </div>
@@ -50,22 +50,67 @@ function NavIcon({
       <NavLink
         to={to}
         className={({ isActive }) =>
-          `${cls} ${isActive ? 'text-cyan-400' : 'text-gray-400 hover:text-white'}`
+          `${cls} ${isActive ? 'text-cyan-400' : 'text-gray-400 hover:text-white'} focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:outline-none`
         }
-        title={label}
+        aria-label={label}
       >
         <SvgIcon name={icon} className="w-5 h-5" />
       </NavLink>
       <span className="absolute top-full mt-1 left-1/2 -translate-x-1/2 px-2 py-1 text-xs text-white bg-gray-700 rounded
-                       opacity-0 group-hover:opacity-100 transition pointer-events-none whitespace-nowrap z-50">
+                       opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition pointer-events-none whitespace-nowrap z-50">
         {label}
       </span>
     </div>
   )
 }
 
+function MobileNavItem({
+  to,
+  icon,
+  label,
+  external,
+  onClose,
+}: {
+  to: string
+  icon: string
+  label: string
+  external?: boolean
+  onClose: () => void
+}) {
+  const cls = "flex items-center gap-3 px-4 py-3 text-sm rounded-lg transition"
+
+  if (external) {
+    return (
+      <a
+        href={to}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`${cls} text-gray-300 hover:bg-gray-800 hover:text-white`}
+        onClick={onClose}
+      >
+        <SvgIcon name={icon} className="w-5 h-5 text-gray-400" />
+        {label}
+      </a>
+    )
+  }
+
+  return (
+    <NavLink
+      to={to}
+      className={({ isActive }) =>
+        `${cls} ${isActive ? 'text-cyan-400 bg-gray-800' : 'text-gray-300 hover:bg-gray-800 hover:text-white'}`
+      }
+      onClick={onClose}
+    >
+      <SvgIcon name={icon} className="w-5 h-5" />
+      {label}
+    </NavLink>
+  )
+}
+
 export default function Layout() {
   const [socialLinks, setSocialLinks] = useState<SocialLink[]>([])
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   useEffect(() => {
     fetch('/api/social-links')
@@ -74,15 +119,19 @@ export default function Layout() {
       .catch(() => {})
   }, [])
 
+  const closeMenu = () => setMobileMenuOpen(false)
+
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
-      <nav className="border-b border-gray-800 bg-gray-800/50 sticky top-0 z-50">
+      <nav className="border-b border-gray-800 bg-gray-900/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <Link to="/" className="text-xl font-bold text-cyan-400 hover:text-cyan-300 transition">
               Sharful Islam
             </Link>
-            <div className="flex items-center gap-3">
+
+            {/* Desktop nav */}
+            <div className="hidden sm:flex items-center gap-3">
               <NavIcon to="/about/me" icon="user" label="About" />
               <NavIcon to="/contact" icon="envelope" label="Contact" />
               <NavIcon to="/docs" icon="document-text" label="API Docs" external />
@@ -97,8 +146,39 @@ export default function Layout() {
               ))}
               <NavIcon to="/auth/login" icon="key" label="Login" external />
             </div>
+
+            {/* Mobile hamburger */}
+            <button
+              className="sm:hidden p-2 rounded-lg text-gray-400 hover:text-white transition
+                         focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:outline-none"
+              onClick={() => setMobileMenuOpen(o => !o)}
+              aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={mobileMenuOpen}
+            >
+              <SvgIcon name={mobileMenuOpen ? 'x-mark' : 'menu'} className="w-6 h-6" />
+            </button>
           </div>
         </div>
+
+        {/* Mobile menu panel */}
+        {mobileMenuOpen && (
+          <div className="sm:hidden border-t border-gray-800 bg-gray-900 px-4 py-3 space-y-1">
+            <MobileNavItem to="/about/me" icon="user" label="About" onClose={closeMenu} />
+            <MobileNavItem to="/contact" icon="envelope" label="Contact" onClose={closeMenu} />
+            <MobileNavItem to="/docs" icon="document-text" label="API Docs" external onClose={closeMenu} />
+            {socialLinks.map(link => (
+              <MobileNavItem
+                key={link.url}
+                to={link.url}
+                icon={SOCIAL_ICON_MAP[link.label.toLowerCase()] ?? 'document'}
+                label={link.label}
+                external
+                onClose={closeMenu}
+              />
+            ))}
+            <MobileNavItem to="/auth/login" icon="key" label="Login" external onClose={closeMenu} />
+          </div>
+        )}
       </nav>
 
       <main className="flex-1">

@@ -4,7 +4,8 @@ use std::sync::Arc;
 use crate::db::{load_social_links, Db};
 use crate::state::AppState;
 
-pub use api_openapi::models::{Competency, Job, ResumeData};
+use crate::routes::api::challenges::row_to_challenge;
+pub use api_openapi::models::{Challenge, Competency, Job, ResumeData};
 
 type ApiError = (StatusCode, String);
 
@@ -100,6 +101,20 @@ pub async fn get_resume_data(State(db): State<Arc<Db>>) -> Result<Json<ResumeDat
 
     let social_links = load_social_links(&conn);
 
+    let mut stmt3 = conn
+        .prepare(
+            "SELECT id, slug, title, job_id, description, short_description, tech_stack, \
+             category, url, image_url, featured, sort_order \
+             FROM challenges WHERE featured = 1 ORDER BY sort_order ASC",
+        )
+        .map_err(db_err)?;
+
+    let challenges: Vec<Challenge> = stmt3
+        .query_map([], row_to_challenge)
+        .map_err(db_err)?
+        .filter_map(|r| r.ok())
+        .collect();
+
     Ok(Json(ResumeData {
         name,
         title,
@@ -108,6 +123,7 @@ pub async fn get_resume_data(State(db): State<Arc<Db>>) -> Result<Json<ResumeDat
         jobs,
         competencies,
         social_links,
+        challenges,
     }))
 }
 

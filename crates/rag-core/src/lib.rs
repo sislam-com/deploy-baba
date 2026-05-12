@@ -11,6 +11,7 @@
 
 pub mod chunk;
 pub mod error;
+pub mod eval;
 pub mod hybrid;
 pub mod portfolio;
 pub mod types;
@@ -80,6 +81,9 @@ impl<T: PortfolioDataProvider> PortfolioDataProvider for Arc<T> {
     }
     async fn get_about_sections(&self) -> Result<Vec<serde_json::Value>, RagError> {
         (**self).get_about_sections().await
+    }
+    async fn get_challenges_summary(&self) -> Result<Vec<serde_json::Value>, RagError> {
+        (**self).get_challenges_summary().await
     }
 }
 

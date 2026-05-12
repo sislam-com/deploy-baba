@@ -11,11 +11,11 @@
 /// function, so there is no hand-maintained `paths(...)` list anywhere.
 use crate::models::{
     AboutSectionInput, AboutSectionResponse, ApiError, AskCitation, AskRequest, AskResponse,
-    AuthMe, ChallengeResponse, Competency, CompetencyInput, CompetencyWithEvidence,
-    ContactResponse, ContactSubmitRequest, CrateInfo, Evidence, EvidenceInput, EvidenceItem,
-    HealthResponse, Job, JobDetail, JobDetailInput, JobInput, JobWithDetails, JobsQuery,
-    MatchedBullet, ResumeData, SocialLink, SocialLinkInput, SocialLinkResponse, TailorRequest,
-    TailorResponse,
+    AuthMe, Challenge, ChallengeInput, ChallengeResponse, Competency, CompetencyInput,
+    CompetencyWithEvidence, ContactResponse, ContactSubmitRequest, CrateInfo, Evidence,
+    EvidenceInput, EvidenceItem, HealthResponse, Job, JobDetail, JobDetailInput, JobInput,
+    JobWithDetails, JobsQuery, MatchedBullet, ResumeData, SocialLink, SocialLinkInput,
+    SocialLinkResponse, TailorRequest, TailorResponse,
 };
 use utoipa::OpenApi;
 
@@ -44,6 +44,7 @@ use utoipa::OpenApi;
         CompetencyWithEvidence,
         AboutSectionResponse,
         SocialLink,
+        Challenge,
         ChallengeResponse,
         ContactSubmitRequest,
         ContactResponse,
@@ -81,6 +82,7 @@ pub struct PublicApiDoc;
         CompetencyInput,
         EvidenceInput,
         Evidence,
+        ChallengeInput,
         TailorRequest,
         MatchedBullet,
         TailorResponse,

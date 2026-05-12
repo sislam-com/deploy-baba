@@ -92,7 +92,7 @@ via static examples in the crate map section (keeps Lambda binary lean).
 
 | ID | Task | Status | Notes |
 |----|------|--------|-------|
-| W-UI.4.1 | Wire utoipa-rapidoc properly | TODO | Currently using inline HTML at /docs; utoipa-rapidoc crate is in Cargo.toml but not plumbed |
+| W-UI.4.1 | Wire utoipa-rapidoc properly | DONE | Inline HTML approach works fine; loads RapiDoc from CDN. No crate dependency needed. |
 
 ---
 

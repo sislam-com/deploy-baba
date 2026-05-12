@@ -90,6 +90,14 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "021_update_competencies",
         include_str!("../migrations/021_update_competencies.sql"),
     ),
+    (
+        "022_create_challenges",
+        include_str!("../migrations/022_create_challenges.sql"),
+    ),
+    (
+        "023_rag_eval",
+        include_str!("../migrations/023_rag_eval.sql"),
+    ),
 ];
 
 /// Re-exported from `api_openapi::models::social` — the canonical SSOT.
@@ -385,5 +393,38 @@ impl PortfolioDataProvider for Db {
             .collect();
 
         Ok(sections)
+    }
+
+    async fn get_challenges_summary(
+        &self,
+    ) -> std::result::Result<Vec<serde_json::Value>, RagError> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn
+            .prepare(
+                "SELECT slug, title, description, short_description, tech_stack, category, url, featured
+                 FROM challenges ORDER BY sort_order ASC",
+            )
+            .map_err(|e| RagError::Database(e.to_string()))?;
+
+        let challenges = stmt
+            .query_map([], |row| {
+                let featured: i64 = row.get(7)?;
+                Ok(serde_json::json!({
+                    "entity_type": "challenge",
+                    "slug": row.get::<_, String>(0)?,
+                    "title": row.get::<_, String>(1)?,
+                    "description": row.get::<_, String>(2)?,
+                    "short_description": row.get::<_, Option<String>>(3)?,
+                    "tech_stack": row.get::<_, Option<String>>(4)?,
+                    "category": row.get::<_, Option<String>>(5)?,
+                    "url": row.get::<_, Option<String>>(6)?,
+                    "featured": featured != 0,
+                }))
+            })
+            .map_err(|e| RagError::Database(e.to_string()))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        Ok(challenges)
     }
 }

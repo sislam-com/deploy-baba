@@ -66,6 +66,10 @@ impl Modify for SecurityAddon {
         crate::routes::api::resume_data::get_resume_data,
         crate::routes::api::about::list_about_sections,
         crate::routes::api::social_links::list_social_links,
+        // ── Challenges (public read) ─────────────────────────────────────────
+        crate::routes::api::challenges::list_challenges,
+        crate::routes::api::challenges::get_challenge,
+        crate::routes::api::challenges::list_challenges_for_job,
         // ── Contact ──────────────────────────────────────────────────────────
         crate::routes::contact::challenge_issue,
         crate::routes::contact::contact_submit,
@@ -95,6 +99,10 @@ impl Modify for SecurityAddon {
         crate::routes::api::admin::create_social_link,
         crate::routes::api::admin::update_social_link,
         crate::routes::api::admin::delete_social_link,
+        // ── Admin — challenges ──────────────────────────────────────────────
+        crate::routes::api::admin::create_challenge,
+        crate::routes::api::admin::update_challenge,
+        crate::routes::api::admin::delete_challenge,
     ),
     components(schemas(
         api_openapi::models::ApiError,
@@ -109,6 +117,7 @@ impl Modify for SecurityAddon {
         api_openapi::models::CompetencyWithEvidence,
         api_openapi::models::AboutSectionResponse,
         api_openapi::models::SocialLink,
+        api_openapi::models::Challenge,
         api_openapi::models::ChallengeResponse,
         api_openapi::models::ContactSubmitRequest,
         api_openapi::models::ContactResponse,
@@ -126,6 +135,7 @@ impl Modify for SecurityAddon {
         api_openapi::models::AboutSectionInput,
         api_openapi::models::SocialLinkInput,
         api_openapi::models::SocialLinkResponse,
+        api_openapi::models::ChallengeInput,
         // W-RST: tailor pipeline (reserved — routes not yet implemented)
         api_openapi::models::TailorRequest,
         api_openapi::models::TailorResponse,
