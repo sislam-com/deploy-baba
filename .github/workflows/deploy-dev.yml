@@ -109,7 +109,7 @@ jobs:
 
       - name: Smoke test /health
         run: |
-          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" "${FN_URL}health" || echo "000")
+          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" "${FN_URL}/health" || echo "000")
           echo "Health check status: ${STATUS}"
           [[ "${STATUS}" == "200" ]]
 
