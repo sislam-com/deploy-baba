@@ -113,7 +113,7 @@ function TechStrip({ jobs }: { jobs: Job[] }) {
       {tags.map((tag, i) => (
         <span
           key={tag}
-          className="text-xs px-3 py-1 rounded-full border border-gray-700 text-gray-300 bg-gray-800/50
+          className="text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded
                      whitespace-nowrap animate-fadeIn"
           style={{ animationDelay: `${300 + i * 40}ms` }}
         >
@@ -156,8 +156,13 @@ function JobCard({ job }: { job: Job }) {
       <div className="absolute left-2.5 top-6 w-3 h-3 rounded-full bg-cyan-400 ring-2 ring-gray-900 hidden sm:block" />
 
       <div
-        className="bg-gray-800 rounded-lg border border-gray-700 hover:border-cyan-500/50 transition cursor-pointer"
+        role="button"
+        tabIndex={0}
+        aria-expanded={open}
+        className="bg-gray-800 rounded-lg border border-gray-700 hover:border-cyan-500/50 transition cursor-pointer
+                   focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:outline-none text-left"
         onClick={toggle}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle() } }}
       >
         <div className="p-6">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-3">
@@ -183,8 +188,9 @@ function JobCard({ job }: { job: Job }) {
               ))}
             </div>
           )}
-          <div className="mt-3 text-xs text-gray-500">
-            {open ? 'click to collapse ▲' : 'click to expand details ▼'}
+          <div className="mt-3 flex items-center gap-1 text-xs text-gray-400">
+            <span>{open ? 'Hide details' : 'View details'}</span>
+            <SvgIcon name={open ? 'chevron-up' : 'chevron-down'} className="w-3 h-3" />
           </div>
         </div>
       </div>
@@ -205,7 +211,7 @@ function JobCard({ job }: { job: Job }) {
                   <ul className="space-y-2">
                     {items.map(item => (
                       <li key={item.id} className="flex gap-2 text-gray-300 text-sm">
-                        <span className="text-cyan-400 mt-0.5 shrink-0">{'▸'}</span>
+                        <SvgIcon name="chevron-right" className="w-3 h-3 text-cyan-400 mt-1 shrink-0" />
                         <span>{item.detail_text}</span>
                       </li>
                     ))}
@@ -249,8 +255,13 @@ function CompetencyCard({ comp, onJobClick }: { comp: Competency; onJobClick: (s
   return (
     <div id={comp.slug}>
       <div
-        className="bg-gray-800 rounded-lg border border-gray-700 hover:border-cyan-500/50 transition cursor-pointer"
+        role="button"
+        tabIndex={0}
+        aria-expanded={open}
+        className="bg-gray-800 rounded-lg border border-gray-700 hover:border-cyan-500/50 transition cursor-pointer
+                   focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:outline-none text-left"
         onClick={toggle}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle() } }}
       >
       <div className="p-6">
         <div className="flex items-start gap-3 mb-3">
@@ -265,8 +276,9 @@ function CompetencyCard({ comp, onJobClick }: { comp: Competency; onJobClick: (s
             )}
           </div>
         </div>
-        <div className="mt-3 text-xs text-gray-500">
-          {open ? 'click to collapse ▲' : 'click to see evidence ▼'}
+        <div className="mt-3 flex items-center gap-1 text-xs text-gray-400">
+          <span>{open ? 'Hide evidence' : 'View evidence'}</span>
+          <SvgIcon name={open ? 'chevron-up' : 'chevron-down'} className="w-3 h-3" />
         </div>
       </div>
 
@@ -281,17 +293,18 @@ function CompetencyCard({ comp, onJobClick }: { comp: Competency; onJobClick: (s
               {Object.entries(byCompany).map(([company, group]) => (
                 <div key={company}>
                   <button
-                    className="text-sm font-semibold text-cyan-400 hover:text-cyan-300 transition mb-2 block"
+                    className="text-sm font-semibold text-cyan-400 hover:text-cyan-300 transition mb-2 flex items-center gap-1"
                     onClick={() => onJobClick(group.slug)}
                   >
-                    {company} {'→'}
+                    {company}
+                    <SvgIcon name="arrow-right" className="w-3.5 h-3.5" />
                   </button>
                   <ul className="space-y-1.5">
                     {group.items.map(ev => {
                       const text = ev.highlight_text ?? ev.detail_text ?? ''
                       return text ? (
                         <li key={ev.id} className="flex gap-2 text-gray-300 text-sm">
-                          <span className="text-cyan-400 mt-0.5 shrink-0">{'▸'}</span>
+                          <SvgIcon name="chevron-right" className="w-3 h-3 text-cyan-400 mt-1 shrink-0" />
                           <span>{text}</span>
                         </li>
                       ) : null
@@ -312,7 +325,7 @@ function ChallengeCard({ challenge: ch, jobs }: { challenge: Challenge; jobs: Jo
   const linkedJob = ch.job_id ? jobs.find(j => j.id === ch.job_id) : null
 
   return (
-    <div className="group bg-gray-800/60 border border-gray-700 rounded-xl p-5 hover:border-cyan-500/30 transition-all">
+    <div className="group bg-gray-800/60 border border-gray-700 rounded-lg p-5 hover:border-cyan-500/50 transition-all">
       <div className="flex items-start justify-between gap-3 mb-3">
         <h3 className="text-lg font-semibold text-white leading-tight">{ch.title}</h3>
         {ch.category && (
@@ -338,8 +351,7 @@ function ChallengeCard({ challenge: ch, jobs }: { challenge: Challenge; jobs: Jo
           {ch.tech_stack.map(tech => (
             <span
               key={tech}
-              className="text-[10px] font-medium px-2 py-0.5 rounded-full
-                         bg-cyan-900/30 text-cyan-400 border border-cyan-800/40"
+              className="text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded"
             >
               {tech}
             </span>
@@ -354,7 +366,8 @@ function ChallengeCard({ challenge: ch, jobs }: { challenge: Challenge; jobs: Jo
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 transition mt-1"
         >
-          View project {'→'}
+          View project
+          <SvgIcon name="arrow-right" className="w-3 h-3" />
         </a>
       )}
     </div>
@@ -408,19 +421,7 @@ export default function Home() {
       (Math.max(...endDates) - Math.min(...startDates)) / (365.25 * 24 * 60 * 60 * 1000)
     )
 
-    const freq: Record<string, number> = {}
-    for (const job of resume.jobs) {
-      const weight = 1 / (job.sort_order || 1)
-      for (const tech of job.tech_stack ?? []) {
-        freq[tech] = (freq[tech] ?? 0) + weight
-      }
-    }
-    const topTech = Object.entries(freq)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([name]) => name)
-
-    return { years, skillCount: resume.competencies.length, topTech }
+    return { years, skillCount: resume.competencies.length }
   }, [resume])
 
   const filteredChallenges = useMemo(() => {
@@ -483,8 +484,6 @@ export default function Home() {
               <StatPill value={`${heroStats.years}+`} label="years" />
               <span className="text-gray-700 text-2xl font-thin hidden sm:inline">|</span>
               <StatPill value={`${heroStats.skillCount}`} label="core skills" />
-              <span className="text-gray-700 text-2xl font-thin hidden sm:inline">|</span>
-              <StatPill value={heroStats.topTech.join(' · ')} label="top tech" />
             </div>
           )}
 
@@ -500,50 +499,66 @@ export default function Home() {
             className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-8 animate-fadeIn"
             style={{ animationDelay: '400ms' }}
           >
-            <div className="flex items-center bg-gray-800/80 rounded-full p-1 border border-gray-700">
+            <div className="flex items-center bg-gray-800/80 rounded-full p-1 border border-gray-700" role="tablist">
               <button
+                role="tab"
+                aria-selected={view === 'timeline'}
+                aria-label="Timeline"
                 onClick={() => setView('timeline')}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition ${
+                className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-full text-sm transition
+                           focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:outline-none ${
                   view === 'timeline'
-                    ? 'bg-cyan-600/20 text-cyan-400 shadow-sm shadow-cyan-500/10'
-                    : 'text-gray-400 hover:text-white'
+                    ? 'bg-cyan-600/20 text-cyan-400 font-semibold shadow-sm shadow-cyan-500/10'
+                    : 'text-gray-400 hover:text-white font-medium'
                 }`}
               >
                 <SvgIcon name="calendar" className="w-4 h-4" />
-                Timeline
+                <span className="hidden sm:inline">Timeline</span>
               </button>
               <button
+                role="tab"
+                aria-selected={view === 'capabilities'}
+                aria-label="Capabilities"
                 onClick={() => setView('capabilities')}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition ${
+                className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-full text-sm transition
+                           focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:outline-none ${
                   view === 'capabilities'
-                    ? 'bg-cyan-600/20 text-cyan-400 shadow-sm shadow-cyan-500/10'
-                    : 'text-gray-400 hover:text-white'
+                    ? 'bg-cyan-600/20 text-cyan-400 font-semibold shadow-sm shadow-cyan-500/10'
+                    : 'text-gray-400 hover:text-white font-medium'
                 }`}
               >
                 <SvgIcon name="bolt" className="w-4 h-4" />
-                Capabilities
+                <span className="hidden sm:inline">Capabilities</span>
               </button>
               <button
+                role="tab"
+                aria-selected={view === 'challenges'}
+                aria-label="Challenges"
                 onClick={() => setView('challenges')}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition ${
+                className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-full text-sm transition
+                           focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:outline-none ${
                   view === 'challenges'
-                    ? 'bg-cyan-600/20 text-cyan-400 shadow-sm shadow-cyan-500/10'
-                    : 'text-gray-400 hover:text-white'
+                    ? 'bg-cyan-600/20 text-cyan-400 font-semibold shadow-sm shadow-cyan-500/10'
+                    : 'text-gray-400 hover:text-white font-medium'
                 }`}
               >
                 <SvgIcon name="briefcase" className="w-4 h-4" />
-                Challenges
+                <span className="hidden sm:inline">Challenges</span>
               </button>
               <button
+                role="tab"
+                aria-selected={view === 'ask'}
+                aria-label="Ask AI"
                 onClick={() => setView('ask')}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition ${
+                className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-full text-sm transition
+                           focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:outline-none ${
                   view === 'ask'
-                    ? 'bg-cyan-600/20 text-cyan-400 shadow-sm shadow-cyan-500/10'
-                    : 'text-gray-400 hover:text-white'
+                    ? 'bg-cyan-600/20 text-cyan-400 font-semibold shadow-sm shadow-cyan-500/10'
+                    : 'text-gray-400 hover:text-white font-medium'
                 }`}
               >
                 <SvgIcon name="chat" className="w-4 h-4" />
-                Ask AI
+                <span className="hidden sm:inline">Ask AI</span>
               </button>
             </div>
 
@@ -551,13 +566,14 @@ export default function Home() {
               <button
                 onClick={() => setDownloadOpen(o => !o)}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium
-                           bg-cyan-600 hover:bg-cyan-500 text-white transition"
+                           border border-gray-600 text-gray-300 hover:border-cyan-500 hover:text-cyan-400
+                           bg-transparent transition focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:outline-none"
               >
                 Download Resume
-                <span className="text-xs">{downloadOpen ? '▴' : '▾'}</span>
+                <SvgIcon name={downloadOpen ? 'chevron-up' : 'chevron-down'} className="w-3.5 h-3.5" />
               </button>
               {downloadOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10 overflow-hidden">
+                <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10 overflow-hidden">
                   <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500 border-b border-gray-700">
                     PDF
                   </div>
@@ -606,8 +622,9 @@ export default function Home() {
       )}
 
       {resume && view === 'timeline' && (
-        <section className="py-12">
+        <section className="py-12" aria-labelledby="section-experience">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 id="section-experience" className="sr-only">Experience</h2>
             <div className="relative">
               <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-700 hidden sm:block" />
               <div className="space-y-6">
@@ -628,8 +645,9 @@ export default function Home() {
       )}
 
       {resume && view === 'capabilities' && (
-        <section className="py-12">
+        <section className="py-12" aria-labelledby="section-capabilities">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 id="section-capabilities" className="sr-only">Capabilities</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {resume.competencies.map((comp, i) => (
                 <div
@@ -646,10 +664,13 @@ export default function Home() {
       )}
 
       {resume && view === 'challenges' && (
-        <section className="py-12">
+        <section className="py-12" aria-labelledby="section-challenges">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 id="section-challenges" className="sr-only">Challenges</h2>
             <div className="flex flex-wrap items-center gap-4 mb-6">
+              <label htmlFor="category-filter" className="sr-only">Category</label>
               <select
+                id="category-filter"
                 value={categoryFilter}
                 onChange={e => setCategoryFilter(e.target.value)}
                 className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-cyan-500 focus:outline-none"
@@ -691,7 +712,13 @@ export default function Home() {
       )}
 
       {view === 'ask' && (
-        <section className="py-8 animate-fadeIn">
+        <section className="py-8 animate-fadeIn" aria-labelledby="section-ask">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 mb-4">
+            <h2 id="section-ask" className="sr-only">Ask AI</h2>
+            <p className="text-sm text-gray-400 text-center">
+              Ask anything about my experience, skills, or this codebase — answers include source citations.
+            </p>
+          </div>
           <Ask embedded />
         </section>
       )}
