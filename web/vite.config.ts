@@ -19,6 +19,7 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:3001',
       '/auth': 'http://localhost:3001',
+      '/resume': 'http://localhost:3001',
     },
   },
   test: {
