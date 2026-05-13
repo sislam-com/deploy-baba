@@ -12,18 +12,11 @@ use std::process::Command;
 use super::ResumeFormat;
 
 const HEADER: &str = "# Sharful Islam
-**AI Systems & Platform Engineer · Rust · RAG · LLM · AWS · 20+ Years**
+**AI Systems & Platform Engineer · Rust · RAG · LLM · AWS**
 
-contact-sislam@sislam.com · [GitHub](https://github.com/shantopagla) · [LinkedIn](https://www.linkedin.com/in/sharfulislam/) · [sislam.com](https://sislam.com)
+sharfulislam@sislam.com · [GitHub](https://github.com/shantopagla) · [LinkedIn](https://www.linkedin.com/in/sharfulislam/) · [sislam.com](https://sislam.com)
 
 ---
-
-";
-
-const EDUCATION: &str = "## Education
-
-- **B.S. Computing Sciences & Graphic Design** — University of Central Oklahoma, Edmond, OK
-- **Certificate, Management & Leadership Skills** — NST, Rockhurst University Continuing Education Center
 
 ";
 
@@ -35,6 +28,7 @@ struct Job {
     end_date: String,
     summary: String,
     tech_stack: Vec<String>,
+    resume_display: String,
 }
 
 struct JobDetail {
@@ -55,6 +49,17 @@ struct Evidence {
     text: String,
 }
 
+struct SkillCategory {
+    name: String,
+    skills: Vec<String>,
+}
+
+struct Education {
+    degree: String,
+    institution: String,
+    location: Option<String>,
+}
+
 pub async fn generate_resume(
     db_path: &Path,
     output_dir: &Path,
@@ -69,11 +74,15 @@ pub async fn generate_resume(
     let conn = Connection::open_with_flags(db_path, OpenFlags::SQLITE_OPEN_READ_ONLY)
         .with_context(|| format!("Failed to open database: {}", db_path.display()))?;
 
-    let jobs = load_jobs(&conn)?;
-    let details = load_job_details(&conn)?;
+    let has_resume_columns = has_column(&conn, "jobs", "resume_display");
+
+    let jobs = load_jobs(&conn, has_resume_columns)?;
+    let details = load_job_details(&conn, has_resume_columns)?;
     let competencies = load_competencies(&conn)?;
     let evidence = load_evidence(&conn)?;
     let raw_bio = load_me_bio(&conn)?;
+    let curated_skills = load_curated_skills(&conn).unwrap_or_default();
+    let education = load_education(&conn).unwrap_or_else(|_| default_education());
 
     let summary = match api_key {
         Some(key) => {
@@ -90,32 +99,73 @@ pub async fn generate_resume(
 
     match format {
         ResumeFormat::Chronological => {
-            generate_chronological(&jobs, &details, &summary, output_dir)?;
+            generate_chronological(
+                &jobs,
+                &details,
+                &summary,
+                &curated_skills,
+                &education,
+                output_dir,
+            )?;
         }
         ResumeFormat::Functional => {
             generate_functional(
                 &jobs,
-                &details,
                 &competencies,
                 &evidence,
                 &summary,
+                &curated_skills,
+                &education,
                 output_dir,
             )?;
         }
         ResumeFormat::All => {
-            generate_chronological(&jobs, &details, &summary, output_dir)?;
-            generate_functional(
+            generate_chronological(
                 &jobs,
                 &details,
+                &summary,
+                &curated_skills,
+                &education,
+                output_dir,
+            )?;
+            generate_functional(
+                &jobs,
                 &competencies,
                 &evidence,
                 &summary,
+                &curated_skills,
+                &education,
                 output_dir,
             )?;
         }
     }
 
     Ok(())
+}
+
+fn has_column(conn: &Connection, table: &str, column: &str) -> bool {
+    let sql = format!("PRAGMA table_info({})", table);
+    let Ok(mut stmt) = conn.prepare(&sql) else {
+        return false;
+    };
+    stmt.query_map([], |row| row.get::<_, String>(1))
+        .map(|rows| rows.filter_map(|r| r.ok()).any(|name| name == column))
+        .unwrap_or(false)
+}
+
+fn default_education() -> Vec<Education> {
+    vec![
+        Education {
+            degree: "B.S. Computing Sciences & Graphic Design".into(),
+            institution: "University of Central Oklahoma".into(),
+            location: Some("Edmond, OK".into()),
+        },
+        Education {
+            degree: "Certificate, Management & Leadership Skills".into(),
+            institution: "NST, Rockhurst University Continuing Education Center".into(),
+            location: None,
+        },
+    ]
 }
 
 fn check_pandoc() -> anyhow::Result<()> {
@@ -129,13 +179,21 @@ fn check_pandoc() -> anyhow::Result<()> {
     }
 }
 
-fn load_jobs(conn: &Connection) -> anyhow::Result<Vec<Job>> {
-    let mut stmt = conn.prepare(
+fn load_jobs(conn: &Connection, has_resume_columns: bool) -> anyhow::Result<Vec<Job>> {
+    let sql = if has_resume_columns {
         "SELECT id, company, title, start_date, \
          COALESCE(end_date, 'Present') as end_date, summary, \
-         COALESCE(tech_stack, '') as tech_stack \
-         FROM jobs ORDER BY sort_order",
-    )?;
+         COALESCE(tech_stack, '') as tech_stack, \
+         COALESCE(resume_display, 'full') as resume_display \
+         FROM jobs ORDER BY sort_order"
+    } else {
+        "SELECT id, company, title, start_date, \
+         COALESCE(end_date, 'Present') as end_date, summary, \
+         COALESCE(tech_stack, '') as tech_stack, \
+         'full' as resume_display \
+         FROM jobs ORDER BY sort_order"
+    };
+    let mut stmt = conn.prepare(sql)?;
 
     let jobs = stmt
         .query_map([], |row| {
@@ -153,6 +211,7 @@ fn load_jobs(conn: &Connection) -> anyhow::Result<Vec<Job>> {
                 end_date: row.get(4)?,
                 summary: row.get(5)?,
                 tech_stack,
+                resume_display: row.get(7)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -160,11 +219,18 @@ fn load_jobs(conn: &Connection) -> anyhow::Result<Vec<Job>> {
     Ok(jobs)
 }
 
-fn load_job_details(conn: &Connection) -> anyhow::Result<Vec<JobDetail>> {
-    let mut stmt = conn.prepare(
+fn load_job_details(conn: &Connection, has_resume_columns: bool) -> anyhow::Result<Vec<JobDetail>> {
+    let sql = if has_resume_columns {
         "SELECT job_id, detail_text, COALESCE(category, 'responsibility') as category \
-         FROM job_details ORDER BY job_id, sort_order",
-    )?;
+         FROM job_details \
+         WHERE COALESCE(resume_visible, 1) = 1 \
+         ORDER BY job_id, sort_order"
+    } else {
+        "SELECT job_id, detail_text, COALESCE(category, 'responsibility') as category \
+         FROM job_details \
+         ORDER BY job_id, sort_order"
+    };
+    let mut stmt = conn.prepare(sql)?;
 
     let details = stmt
         .query_map([], |row| {
@@ -227,6 +293,54 @@ fn load_me_bio(conn: &Connection) -> anyhow::Result<String> {
     .context("about_sections row with slug='me-bio' not found — DB is missing required data")
 }
 
+fn load_curated_skills(conn: &Connection) -> anyhow::Result<Vec<SkillCategory>> {
+    let mut stmt = conn.prepare(
+        "SELECT sc.name, cs.skill_name \
+         FROM curated_skills cs \
+         JOIN skill_categories sc ON cs.category_id = sc.id \
+         ORDER BY sc.sort_order, cs.sort_order",
+    )?;
+
+    let rows = stmt
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let mut categories: Vec<SkillCategory> = Vec::new();
+    for (cat_name, skill) in rows {
+        if let Some(last) = categories.last_mut() {
+            if last.name == cat_name {
+                last.skills.push(skill);
+                continue;
+            }
+        }
+        categories.push(SkillCategory {
+            name: cat_name,
+            skills: vec![skill],
+        });
+    }
+
+    Ok(categories)
+}
+
+fn load_education(conn: &Connection) -> anyhow::Result<Vec<Education>> {
+    let mut stmt =
+        conn.prepare("SELECT degree, institution, location FROM education ORDER BY sort_order")?;
+
+    let education = stmt
+        .query_map([], |row| {
+            Ok(Education {
+                degree: row.get(0)?,
+                institution: row.get(1)?,
+                location: row.get(2)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(education)
+}
+
 /// Static fallback summary used when `--ai` is absent or the API call fails.
 /// Uses the raw_bio sourced from the DB (about_sections.me-bio) directly.
 fn polish_bio_to_summary_static(raw_bio: &str) -> String {
@@ -277,6 +391,8 @@ fn generate_chronological(
     jobs: &[Job],
     details: &[JobDetail],
     summary: &str,
+    curated_skills: &[SkillCategory],
+    education: &[Education],
     output_dir: &Path,
 ) -> anyhow::Result<()> {
     println!("  Generating chronological resume...");
@@ -286,35 +402,54 @@ fn generate_chronological(
     md.push_str(summary);
     md.push_str("## Experience\n\n");
 
-    // Group details by job_id
     let mut details_by_job: HashMap<i64, Vec<&JobDetail>> = HashMap::new();
     for d in details {
         details_by_job.entry(d.job_id).or_default().push(d);
     }
 
     for job in jobs {
+        match job.resume_display.as_str() {
+            "hidden" => continue,
+            "condensed" => {
+                md.push_str(&format!(
+                    "**{}** — {} ({} – {})\n\n",
+                    job.title, job.company, job.start_date, job.end_date
+                ));
+                continue;
+            }
+            _ => {}
+        }
+
         md.push_str(&format!(
             "### {} — {}\n*{} – {}*\n\n{}\n\n",
             job.title, job.company, job.start_date, job.end_date, job.summary
         ));
 
         if let Some(job_details) = details_by_job.get(&job.id) {
-            // Group by category
             let mut by_cat: HashMap<&str, Vec<&&JobDetail>> = HashMap::new();
             for d in job_details {
                 by_cat.entry(&d.category).or_default().push(d);
             }
 
-            // Category display order
+            let active_cats: Vec<&str> = ["achievement", "responsibility", "sub-engagement"]
+                .iter()
+                .copied()
+                .filter(|c| by_cat.contains_key(c))
+                .collect();
+
+            let use_headers = active_cats.len() > 1;
+
             for cat in &["achievement", "responsibility", "sub-engagement"] {
                 if let Some(items) = by_cat.get(*cat) {
-                    let label = match *cat {
-                        "achievement" => "**Achievements**",
-                        "responsibility" => "**Responsibilities**",
-                        "sub-engagement" => "**Client Engagements**",
-                        _ => cat,
-                    };
-                    md.push_str(&format!("{}\n\n", label));
+                    if use_headers {
+                        let label = match *cat {
+                            "achievement" => "**Achievements**",
+                            "responsibility" => "**Responsibilities**",
+                            "sub-engagement" => "**Client Engagements**",
+                            _ => cat,
+                        };
+                        md.push_str(&format!("{}\n\n", label));
+                    }
                     for item in items {
                         md.push_str(&format!("- {}\n", item.detail_text));
                     }
@@ -333,23 +468,19 @@ fn generate_chronological(
         md.push_str("---\n\n");
     }
 
-    // Aggregate tech skills
-    let all_tech = aggregate_tech(jobs);
-    md.push_str("## Technical Skills\n\n");
-    md.push_str(&all_tech);
-    md.push('\n');
-
-    md.push_str(EDUCATION);
+    render_skills(&mut md, curated_skills, jobs);
+    render_education(&mut md, education);
 
     write_and_convert(&md, output_dir, "chronological")
 }
 
 fn generate_functional(
     jobs: &[Job],
-    _details: &[JobDetail],
     competencies: &[Competency],
     evidence: &[Evidence],
     summary: &str,
+    curated_skills: &[SkillCategory],
+    education: &[Education],
     output_dir: &Path,
 ) -> anyhow::Result<()> {
     println!("  Generating functional resume...");
@@ -358,10 +489,8 @@ fn generate_functional(
     md.push_str(HEADER);
     md.push_str(summary);
 
-    // Build lookup maps
     let job_map: HashMap<i64, &Job> = jobs.iter().map(|j| (j.id, j)).collect();
 
-    // Group evidence by competency
     let mut evidence_by_comp: HashMap<i64, Vec<&Evidence>> = HashMap::new();
     for ev in evidence {
         evidence_by_comp
@@ -373,10 +502,16 @@ fn generate_functional(
     md.push_str("## Core Competencies\n\n");
 
     for comp in competencies {
+        let has_evidence = evidence_by_comp
+            .get(&comp.id)
+            .is_some_and(|evs| evs.iter().any(|e| !e.text.is_empty()));
+        if !has_evidence {
+            continue;
+        }
+
         md.push_str(&format!("### {}\n\n{}\n\n", comp.name, comp.description));
 
         if let Some(evs) = evidence_by_comp.get(&comp.id) {
-            // Group by company
             let mut by_company: HashMap<i64, Vec<&&Evidence>> = HashMap::new();
             for ev in evs {
                 by_company.entry(ev.job_id).or_default().push(ev);
@@ -400,6 +535,9 @@ fn generate_functional(
 
     md.push_str("## Employment History\n\n");
     for job in jobs {
+        if job.resume_display == "hidden" {
+            continue;
+        }
         md.push_str(&format!(
             "- **{}** @ {} ({} – {})\n",
             job.title, job.company, job.start_date, job.end_date
@@ -407,27 +545,44 @@ fn generate_functional(
     }
     md.push('\n');
 
-    let all_tech = aggregate_tech(jobs);
-    md.push_str("## Technical Skills\n\n");
-    md.push_str(&all_tech);
-    md.push('\n');
-
-    md.push_str(EDUCATION);
+    render_skills(&mut md, curated_skills, jobs);
+    render_education(&mut md, education);
 
     write_and_convert(&md, output_dir, "functional")
 }
 
-fn aggregate_tech(jobs: &[Job]) -> String {
-    let mut seen = std::collections::HashSet::new();
-    let mut all: Vec<String> = Vec::new();
-    for job in jobs {
-        for tech in &job.tech_stack {
-            if seen.insert(tech.clone()) {
-                all.push(tech.clone());
-            }
+fn render_skills(md: &mut String, curated_skills: &[SkillCategory], jobs: &[Job]) {
+    md.push_str("## Technical Skills\n\n");
+    if curated_skills.is_empty() {
+        let mut seen = std::collections::HashSet::new();
+        let all: Vec<&str> = jobs
+            .iter()
+            .flat_map(|j| j.tech_stack.iter())
+            .filter(|t| seen.insert(t.as_str()))
+            .map(|t| t.as_str())
+            .collect();
+        md.push_str(&all.join(", "));
+        md.push_str("\n\n");
+    } else {
+        for cat in curated_skills {
+            md.push_str(&format!("**{}:** {}\n\n", cat.name, cat.skills.join(", ")));
         }
     }
-    format!("{}\n", all.join(", "))
+}
+
+fn render_education(md: &mut String, education: &[Education]) {
+    md.push_str("## Education\n\n");
+    for ed in education {
+        if let Some(loc) = &ed.location {
+            md.push_str(&format!(
+                "- **{}** — {}, {}\n",
+                ed.degree, ed.institution, loc
+            ));
+        } else {
+            md.push_str(&format!("- **{}** — {}\n", ed.degree, ed.institution));
+        }
+    }
+    md.push('\n');
 }
 
 fn write_and_convert(md: &str, output_dir: &Path, format_name: &str) -> anyhow::Result<()> {

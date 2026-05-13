@@ -167,3 +167,44 @@ async fn publish(environment: String, dry_run: bool) -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cli_parse_build() {
+        let cli = Cli::try_parse_from(["xtask", "build", "compile"]).unwrap();
+        matches!(cli.command, Commands::Build { .. });
+    }
+
+    #[test]
+    fn test_cli_parse_test() {
+        let cli = Cli::try_parse_from(["xtask", "test", "all"]).unwrap();
+        matches!(cli.command, Commands::Test { .. });
+    }
+
+    #[test]
+    fn test_cli_parse_quality() {
+        let cli = Cli::try_parse_from(["xtask", "quality", "all"]).unwrap();
+        matches!(cli.command, Commands::Quality { .. });
+    }
+
+    #[test]
+    fn test_cli_parse_cache() {
+        let cli = Cli::try_parse_from(["xtask", "cache", "status"]).unwrap();
+        matches!(cli.command, Commands::Cache { .. });
+    }
+
+    #[test]
+    fn test_cli_parse_publish_dry() {
+        let cli = Cli::try_parse_from(["xtask", "publish", "dev", "--dry-run"]).unwrap();
+        matches!(cli.command, Commands::Publish { .. });
+    }
+
+    #[test]
+    fn test_cli_parse_publish_no_dry() {
+        let cli = Cli::try_parse_from(["xtask", "publish", "prod"]).unwrap();
+        matches!(cli.command, Commands::Publish { .. });
+    }
+}

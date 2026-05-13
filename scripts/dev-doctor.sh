@@ -13,9 +13,9 @@ PASS=0
 FAIL=0
 WARN=0
 
-ok()   { echo -e "  ${GREEN}✓${NC} $*"; ((PASS++)); }
-fail() { echo -e "  ${RED}✗${NC} $*"; ((FAIL++)); }
-warn() { echo -e "  ${YELLOW}~${NC} $*"; ((WARN++)); }
+ok()   { echo -e "  ${GREEN}✓${NC} $*"; PASS=$((PASS + 1)); }
+fail() { echo -e "  ${RED}✗${NC} $*"; FAIL=$((FAIL + 1)); }
+warn() { echo -e "  ${YELLOW}~${NC} $*"; WARN=$((WARN + 1)); }
 
 echo ""
 echo "deploy-baba dev-doctor"
