@@ -214,6 +214,55 @@ impl IntoResponse for ApiError {
     }
 }
 
+// ── Deprecation Middleware (ADR-024) ────────────────────────────────────────
+
+/// Adds deprecation headers to responses for sunset API versions.
+///
+/// When a version is deprecated, this middleware adds:
+/// - `X-API-Deprecated: true` — indicates the version is deprecated
+/// - `Sunset: <date>` — when the version will be removed
+/// - `X-API-Replacement: <path>` — the new version path
+///
+/// Example headers for a deprecated v1 endpoint:
+/// ```text
+/// X-API-Deprecated: true
+/// Sunset: 2027-01-01
+/// X-API-Replacement: /api/v2/jobs
+/// ```
+///
+/// # Usage
+/// ```rust,ignore
+/// .route_layer(axum::middleware::from_fn(deprecation_middleware))
+/// ```
+pub async fn deprecation_middleware(req: Request, next: Next) -> Response {
+    let response = next.run(req).await;
+
+    // Check if the request path contains a deprecated version
+    // For now, no versions are deprecated (v1 is current)
+    // This will be updated when v2 is introduced and v1 is sunset
+    //
+    // TODO: When v1 is deprecated:
+    // 1. Add `mut` back to: let mut response = next.run(req).await;
+    // 2. Uncomment the following:
+    // let path = req.uri().path();
+    // if path.starts_with("/api/v1/") {
+    //     response.headers_mut().insert(
+    //         "X-API-Deprecated",
+    //         HeaderValue::from_static("true"),
+    //     );
+    //     response.headers_mut().insert(
+    //         "Sunset",
+    //         HeaderValue::from_static("2027-01-01"),
+    //     );
+    //     response.headers_mut().insert(
+    //         "X-API-Replacement",
+    //         HeaderValue::from_static("/api/v2"),
+    //     );
+    // }
+
+    response
+}
+
 /// In-memory rate limiter using sliding window algorithm
 /// Key format: "client_ip:endpoint"
 #[cfg(test)]
@@ -670,5 +719,13 @@ mod version_tests {
         // Ensure UnsupportedVersion variant is constructed (dead code fix)
         let error = ApiError::UnsupportedVersion("v999".to_string());
         assert!(error.to_string().contains("v999"));
+    }
+
+    #[test]
+    fn test_api_version_struct_debug() {
+        let version = ApiVersion::new(1, 0);
+        let debug = format!("{:?}", version);
+        assert!(debug.contains("1"));
+        assert!(debug.contains("0"));
     }
 }

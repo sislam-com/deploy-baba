@@ -103,7 +103,7 @@ async fn test_admin_requires_auth() {
     let app = build(state);
 
     let request = Request::builder()
-        .uri("/api/admin/jobs")
+        .uri("/api/v1/admin/jobs")
         .body(Body::empty())
         .unwrap();
 
@@ -134,7 +134,7 @@ async fn test_public_api_accessible() {
     let app = build(state);
 
     let request = Request::builder()
-        .uri("/api/about")
+        .uri("/api/v1/about")
         .body(Body::empty())
         .unwrap();
 

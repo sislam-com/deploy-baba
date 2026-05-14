@@ -5,6 +5,8 @@
 /// utoipa v5 but this workspace uses v4. Migration is tracked as W-APIO.4.4 and
 /// deferred until the workspace upgrades to utoipa v5. For now we keep the
 /// hand-maintained list; all *schema types* come from `api_openapi::models`.
+use std::collections::HashMap;
+
 use utoipa::{
     openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme},
     Modify, OpenApi,
@@ -28,6 +30,46 @@ impl Modify for SecurityAddon {
                     .build(),
             ),
         );
+    }
+}
+
+/// API Version Metadata Modifier (ADR-024)
+///
+/// Adds version information and deprecation schedule to the OpenAPI spec.
+/// This enables API consumers to understand versioning and plan migrations.
+pub struct ApiVersionModifier;
+
+impl Modify for ApiVersionModifier {
+    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        // Update API version to reflect URL-based versioning (v1.0.0)
+        openapi.info.version = "1.0.0".to_string();
+
+        // Add version metadata extensions
+        // These help API consumers understand the versioning strategy
+        let version_metadata = serde_json::json!({
+            "x-api-versioning": {
+                "strategy": "url-path",
+                "current": "v1",
+                "deprecated": [],
+                "sunset": null,
+                "documentation": "https://sislam.com/docs/api-versioning"
+            }
+        });
+
+        // Convert serde_json::Map to HashMap for utoipa compatibility
+        let mut extensions: HashMap<String, serde_json::Value> = HashMap::new();
+        for (key, value) in version_metadata.as_object().unwrap() {
+            extensions.insert(key.clone(), value.clone());
+        }
+
+        // Merge into existing extensions or set new ones
+        if let Some(existing) = openapi.info.extensions.as_mut() {
+            for (key, value) in extensions {
+                existing.insert(key, value);
+            }
+        } else {
+            openapi.info.extensions = Some(extensions);
+        }
     }
 }
 
@@ -141,7 +183,7 @@ impl Modify for SecurityAddon {
         api_openapi::models::TailorResponse,
         api_openapi::models::MatchedBullet,
     )),
-    modifiers(&SecurityAddon),
+    modifiers(&SecurityAddon, &ApiVersionModifier),
     tags(
         (name = "health", description = "Service health checks"),
         (name = "crates", description = "deploy-baba crate information"),

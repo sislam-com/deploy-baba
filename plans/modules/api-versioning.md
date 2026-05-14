@@ -1,5 +1,5 @@
 # W-VER: api-versioning
-**Path:** `services/ui/src/middleware/`, `services/ui/src/router.rs` | **Status:** In Progress
+**Path:** `services/ui/src/middleware/`, `services/ui/src/router.rs` | **Status:** Done
 **Coverage floor:** 80% | **Depends on:** W-UI, W-APIO | **Depended on by:** W-OBS, W-RES
 
 ---
@@ -114,10 +114,10 @@ impl Modify for ApiVersionModifier {
 
 | ID | Task | Status | Notes |
 |----|------|--------|-------|
-| W-VER.4.1 | Create version extraction middleware | TODO | Parse `ApiVersion` from URL path, error handling |
-| W-VER.4.2 | Add deprecation headers middleware | TODO | Sunset headers, replacement endpoint headers |
-| W-VER.4.3 | Update router structure for version nesting | TODO | `/api/v1/` nesting, fallback handler |
-| W-VER.4.4 | Add OpenAPI version metadata | TODO | ApiVersionModifier, deprecation schedule in spec |
+| W-VER.4.1 | Create version extraction middleware | Done | Parse `ApiVersion` from URL path, error handling |
+| W-VER.4.2 | Add deprecation headers middleware | Done | Sunset headers, replacement endpoint headers (template ready) |
+| W-VER.4.3 | Update router structure for version nesting | Done | `/api/v1/` nesting, fallback handler, redirects |
+| W-VER.4.4 | Add OpenAPI version metadata | Done | ApiVersionModifier, deprecation schedule in spec |
 
 ---
 
