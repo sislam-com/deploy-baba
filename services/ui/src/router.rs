@@ -37,7 +37,7 @@ pub fn build(state: AppState) -> Router {
         .route("/api/contact", post(routes::contact::contact_submit))
         // ── Resume file downloads ────────────────────────────────────────────
         .nest_service("/resume", ServeDir::new("target/resume"))
-        // ── API routes ───────────────────────────────────────────────────────
+        // ── API routes ─────────────────────────────────────────────────────────
         .nest("/api", routes::api::router())
         .nest("/api/admin", admin_routes)
         // ── Auth routes (server-side Cognito redirects) ─────────────────────

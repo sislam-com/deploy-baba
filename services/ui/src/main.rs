@@ -12,14 +12,16 @@ use tower::ServiceExt as _;
 mod auth;
 mod db;
 mod middleware;
+
 mod openapi;
 mod router;
 mod routes;
 mod state;
+mod telemetry;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    tracing_subscriber::fmt().without_time().init();
+    telemetry::init_telemetry();
 
     let db_path = std::env::var("DB_PATH").unwrap_or_else(|_| "deploy-baba.db".to_string());
     let db = Arc::new(db::Db::open(&db_path)?);

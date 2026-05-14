@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use crate::auth::AuthConfig;
 use crate::db::Db;
+
 use rag_sqlite::RagStore;
 
 /// Top-level application state threaded through all routes.

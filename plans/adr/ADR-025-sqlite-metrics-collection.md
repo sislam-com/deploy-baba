@@ -1,7 +1,7 @@
 # ADR-025: SQLite-Based Metrics Collection
 
 **Date:** 2026-05-14
-**Status:** Proposed
+**Status:** Accepted
 **Affected modules:** W-OBS, W-UI, W-RAG
 
 ## Context

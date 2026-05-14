@@ -5,10 +5,12 @@
 pub mod auth;
 pub mod db;
 pub mod middleware;
+
 pub mod openapi;
 pub mod router;
 pub mod routes;
 pub mod state;
+pub mod telemetry;
 
 // Re-export commonly used types
 pub use router::build;

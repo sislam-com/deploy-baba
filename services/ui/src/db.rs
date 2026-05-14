@@ -106,6 +106,10 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "025_resume_content_polish",
         include_str!("../migrations/025_resume_content_polish.sql"),
     ),
+    (
+        "026_metrics_tables",
+        include_str!("../migrations/026_metrics_tables.sql"),
+    ),
 ];
 
 /// Re-exported from `api_openapi::models::social` — the canonical SSOT.
