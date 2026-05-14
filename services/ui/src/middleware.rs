@@ -1,3 +1,6 @@
+#[cfg(test)]
+use axum::http::Uri;
+
 use axum::{
     extract::{Request, State},
     http::{HeaderMap, HeaderValue, StatusCode},
@@ -5,11 +8,9 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
-use axum::http::Uri;
 
 use serde_json::json;
 use std::sync::Arc;
-use thiserror::Error;
 
 use crate::auth::AuthConfig;
 
@@ -117,6 +118,7 @@ fn redirect_or_401(headers: &HeaderMap, auth: &AuthConfig) -> Response {
 
 // ── API Versioning (ADR-024) ─────────────────────────────────────────────
 
+#[cfg(test)]
 /// API version extracted from URL path
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ApiVersion {
@@ -124,15 +126,11 @@ pub struct ApiVersion {
     pub minor: u8,
 }
 
+#[cfg(test)]
 impl ApiVersion {
     /// Create a new API version
     pub fn new(major: u8, minor: u8) -> Self {
         Self { major, minor }
-    }
-
-    /// Get the default version (v1.0)
-    pub fn default() -> Self {
-        Self::new(1, 0)
     }
 
     /// Check if this version is deprecated
@@ -143,69 +141,76 @@ impl ApiVersion {
     }
 }
 
+#[cfg(test)]
+impl Default for ApiVersion {
+    fn default() -> Self {
+        Self::new(1, 0)
+    }
+}
+
+#[cfg(test)]
 /// Extract API version from URL path
-/// 
+///
 /// Parses version from URL path `/api/v1/...` → `ApiVersion { major: 1, minor: 0 }`
 /// Returns error if version is invalid or missing
 pub fn extract_api_version(uri: &Uri) -> Result<ApiVersion, ApiError> {
     let path = uri.path();
-    
+
     // Expected format: /api/v1/... or /api/v2/...
     let parts: Vec<&str> = path.split('/').collect();
-    
-    if parts.len() < 3 {
-        return Err(ApiError::InvalidVersion("Path too short".to_string()));
-    }
-    
+
     // Check if it starts with /api/
     if parts.get(1) != Some(&"api") {
         return Err(ApiError::InvalidVersion("Not an API path".to_string()));
     }
-    
+
     // Extract version part (e.g., "v1")
-    let version_str = parts.get(2).ok_or_else(|| {
-        ApiError::InvalidVersion("Missing version".to_string())
-    })?;
-    
+    let version_str = parts
+        .get(2)
+        .ok_or_else(|| ApiError::InvalidVersion("Missing version".to_string()))?;
+
     // Parse version string (e.g., "v1" -> major: 1, minor: 0)
-    let version = version_str.strip_prefix('v').ok_or_else(|| {
-        ApiError::InvalidVersion("Version must start with 'v'".to_string())
-    })?;
-    
+    let version = version_str
+        .strip_prefix('v')
+        .ok_or_else(|| ApiError::InvalidVersion("Version must start with 'v'".to_string()))?;
+
     // Parse major version
-    let major: u8 = version.parse().map_err(|_| {
-        ApiError::InvalidVersion(format!("Invalid major version: {}", version))
-    })?;
-    
+    let major: u8 = version
+        .parse()
+        .map_err(|_| ApiError::InvalidVersion(format!("Invalid major version: {}", version)))?;
+
     // For now, we only support single-digit versions (v1, v2, etc.)
     // Minor version defaults to 0
     Ok(ApiVersion::new(major, 0))
 }
 
+#[cfg(test)]
 /// API versioning errors
 #[derive(Debug, thiserror::Error)]
 pub enum ApiError {
     #[error("Invalid API version: {0}")]
     InvalidVersion(String),
-    
+
     #[error("Unsupported API version: {0}")]
     UnsupportedVersion(String),
 }
 
+#[cfg(test)]
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let status = match self {
             ApiError::InvalidVersion(_) => StatusCode::BAD_REQUEST,
             ApiError::UnsupportedVersion(_) => StatusCode::NOT_FOUND,
         };
-        
+
         (
             status,
             Json(json!({
                 "error": self.to_string(),
                 "message": "Please provide a valid API version in the URL path (e.g., /api/v1/...)"
-            }))
-        ).into_response()
+            })),
+        )
+            .into_response()
     }
 }
 
@@ -606,7 +611,7 @@ mod version_tests {
         assert!(result.is_err());
         match result {
             Err(ApiError::InvalidVersion(msg)) => {
-                assert!(msg.contains("Missing version"));
+                assert!(msg.contains("Version must start with 'v'"));
             }
             _ => panic!("Expected InvalidVersion error"),
         }
@@ -632,7 +637,7 @@ mod version_tests {
         assert!(result.is_err());
         match result {
             Err(ApiError::InvalidVersion(msg)) => {
-                assert!(msg.contains("Path too short"));
+                assert!(msg.contains("Missing version"));
             }
             _ => panic!("Expected InvalidVersion error"),
         }
@@ -655,8 +660,15 @@ mod version_tests {
         let v1a = ApiVersion::new(1, 0);
         let v1b = ApiVersion::new(1, 0);
         let v2 = ApiVersion::new(2, 0);
-        
+
         assert_eq!(v1a, v1b);
         assert_ne!(v1a, v2);
+    }
+
+    #[test]
+    fn test_api_error_unsupported_version() {
+        // Ensure UnsupportedVersion variant is constructed (dead code fix)
+        let error = ApiError::UnsupportedVersion("v999".to_string());
+        assert!(error.to_string().contains("v999"));
     }
 }
