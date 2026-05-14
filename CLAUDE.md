@@ -73,7 +73,7 @@ Update `git.sha`, `last_updated`, and the relevant component's `git_sha_at_scan`
 
 - **Name:** shantopagla
 - **Email:** it@shantopagla.com
-- **GitHub:** shantopagla
+- **GitHub:** sislam-com
 - **Primary Language:** Rust (also uses TypeScript/Node.js, Python)
 - **Cloud Platform:** AWS (us-east-1)
 - **OS:** macOS
@@ -160,6 +160,10 @@ Key commands:
 - **ADR-007:** OpenTofu over Terraform — `tofu` CLI binary, MPL-2.0
 - **ADR-008:** Cognito hosted UI auth — implicit grant, JWKS from env, HttpOnly cookie, dev-mode bypass
 - **ADR-009:** API Gateway HTTP API for `POST /api/contact` only — OAC body hash workaround
+- **ADR-024:** API Versioning Strategy — URL-based versioning with Function URL routing; deprecation headers
+- **ADR-025:** SQLite-Based Metrics Collection — Zero-cost observability via SQLite metrics tables
+- **ADR-026:** Code-Level Resilience Patterns — In-memory rate limiting; retry; circuit breaker
+- **ADR-027:** Module-Based Service Decomposition — Logical separation within single Lambda
 
 ### Stack Config (`stack.toml`)
 
@@ -185,9 +189,9 @@ Entry point: `plans/INDEX.md` — lists all modules, ADRs, cross-cutting concern
 **The plan system is the single source of truth for project state.** Keep it updated.
 
 Structure under `plans/`:
-- `modules/` — per-component plans (30 modules incl. ai-dlc, ci, web, dev-environment)
-- `adr/` — architecture decision records (ADR-001 through ADR-022)
-- `cross-cutting/` — 10 shared concern files (incl. ai-dlc.md, initial-setup.md)
+- `modules/` — per-component plans (34 modules incl. ai-dlc, ci, web, dev-environment, api-versioning, observability, resilience, module-decomposition)
+- `adr/` — architecture decision records (ADR-001 through ADR-027)
+- `cross-cutting/` — 11 shared concern files (incl. ai-dlc.md, initial-setup.md, zero-cost-microservices.md)
 - `drift/` — drift logs (format: `DRL-YYYY-MM-DD-topic`)
 
 AI-DLC session lifecycle: `plans/cross-cutting/ai-dlc.md` — covers the 6 stages (Startup → Planning → Implementation → Verification → Maintenance → Commit). Run `/plan-sync` at the end of any implementation session to sync module Status fields, INDEX.md, and ADR back-references.
