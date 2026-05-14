@@ -5,9 +5,11 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
+use axum::http::Uri;
 
 use serde_json::json;
 use std::sync::Arc;
+use thiserror::Error;
 
 use crate::auth::AuthConfig;
 
@@ -110,6 +112,100 @@ fn redirect_or_401(headers: &HeaderMap, auth: &AuthConfig) -> Response {
             HeaderValue::from_str(&location).unwrap_or_else(|_| HeaderValue::from_static("/")),
         );
         (StatusCode::FOUND, resp_headers).into_response()
+    }
+}
+
+// ── API Versioning (ADR-024) ─────────────────────────────────────────────
+
+/// API version extracted from URL path
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ApiVersion {
+    pub major: u8,
+    pub minor: u8,
+}
+
+impl ApiVersion {
+    /// Create a new API version
+    pub fn new(major: u8, minor: u8) -> Self {
+        Self { major, minor }
+    }
+
+    /// Get the default version (v1.0)
+    pub fn default() -> Self {
+        Self::new(1, 0)
+    }
+
+    /// Check if this version is deprecated
+    pub fn is_deprecated(&self) -> bool {
+        // For now, no versions are deprecated
+        // This will be updated when v2 is introduced
+        false
+    }
+}
+
+/// Extract API version from URL path
+/// 
+/// Parses version from URL path `/api/v1/...` → `ApiVersion { major: 1, minor: 0 }`
+/// Returns error if version is invalid or missing
+pub fn extract_api_version(uri: &Uri) -> Result<ApiVersion, ApiError> {
+    let path = uri.path();
+    
+    // Expected format: /api/v1/... or /api/v2/...
+    let parts: Vec<&str> = path.split('/').collect();
+    
+    if parts.len() < 3 {
+        return Err(ApiError::InvalidVersion("Path too short".to_string()));
+    }
+    
+    // Check if it starts with /api/
+    if parts.get(1) != Some(&"api") {
+        return Err(ApiError::InvalidVersion("Not an API path".to_string()));
+    }
+    
+    // Extract version part (e.g., "v1")
+    let version_str = parts.get(2).ok_or_else(|| {
+        ApiError::InvalidVersion("Missing version".to_string())
+    })?;
+    
+    // Parse version string (e.g., "v1" -> major: 1, minor: 0)
+    let version = version_str.strip_prefix('v').ok_or_else(|| {
+        ApiError::InvalidVersion("Version must start with 'v'".to_string())
+    })?;
+    
+    // Parse major version
+    let major: u8 = version.parse().map_err(|_| {
+        ApiError::InvalidVersion(format!("Invalid major version: {}", version))
+    })?;
+    
+    // For now, we only support single-digit versions (v1, v2, etc.)
+    // Minor version defaults to 0
+    Ok(ApiVersion::new(major, 0))
+}
+
+/// API versioning errors
+#[derive(Debug, thiserror::Error)]
+pub enum ApiError {
+    #[error("Invalid API version: {0}")]
+    InvalidVersion(String),
+    
+    #[error("Unsupported API version: {0}")]
+    UnsupportedVersion(String),
+}
+
+impl IntoResponse for ApiError {
+    fn into_response(self) -> Response {
+        let status = match self {
+            ApiError::InvalidVersion(_) => StatusCode::BAD_REQUEST,
+            ApiError::UnsupportedVersion(_) => StatusCode::NOT_FOUND,
+        };
+        
+        (
+            status,
+            Json(json!({
+                "error": self.to_string(),
+                "message": "Please provide a valid API version in the URL path (e.g., /api/v1/...)"
+            }))
+        ).into_response()
     }
 }
 
@@ -468,5 +564,99 @@ mod tests {
 
         // Request should be allowed again after window expires
         assert!(limiter.check("test").await);
+    }
+}
+
+#[cfg(test)]
+mod version_tests {
+    use super::*;
+    use axum::http::Uri;
+
+    #[test]
+    fn test_extract_api_version_v1() {
+        let uri = Uri::from_static("/api/v1/jobs");
+        let version = extract_api_version(&uri).unwrap();
+        assert_eq!(version, ApiVersion::new(1, 0));
+    }
+
+    #[test]
+    fn test_extract_api_version_v2() {
+        let uri = Uri::from_static("/api/v2/jobs");
+        let version = extract_api_version(&uri).unwrap();
+        assert_eq!(version, ApiVersion::new(2, 0));
+    }
+
+    #[test]
+    fn test_extract_api_version_invalid_path() {
+        let uri = Uri::from_static("/jobs");
+        let result = extract_api_version(&uri);
+        assert!(result.is_err());
+        match result {
+            Err(ApiError::InvalidVersion(msg)) => {
+                assert!(msg.contains("Not an API path"));
+            }
+            _ => panic!("Expected InvalidVersion error"),
+        }
+    }
+
+    #[test]
+    fn test_extract_api_version_missing_version() {
+        let uri = Uri::from_static("/api/jobs");
+        let result = extract_api_version(&uri);
+        assert!(result.is_err());
+        match result {
+            Err(ApiError::InvalidVersion(msg)) => {
+                assert!(msg.contains("Missing version"));
+            }
+            _ => panic!("Expected InvalidVersion error"),
+        }
+    }
+
+    #[test]
+    fn test_extract_api_version_invalid_format() {
+        let uri = Uri::from_static("/api/invalid/jobs");
+        let result = extract_api_version(&uri);
+        assert!(result.is_err());
+        match result {
+            Err(ApiError::InvalidVersion(msg)) => {
+                assert!(msg.contains("must start with 'v'"));
+            }
+            _ => panic!("Expected InvalidVersion error"),
+        }
+    }
+
+    #[test]
+    fn test_extract_api_version_path_too_short() {
+        let uri = Uri::from_static("/api");
+        let result = extract_api_version(&uri);
+        assert!(result.is_err());
+        match result {
+            Err(ApiError::InvalidVersion(msg)) => {
+                assert!(msg.contains("Path too short"));
+            }
+            _ => panic!("Expected InvalidVersion error"),
+        }
+    }
+
+    #[test]
+    fn test_api_version_default() {
+        let version = ApiVersion::default();
+        assert_eq!(version, ApiVersion::new(1, 0));
+    }
+
+    #[test]
+    fn test_api_version_is_deprecated() {
+        let v1 = ApiVersion::new(1, 0);
+        assert!(!v1.is_deprecated());
+    }
+
+    #[test]
+    fn test_api_version_equality() {
+        let v1a = ApiVersion::new(1, 0);
+        let v1b = ApiVersion::new(1, 0);
+        let v2 = ApiVersion::new(2, 0);
+        
+        assert_eq!(v1a, v1b);
+        assert_ne!(v1a, v2);
     }
 }

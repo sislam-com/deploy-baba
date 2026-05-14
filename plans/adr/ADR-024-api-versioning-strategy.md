@@ -1,7 +1,7 @@
 # ADR-024: API Versioning Strategy
 
 **Date:** 2026-05-14
-**Status:** Proposed
+**Status:** Accepted
 **Affected modules:** W-VER, W-UI, W-APIO, W-OBS
 
 ## Context

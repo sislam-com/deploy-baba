@@ -37,7 +37,10 @@ pub fn build(state: AppState) -> Router {
         .route("/api/contact", post(routes::contact::contact_submit))
         // ── Resume file downloads ────────────────────────────────────────────
         .nest_service("/resume", ServeDir::new("target/resume"))
-        // ── API routes ─────────────────────────────────────────────────────────
+        // ── API versioning (ADR-024) ─────────────────────────────────────────
+        // Phase 1: Version extraction middleware added, routes unchanged
+        // Future: Migrate to /api/v1/ structure with backward-compatible redirects
+        // ── API routes (current unversioned, will migrate to /api/v1/ in Phase 2) ─
         .nest("/api", routes::api::router())
         .nest("/api/admin", admin_routes)
         // ── Auth routes (server-side Cognito redirects) ─────────────────────
