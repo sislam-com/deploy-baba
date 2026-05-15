@@ -273,7 +273,10 @@ let secret = secrets_manager
 ## Implementation Roadmap
 
 ### Phase 1: Foundation (P0)
-- [ ] W-VER.4.1: Version extraction middleware
+- [x] ~~W-VER.4.1~~: Version extraction middleware — **DONE**
+- [x] ~~W-VER.4.2~~: Deprecation headers middleware — **DONE**
+- [x] ~~W-VER.4.3~~: Router structure for version nesting — **DONE**
+- [x] ~~W-VER.4.4~~: OpenAPI version metadata — **DONE**
 - [ ] W-OBS.4.1: Telemetry initialization
 - [ ] W-OBS.4.2: SQLite metrics tables
 
@@ -288,7 +291,6 @@ let secret = secrets_manager
 - [ ] W-MOD.4.3: Extract RAG module
 
 ### Phase 4: Advanced Features (P3)
-- [ ] W-VER.4.4: OpenAPI version metadata
 - [ ] W-OBS.4.4: Metrics query endpoint
 - [ ] W-MOD.4.6: Module-specific metrics
 

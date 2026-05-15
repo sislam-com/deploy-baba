@@ -2,7 +2,7 @@
   "_meta": {
     "description": "Global agent cache for deploy-baba. Claude reads this on startup to avoid re-exploring unchanged code.",
     "generated_by": "just cache-refresh",
-    "last_updated": "2026-05-14",
+    "last_updated": "2026-05-15",
     "schema_version": "1.0.0",
     "usage": "Check git.sha against `git rev-parse HEAD`. If match: use cached data. If mismatch: re-scan changed components only, then update this file."
   },
@@ -29,7 +29,10 @@
     "ADR-020": "GitHub Actions CI with OIDC",
     "ADR-021": "Automated Release Tagging via xtask",
     "ADR-022": "Developer First-Run Environment",
-    "ADR-023": "Agentic Tool-Dispatch Architecture"
+    "ADR-023": "Agentic Tool-Dispatch Architecture",
+    "ADR-024": "API Versioning Strategy — URL-based versioning with Function URL routing; version extraction middleware; deprecation headers; OpenAPI version metadata (Accepted 2026-05-14)",
+    "ADR-025": "SQLite-Based Metrics Collection — Zero-cost observability via SQLite metrics tables; structured logging with tracing; p50/p95/p99 latency calculation (Accepted 2026-05-14)",
+    "ADR-026": "Code-Level Resilience Patterns — In-memory rate limiting; retry with exponential backoff; circuit breaker for LLM calls; request validation middleware (Accepted)"
   },
   "crates": {
     "api-core": {
@@ -50,7 +53,7 @@
         "default",
         "validation"
       ],
-      "git_sha_at_scan": "8a5ea10def27bd438b27b85d6e4c362c3fd224fd",
+      "git_sha_at_scan": "ae5bcd6d9f030456d5c509556b2247442347c827",
       "key_files": [
         "src/lib.rs"
       ],
@@ -71,7 +74,7 @@
       ],
       "description": "GraphQL schema generator implementing api-core traits",
       "features": [],
-      "git_sha_at_scan": "8a5ea10def27bd438b27b85d6e4c362c3fd224fd",
+      "git_sha_at_scan": "ae5bcd6d9f030456d5c509556b2247442347c827",
       "key_files": [
         "src/lib.rs"
       ],
@@ -92,7 +95,7 @@
       ],
       "description": "gRPC/Protocol Buffer schema generator implementing api-core traits",
       "features": [],
-      "git_sha_at_scan": "8a5ea10def27bd438b27b85d6e4c362c3fd224fd",
+      "git_sha_at_scan": "ae5bcd6d9f030456d5c509556b2247442347c827",
       "key_files": [
         "src/lib.rs"
       ],
@@ -116,7 +119,7 @@
       ],
       "description": "Multi-format API specification merging with conflict resolution",
       "features": [],
-      "git_sha_at_scan": "8a5ea10def27bd438b27b85d6e4c362c3fd224fd",
+      "git_sha_at_scan": "ae5bcd6d9f030456d5c509556b2247442347c827",
       "key_files": [
         "src/lib.rs"
       ],
@@ -139,7 +142,7 @@
       ],
       "description": "OpenAPI 3.0 specification generator implementing api-core traits",
       "features": [],
-      "git_sha_at_scan": "8a5ea10def27bd438b27b85d6e4c362c3fd224fd",
+      "git_sha_at_scan": "ae5bcd6d9f030456d5c509556b2247442347c827",
       "key_files": [
         "src/lib.rs"
       ],
@@ -164,7 +167,7 @@
         "default",
         "validation"
       ],
-      "git_sha_at_scan": "8a5ea10def27bd438b27b85d6e4c362c3fd224fd",
+      "git_sha_at_scan": "ae5bcd6d9f030456d5c509556b2247442347c827",
       "key_files": [
         "src/lib.rs"
       ],
@@ -183,7 +186,7 @@
       "dependents": [],
       "description": "JSON implementation of config-core universal traits",
       "features": [],
-      "git_sha_at_scan": "8a5ea10def27bd438b27b85d6e4c362c3fd224fd",
+      "git_sha_at_scan": "ae5bcd6d9f030456d5c509556b2247442347c827",
       "key_files": [
         "src/lib.rs"
       ],
@@ -204,7 +207,7 @@
       ],
       "description": "TOML implementation of config-core universal traits",
       "features": [],
-      "git_sha_at_scan": "8a5ea10def27bd438b27b85d6e4c362c3fd224fd",
+      "git_sha_at_scan": "ae5bcd6d9f030456d5c509556b2247442347c827",
       "key_files": [
         "src/lib.rs"
       ],
@@ -223,7 +226,7 @@
       "dependents": [],
       "description": "YAML implementation of config-core universal traits",
       "features": [],
-      "git_sha_at_scan": "8a5ea10def27bd438b27b85d6e4c362c3fd224fd",
+      "git_sha_at_scan": "ae5bcd6d9f030456d5c509556b2247442347c827",
       "key_files": [
         "src/lib.rs"
       ],
@@ -246,7 +249,7 @@
         "default",
         "config (optional: config-core)"
       ],
-      "git_sha_at_scan": "8a5ea10def27bd438b27b85d6e4c362c3fd224fd",
+      "git_sha_at_scan": "ae5bcd6d9f030456d5c509556b2247442347c827",
       "key_files": [
         "src/lib.rs"
       ],
@@ -260,7 +263,7 @@
     "backup": "S3 via EventBridge schedule",
     "engine": "SQLite (rusqlite 0.32 bundled)",
     "file": "deploy-baba.db",
-    "git_sha_at_scan": "8a5ea10def27bd438b27b85d6e4c362c3fd224fd",
+    "git_sha_at_scan": "ae5bcd6d9f030456d5c509556b2247442347c827",
     "latest_migrations": [
       "012_update_about_sections (W-ABT — superseded split convention; ADR-010 upsert applies to new migrations)",
       "013_align_linkedin_profile (W-LINK — ADR-010 upsert to update LinkedIn URL)",
@@ -273,14 +276,14 @@
   },
   "git": {
     "branch": "feat/versioning-rag",
-    "last_commit": "Plans for versioning and metrics",
+    "last_commit": "feat: implement API versioning (ADR-024)",
     "remote": "git@github.com:shantopagla/deploy-baba.git",
-    "sha": "8a5ea10def27bd438b27b85d6e4c362c3fd224fd",
-    "short_sha": "8a5ea10"
+    "sha": "ae5bcd6d9f030456d5c509556b2247442347c827",
+    "short_sha": "ae5bcd6"
   },
   "infra": {
     "aws_region": "us-east-1",
-    "git_sha_at_scan": "8a5ea10def27bd438b27b85d6e4c362c3fd224fd",
+    "git_sha_at_scan": "ae5bcd6d9f030456d5c509556b2247442347c827",
     "key_resources": [
       "Lambda Function URL (ADR-003, no API Gateway)",
       "EFS for SQLite persistence (ADR-002)",
@@ -397,9 +400,9 @@
       "cognito_pool_id": "us-east-1_I7c15vLHE",
       "crate_name": "deploy-baba-ui",
       "database": "rusqlite on EFS (ADR-002)",
-      "description": "Pure JSON API server + SPA static asset host — the Lambda binary (ADR-019)",
+      "description": "Pure JSON API server + SPA static asset host — the Lambda binary (ADR-019). API versioning via /api/v1/ (ADR-024, W-VER DONE)",
       "framework": "axum 0.7",
-      "git_sha_at_scan": "8a5ea10def27bd438b27b85d6e4c362c3fd224fd",
+      "git_sha_at_scan": "ae5bcd6d9f030456d5c509556b2247442347c827",
       "key_files": [
         "src/main.rs",
         "src/router.rs",
@@ -455,7 +458,7 @@
   },
   "xtask": {
     "description": "Internal CLI plumbing — NEVER invoke directly, use `just` (ADR-001)",
-    "git_sha_at_scan": "8a5ea10def27bd438b27b85d6e4c362c3fd224fd",
+    "git_sha_at_scan": "ae5bcd6d9f030456d5c509556b2247442347c827",
     "open_issues": [
       "W-XT.4.2: Remove or wire up EnvironmentInterpolator (dead code)",
       "W-XT.4.3: Implement just infra-bootstrap (creates S3 + DynamoDB + SSM)"
