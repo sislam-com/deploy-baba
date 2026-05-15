@@ -24,6 +24,7 @@ use axum::{
 };
 use llm_anthropic::AnthropicProvider;
 use llm_core::{ChatMessage, GenerationConfig, LlmProvider, LlmRequest, MessageRole};
+use llm_openai::OpenAIProvider;
 use rag_core::{DefaultPromptAssembler, HybridRetriever, PromptAssembler, Retriever};
 use rag_sqlite::RagStore;
 
@@ -72,6 +73,51 @@ pub async fn init_anthropic_key() {
 pub fn get_anthropic_key() -> Option<&'static str> {
     ANTHROPIC_API_KEY.get().and_then(|v| v.as_deref())
 }
+
+// ── OpenAI API key (local dev direct path) ─────────────────────────────────────
+
+static OPENAI_API_KEY: OnceLock<Option<String>> = OnceLock::new();
+
+pub async fn init_openai_key() {
+    if OPENAI_API_KEY.get().is_some() {
+        return;
+    }
+
+    let value = if let Ok(arn) = std::env::var("OPENAI_API_KEY_ARN") {
+        let config = aws_config::load_from_env().await;
+        let client = aws_sdk_secretsmanager::Client::new(&config);
+        match client.get_secret_value().secret_id(&arn).send().await {
+            Ok(resp) => resp.secret_string().map(|s| {
+                let s = s.trim().to_string();
+                if s.starts_with('{') {
+                    if let Ok(serde_json::Value::Object(map)) = serde_json::from_str(&s) {
+                        if let Some(v) = map.values().next().and_then(|v| v.as_str()) {
+                            return v.to_string();
+                        }
+                    }
+                }
+                s
+            }),
+            Err(e) => {
+                tracing::error!("Failed to fetch OpenAI key from Secrets Manager: {e}");
+                None
+            }
+        }
+    } else {
+        std::env::var("OPENAI_API_KEY").ok()
+    };
+
+    OPENAI_API_KEY.set(value).ok();
+}
+
+pub fn get_openai_key() -> Option<&'static str> {
+    OPENAI_API_KEY.get().and_then(|v| v.as_deref())
+}
+
+// ── Provider selector ───────────────────────────────────────────────────────────
+
+static LLM_PROVIDER: LazyLock<String> =
+    LazyLock::new(|| std::env::var("LLM_PROVIDER").unwrap_or_else(|_| "anthropic".to_string()));
 
 // ── Rate limiter ──────────────────────────────────────────────────────────────
 
@@ -256,16 +302,18 @@ pub async fn ask(
 
     // Dual-mode generation (ADR-004):
     //   Production: invoke llm-proxy Lambda
-    //   Local dev:  call Anthropic directly
+    //   Local dev:  call provider directly
+    let provider_id = LLM_PROVIDER.as_str();
     let proxy_resp = if let Some(fn_name) = proxy_fn_name {
-        invoke_proxy_lambda(&fn_name, &bundle.system_prompt, &bundle.user_message).await?
-    } else {
-        generate_direct(
-            direct_key.unwrap(),
+        invoke_proxy_lambda(
+            &fn_name,
             &bundle.system_prompt,
             &bundle.user_message,
+            provider_id,
         )
         .await?
+    } else {
+        generate_direct(provider_id, &bundle.system_prompt, &bundle.user_message).await?
     };
 
     let latency_ms = pipeline_start.elapsed().as_millis() as i64;
@@ -320,6 +368,7 @@ async fn invoke_proxy_lambda(
     fn_name: &str,
     system_prompt: &str,
     user_message: &str,
+    provider_id: &str,
 ) -> Result<AskProxyResponse, (StatusCode, Json<serde_json::Value>)> {
     let proxy_req = AskProxyRequest {
         system_prompt: system_prompt.to_owned(),
@@ -328,6 +377,7 @@ async fn invoke_proxy_lambda(
         temperature: 0.2,
         tools: vec![],
         api_base_url: std::env::var("PORTFOLIO_API_BASE_URL").ok(),
+        provider: provider_id.to_string(),
     };
 
     let payload_bytes = serde_json::to_vec(&proxy_req).map_err(|e| {
@@ -358,11 +408,37 @@ async fn invoke_proxy_lambda(
 }
 
 async fn generate_direct(
-    api_key: &str,
+    provider_id: &str,
     system_prompt: &str,
     user_message: &str,
 ) -> Result<AskProxyResponse, (StatusCode, Json<serde_json::Value>)> {
-    let provider = AnthropicProvider::new(api_key.to_owned());
+    let provider: Box<dyn LlmProvider> = match provider_id {
+        "anthropic" => {
+            let key = get_anthropic_key().ok_or_else(|| {
+                err(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "Anthropic API key not configured",
+                )
+            })?;
+            Box::new(AnthropicProvider::new(key))
+        }
+        "openai" => {
+            let key = get_openai_key().ok_or_else(|| {
+                err(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "OpenAI API key not configured",
+                )
+            })?;
+            Box::new(OpenAIProvider::new(key))
+        }
+        _ => {
+            return Err(err(
+                StatusCode::BAD_REQUEST,
+                &format!("Unknown provider: {provider_id}"),
+            ))
+        }
+    };
+
     let llm_req = LlmRequest {
         model: provider.default_model().to_owned(),
         messages: vec![ChatMessage::text(MessageRole::User, user_message)],
@@ -388,6 +464,7 @@ async fn generate_direct(
         output_tokens: resp.output_tokens,
         tools_used: vec![],
         turns: 1,
+        provider: provider_id.to_string(),
     })
 }
 

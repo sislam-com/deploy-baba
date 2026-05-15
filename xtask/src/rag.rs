@@ -42,8 +42,8 @@ pub enum RagAction {
         #[arg(long, default_value = "10")]
         top_k: usize,
     },
-    /// Retrieve + generate: retrieve chunks via FTS, assemble grounded prompt, call Claude.
-    /// Requires ANTHROPIC_API_KEY env var.
+    /// Retrieve + generate: retrieve chunks via FTS, assemble grounded prompt, call LLM.
+    /// Requires ANTHROPIC_API_KEY or OPENAI_API_KEY env var depending on provider.
     Ask {
         /// Path to the SQLite database.
         #[arg(long, default_value = "deploy-baba.db")]
@@ -56,6 +56,9 @@ pub enum RagAction {
         /// Max tokens for the LLM response.
         #[arg(long, default_value = "1024")]
         max_tokens: u32,
+        /// LLM provider to use (anthropic or openai).
+        #[arg(long, default_value = "anthropic")]
+        provider: String,
     },
 }
 
@@ -76,7 +79,8 @@ pub async fn execute(action: RagAction) -> anyhow::Result<()> {
             query,
             top_k,
             max_tokens,
-        } => ask_cmd(&db_path, &query, top_k, max_tokens).await,
+            provider,
+        } => ask_cmd(&db_path, &query, top_k, max_tokens, &provider).await,
     }
 }
 
@@ -429,13 +433,29 @@ fn query_social_links(conn: &Connection) -> anyhow::Result<Vec<serde_json::Value
 
 // ── Ask ───────────────────────────────────────────────────────────────────
 
-async fn ask_cmd(db_path: &Path, query: &str, top_k: usize, max_tokens: u32) -> anyhow::Result<()> {
+async fn ask_cmd(
+    db_path: &Path,
+    query: &str,
+    top_k: usize,
+    max_tokens: u32,
+    provider_id: &str,
+) -> anyhow::Result<()> {
     use llm_anthropic::AnthropicProvider;
     use llm_core::{ChatMessage, GenerationConfig, LlmProvider, LlmRequest, MessageRole};
+    use llm_openai::OpenAIProvider;
     use rag_core::{DefaultPromptAssembler, PromptAssembler, Retriever};
 
-    let api_key = std::env::var("ANTHROPIC_API_KEY")
-        .map_err(|_| anyhow::anyhow!("ANTHROPIC_API_KEY env var required for `rag ask`"))?;
+    let api_key = match provider_id {
+        "anthropic" => std::env::var("ANTHROPIC_API_KEY").map_err(|_| {
+            anyhow::anyhow!(
+                "ANTHROPIC_API_KEY env var required for `rag ask` with provider=anthropic"
+            )
+        })?,
+        "openai" => std::env::var("OPENAI_API_KEY").map_err(|_| {
+            anyhow::anyhow!("OPENAI_API_KEY env var required for `rag ask` with provider=openai")
+        })?,
+        _ => return Err(anyhow::anyhow!("Unknown provider: {provider_id}")),
+    };
 
     let top_k = top_k.clamp(1, 20);
 
@@ -454,12 +474,21 @@ async fn ask_cmd(db_path: &Path, query: &str, top_k: usize, max_tokens: u32) -> 
         return Ok(());
     }
 
-    println!("Found {} chunk(s). Calling Claude...\n", chunks.len());
+    println!(
+        "Found {} chunk(s). Calling {}...\n",
+        chunks.len(),
+        provider_id
+    );
 
     let assembler = DefaultPromptAssembler;
     let bundle = assembler.assemble(query, &chunks);
 
-    let provider = AnthropicProvider::new(api_key);
+    let provider: Box<dyn LlmProvider> = match provider_id {
+        "anthropic" => Box::new(AnthropicProvider::new(api_key)),
+        "openai" => Box::new(OpenAIProvider::new(api_key)),
+        _ => return Err(anyhow::anyhow!("Unknown provider: {provider_id}")),
+    };
+
     let req = LlmRequest {
         model: provider.default_model().to_owned(),
         messages: vec![ChatMessage::text(MessageRole::User, bundle.user_message)],

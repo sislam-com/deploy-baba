@@ -38,9 +38,13 @@ async fn main() -> Result<()> {
     tracing::info!("→ PoW secret ready");
 
     routes::api::ask::init_anthropic_key().await;
+    routes::api::ask::init_openai_key().await;
     let has_proxy = std::env::var("LLM_PROXY_LAMBDA_NAME").is_ok();
-    let has_direct = routes::api::ask::get_anthropic_key().is_some();
-    tracing::info!("→ LLM backend: proxy={has_proxy}, direct={has_direct}",);
+    let has_anthropic = routes::api::ask::get_anthropic_key().is_some();
+    let has_openai = routes::api::ask::get_openai_key().is_some();
+    tracing::info!(
+        "→ LLM backend: proxy={has_proxy}, anthropic={has_anthropic}, openai={has_openai}",
+    );
 
     let app_state = state::AppState {
         db,

@@ -3,6 +3,7 @@
 use anyhow::Context;
 use llm_anthropic::AnthropicProvider;
 use llm_core::{ChatMessage, GenerationConfig, LlmProvider, LlmRequest, MessageRole};
+use llm_openai::OpenAIProvider;
 use rusqlite::{Connection, OpenFlags};
 use std::collections::HashMap;
 use std::fs;
@@ -29,8 +30,10 @@ struct Job {
     summary: String,
     tech_stack: Vec<String>,
     resume_display: String,
+    sort_order: i64,
 }
 
+#[allow(dead_code)]
 struct JobDetail {
     job_id: i64,
     detail_text: String,
@@ -65,6 +68,7 @@ pub async fn generate_resume(
     output_dir: &Path,
     format: &ResumeFormat,
     api_key: Option<String>,
+    provider: Option<&str>,
 ) -> anyhow::Result<()> {
     check_pandoc()?;
 
@@ -84,17 +88,26 @@ pub async fn generate_resume(
     let curated_skills = load_curated_skills(&conn).unwrap_or_default();
     let education = load_education(&conn).unwrap_or_else(|_| default_education());
 
-    let summary = match api_key {
-        Some(key) => {
-            println!("  Polishing Professional Summary via Claude...");
-            polish_bio_to_summary_ai(&raw_bio, &key)
+    let summary = match (api_key, provider) {
+        (Some(key), Some(provider_id)) => {
+            println!("  Polishing Professional Summary via {provider_id}...");
+            polish_bio_to_summary_ai(&raw_bio, &key, provider_id)
                 .await
                 .unwrap_or_else(|e| {
                     eprintln!("  Warning: AI polish failed ({e}), using static summary.");
                     polish_bio_to_summary_static(&raw_bio)
                 })
         }
-        None => polish_bio_to_summary_static(&raw_bio),
+        (Some(key), None) => {
+            println!("  Polishing Professional Summary via Claude (default)...");
+            polish_bio_to_summary_ai(&raw_bio, &key, "anthropic")
+                .await
+                .unwrap_or_else(|e| {
+                    eprintln!("  Warning: AI polish failed ({e}), using static summary.");
+                    polish_bio_to_summary_static(&raw_bio)
+                })
+        }
+        (None, _) => polish_bio_to_summary_static(&raw_bio),
     };
 
     match format {
@@ -184,13 +197,15 @@ fn load_jobs(conn: &Connection, has_resume_columns: bool) -> anyhow::Result<Vec<
         "SELECT id, company, title, start_date, \
          COALESCE(end_date, 'Present') as end_date, summary, \
          COALESCE(tech_stack, '') as tech_stack, \
-         COALESCE(resume_display, 'full') as resume_display \
+         COALESCE(resume_display, 'full') as resume_display, \
+         sort_order \
          FROM jobs ORDER BY sort_order"
     } else {
         "SELECT id, company, title, start_date, \
          COALESCE(end_date, 'Present') as end_date, summary, \
          COALESCE(tech_stack, '') as tech_stack, \
-         'full' as resume_display \
+         'full' as resume_display, \
+         sort_order \
          FROM jobs ORDER BY sort_order"
     };
     let mut stmt = conn.prepare(sql)?;
@@ -212,6 +227,7 @@ fn load_jobs(conn: &Connection, has_resume_columns: bool) -> anyhow::Result<Vec<
                 summary: row.get(5)?,
                 tech_stack,
                 resume_display: row.get(7)?,
+                sort_order: row.get(8)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -347,12 +363,20 @@ fn polish_bio_to_summary_static(raw_bio: &str) -> String {
     format!("## Professional Summary\n\n{}\n\n", raw_bio)
 }
 
-/// Calls Claude to rephrase `raw_bio` into a polished resume Professional Summary section.
+/// Calls LLM to rephrase `raw_bio` into a polished resume Professional Summary section.
 ///
 /// Enforces the grounding contract: the model may only rephrase content present in `raw_bio`.
 /// On error, the caller falls back to [`polish_bio_to_summary_static`].
-async fn polish_bio_to_summary_ai(raw_bio: &str, api_key: &str) -> anyhow::Result<String> {
-    let provider = AnthropicProvider::new(api_key);
+async fn polish_bio_to_summary_ai(
+    raw_bio: &str,
+    api_key: &str,
+    provider_id: &str,
+) -> anyhow::Result<String> {
+    let provider: Box<dyn LlmProvider> = match provider_id {
+        "anthropic" => Box::new(AnthropicProvider::new(api_key)),
+        "openai" => Box::new(OpenAIProvider::new(api_key)),
+        _ => return Err(anyhow::anyhow!("Unknown provider: {provider_id}")),
+    };
 
     let system = "You are a professional resume writer. \
         Your task is to rephrase the bio provided by the user into a polished, \
@@ -387,6 +411,17 @@ async fn polish_bio_to_summary_ai(raw_bio: &str, api_key: &str) -> anyhow::Resul
     Ok(format!("## Professional Summary\n\n{polished}\n\n"))
 }
 
+fn bullet_budget(sort_order: i64, display: &str) -> usize {
+    match display {
+        "hidden" => 0,
+        "condensed" => 1,
+        _ => match sort_order {
+            0..=1 => 4,
+            _ => 2,
+        },
+    }
+}
+
 fn generate_chronological(
     jobs: &[Job],
     details: &[JobDetail],
@@ -408,16 +443,23 @@ fn generate_chronological(
     }
 
     for job in jobs {
-        match job.resume_display.as_str() {
-            "hidden" => continue,
-            "condensed" => {
-                md.push_str(&format!(
-                    "**{}** — {} ({} – {})\n\n",
-                    job.title, job.company, job.start_date, job.end_date
-                ));
-                continue;
+        let budget = bullet_budget(job.sort_order, &job.resume_display);
+        if budget == 0 {
+            continue;
+        }
+
+        if job.resume_display == "condensed" {
+            md.push_str(&format!(
+                "**{}** — {} ({} – {})\n\n",
+                job.title, job.company, job.start_date, job.end_date
+            ));
+            if let Some(job_details) = details_by_job.get(&job.id) {
+                for item in job_details.iter().take(budget) {
+                    md.push_str(&format!("- {}\n", item.detail_text));
+                }
+                md.push('\n');
             }
-            _ => {}
+            continue;
         }
 
         md.push_str(&format!(
@@ -426,36 +468,10 @@ fn generate_chronological(
         ));
 
         if let Some(job_details) = details_by_job.get(&job.id) {
-            let mut by_cat: HashMap<&str, Vec<&&JobDetail>> = HashMap::new();
-            for d in job_details {
-                by_cat.entry(&d.category).or_default().push(d);
+            for item in job_details.iter().take(budget) {
+                md.push_str(&format!("- {}\n", item.detail_text));
             }
-
-            let active_cats: Vec<&str> = ["achievement", "responsibility", "sub-engagement"]
-                .iter()
-                .copied()
-                .filter(|c| by_cat.contains_key(c))
-                .collect();
-
-            let use_headers = active_cats.len() > 1;
-
-            for cat in &["achievement", "responsibility", "sub-engagement"] {
-                if let Some(items) = by_cat.get(*cat) {
-                    if use_headers {
-                        let label = match *cat {
-                            "achievement" => "**Achievements**",
-                            "responsibility" => "**Responsibilities**",
-                            "sub-engagement" => "**Client Engagements**",
-                            _ => cat,
-                        };
-                        md.push_str(&format!("{}\n\n", label));
-                    }
-                    for item in items {
-                        md.push_str(&format!("- {}\n", item.detail_text));
-                    }
-                    md.push('\n');
-                }
-            }
+            md.push('\n');
         }
 
         if !job.tech_stack.is_empty() {

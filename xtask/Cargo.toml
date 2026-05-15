@@ -24,6 +24,7 @@ rusqlite = { workspace = true }
 # LLM
 llm-core = { workspace = true }
 llm-anthropic = { workspace = true }
+llm-openai = { workspace = true }
 
 # RAG
 rag-core = { workspace = true }
