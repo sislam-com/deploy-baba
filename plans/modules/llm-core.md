@@ -1,5 +1,5 @@
-# W-LLM: llm-core + llm-anthropic
-**Crates:** `crates/llm-core/`, `crates/llm-anthropic/` | **Status:** WIP
+# W-LLM: llm-core + llm-anthropic + llm-openai
+**Crates:** `crates/llm-core/`, `crates/llm-anthropic/`, `crates/llm-openai/` | **Status:** WIP
 **Coverage floor:** N/A (library crates) | **Depends on:** — | **Depended on by:** W-RST, W-UI (via W-RST)
 
 ---
@@ -8,9 +8,9 @@
 
 Pluggable LLM provider abstraction mirroring the `api-core` + adapter
 pattern used elsewhere in the workspace. `llm-core` defines the vendor-agnostic
-trait surface; `llm-anthropic` is the first concrete implementation. Future
-adapters (`llm-openai`, `llm-bedrock`, `llm-ollama`, `llm-fastembed`) slot in
-as independent crates without touching `services/ui`.
+trait surface; `llm-anthropic` is the first concrete implementation. `llm-openai`
+is the second (added 2026-05-XX). Future adapters (`llm-bedrock`, `llm-ollama`,
+`llm-fastembed`) slot in as independent crates without touching `services/ui`.
 
 The grounding contract — which enforces that the generator may only rephrase
 existing resume bullets, never invent content — is also enforced here in the
@@ -190,18 +190,16 @@ The loop lives in `crates/llm-core/src/agent_loop.rs`:
 
 Returns `AgentResult { final_content, tool_calls_made, total_tokens, turns, model }`.
 
-### Cargo feature flag selection
-`services/ui/Cargo.toml` feature flag:
-```toml
-[features]
-default = ["llm-anthropic"]
-llm-anthropic = ["dep:llm-anthropic"]
-# llm-openai = ["dep:llm-openai"]   # future
-# llm-bedrock = ["dep:llm-bedrock"] # future
-```
+### Runtime provider selection
+The `llm-proxy` Lambda selects the active adapter at runtime via a
+`provider` field in the request (default: `"anthropic"`). Local dev uses
+the `LLM_PROVIDER` env var (default: `"anthropic"`). Both `llm-anthropic`
+and `llm-openai` are compiled into the binary; the selector branch
+instantiates the right adapter at request time.
+
 `services/ui/src/tailor/` always programs against the `LlmProvider`
-trait — never against `AnthropicProvider` directly. The concrete type
-is injected at startup in `main.rs`.
+trait — never against concrete adapter types directly. The concrete type
+is instantiated based on the runtime selector.
 
 ### Template crate to follow
 `crates/api-core/` — examine its `src/lib.rs`, `Cargo.toml`, and
@@ -218,7 +216,7 @@ is injected at startup in `main.rs`.
 | W-LLM.4.3 | Add `crates/llm-core` + `crates/llm-anthropic` to `[workspace.members]` in root `Cargo.toml`; add `async-trait` to workspace deps; add path entries to `[workspace.dependencies]` | DONE | Workspace plumbing; `services/ui` feature wiring deferred to W-RST PR |
 | W-LLM.4.4 | Per-crate README files for `llm-core` and `llm-anthropic` (W-DX.3 alignment) | DONE | MIT license for both crates; describes traits, feature flags, secret name |
 | W-LLM.4.5 | `llm-anthropic` integration tests: `provider_id_is_anthropic`, `default_model_is_haiku` (CI-safe); `live_generate_*` (3 `#[ignore]` tests, run via `just test-llm PROFILE`) | DONE (2026-04-15) | |
-| W-LLM.4.6 | **Future**: `crates/llm-openai`, `crates/llm-bedrock`, `crates/llm-ollama`, `crates/llm-gemini` — additional `LlmProvider` adapters. Not scheduled. | DEFERRED | |
+| W-LLM.4.6 | **Future**: `crates/llm-bedrock`, `crates/llm-ollama`, `crates/llm-gemini` — additional `LlmProvider` adapters. Not scheduled. | DEFERRED | OpenAI adapter moved to W-LLM.4.15 (implemented 2026-05-XX) |
 | W-LLM.4.7 | **Future**: `crates/llm-fastembed` — local ONNX `EmbeddingProvider` impl. Ships alongside W-RST.4.11. ADR-016 created at that point. | DEFERRED | |
 | W-LLM.4.8 | Add `id: String` field to `ToolCall` struct | DONE | `crates/llm-core/src/types.rs`; Anthropic tool_result id support |
 | W-LLM.4.9 | Extend `ChatMessage.content` from `String` to `MessageContent` enum (Text + ToolResult) | DONE | Breaking change; `ChatMessage::text()`, `ChatMessage::tool_result()`, `text_content()` |
@@ -227,6 +225,7 @@ is injected at startup in `main.rs`.
 | W-LLM.4.12 | Update `StubLlmProvider` for tool-use testing (`with_tool_response`) | DONE | `crates/llm-core/src/testing.rs`; `with_tool_response()`, `with_tool_response_always()` |
 | W-LLM.4.13 | Update Anthropic adapter: parse `id` from `ContentBlock::ToolUse`, serialize `MessageContent::ToolResult` as content-array | DONE | `crates/llm-anthropic/src/lib.rs`; tool_result wire format |
 | W-LLM.4.14 | Migrate all call-sites for `ChatMessage.content` breaking change | DONE | 7 files migrated: grounding.rs, testing.rs, lib.rs doc, llm-anthropic, llm-proxy, xtask/rag.rs, xtask/resume/generate.rs |
+| W-LLM.4.15 | Implement `crates/llm-openai` adapter crate | TODO (2026-05-XX) | Direct HTTP against OpenAI Chat Completions API; GPT-4o-mini default, GPT-4o upgrade; runtime selector in llm-proxy; local dev support in services/ui |
 
 ---
 
@@ -254,7 +253,7 @@ is injected at startup in `main.rs`.
 - → ADR-023 (Agentic Tool-Dispatch Architecture — agent loop + ToolExecutor)
 - → ADR-012 (OpenAPI SSOT — LlmRequest/LlmResponse may surface via OpenAPI models)
 - → W-RST (primary consumer of `LlmProvider` trait)
-- → W-SEC (secret `deploy-baba/prod/anthropic-api-key`)
+- → W-SEC (secrets `deploy-baba/prod/anthropic-api-key`, `deploy-baba/prod/openai-api-key`)
 - → W-DX.3 (per-crate README coverage)
 - → `plans/cross-cutting/llm-policy.md` (operational rules, provider registry, agentic cost model)
 - → `crates/api-core/` (template crate for structure and conventions)
