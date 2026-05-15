@@ -57,6 +57,10 @@ Example: `DRL-2026-03-18-terraform.md`
 | `CI` | CI/CD pipeline | `.github/workflows/`, `infra/ci-oidc.tf`, `xtask/src/release/` |
 | `WEB` | Vite SPA (React 18 + TypeScript) | `web/` |
 | `DEV` | Developer environment | `scripts/`, `.devcontainer/`, `plans/cross-cutting/initial-setup.md` |
+| `VER` | api-versioning | `services/ui/src/middleware/version.rs`, `services/ui/src/router.rs` — URL-based API versioning strategy |
+| `OBS` | observability | `services/ui/src/telemetry.rs`, `services/ui/migrations/` — SQLite-based metrics collection + structured logging |
+| `RES` | resilience | `services/ui/src/middleware/` — code-level resilience patterns (rate limiting, retry, circuit breaker, validation) |
+| `MOD` | module-decomposition | `services/ui/src/modules/` — logical module separation within single Lambda service |
 
 ---
 

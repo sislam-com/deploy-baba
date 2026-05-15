@@ -1,59 +1,77 @@
 # deploy-baba
 
-**Zero-cost Rust abstractions for deployment automation.**
+**Full-stack portfolio platform on AWS Lambda — near-zero cost.**
 
-A composable crate ecosystem for configuration parsing, API specification
-generation, and infrastructure type definitions — built on trait-based
-composition with monomorphization, not dynamic dispatch.
+A Rust + React application powering [sislam.com](https://sislam.com): interactive resume, RAG-powered Q&A, admin dashboard, and contact form — all running on a single Lambda function with SQLite on EFS.
+
+Built on a composable crate ecosystem using trait-based composition with monomorphization, not dynamic dispatch.
 
 ```
-┌─────────────────────────────────────────────────────┐
-│              Config Layer                            │
-│  config-core → config-toml / config-yaml / config-json │
-├─────────────────────────────────────────────────────┤
-│             API Spec Layer                           │
-│  api-core → api-openapi / api-graphql / api-grpc    │
-│                    → api-merger                      │
-├─────────────────────────────────────────────────────┤
-│           Infrastructure Layer                       │
-│  infra-types (Stack, Service, SQLite, Network)       │
-└─────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│  React SPA (Vite + TypeScript)                                  │
+│  Home / About / Ask / Contact / Dashboard                       │
+├─────────────────────────────────────────────────────────────────┤
+│  CloudFront CDN (S3 OAC for SPA, Lambda origin for /api)        │
+├─────────────────────────────────────────────────────────────────┤
+│  services/ui        │  services/email   │  services/llm-proxy   │
+│  (main Lambda)      │  (SES Lambda)     │  (Anthropic proxy)    │
+├─────────────────────┴───────────────────┴───────────────────────┤
+│  SQLite on EFS (26 migrations) + S3 backup                      │
+├─────────────────────────────────────────────────────────────────┤
+│  Library Crates                                                  │
+│  config-* │ api-* │ infra-types │ llm-* │ rag-* │ mcp          │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-## Quick Start
+## Features
 
-```rust
-use config_toml::TomlParser;
-use config_core::ConfigParser;
-use serde::{Deserialize, Serialize};
+- **Interactive resume** — timeline and capabilities views, PDF/DOCX downloads, generated from DB
+- **RAG-powered Q&A** — ask questions about the portfolio; answers grounded in indexed codebase content
+- **Admin dashboard** — authenticated CRUD for jobs, about sections, social links, challenges
+- **Contact form** — proof-of-work spam protection, SES email delivery via dedicated Lambda
+- **OpenAPI spec** — auto-generated dual spec (public + admin), served at `/docs`
+- **Resume generation** — DB → Markdown → DOCX/PDF pipeline via xtask
 
-#[derive(Debug, Deserialize, Serialize)]
-struct MyConfig {
-    name: String,
-    version: String,
-}
+## Project Structure
 
-// Parse from TOML — swap TomlParser for YamlParser or JsonParser
-// with zero code changes. Same trait, same generic bounds.
-let config: MyConfig = TomlParser::parse(r#"
-    name = "my-app"
-    version = "1.0.0"
-"#)?;
+```
+deploy-baba/
+├── crates/            # 15 library crates (pure Rust, no binaries)
+├── services/
+│   ├── ui/            # Main Lambda: Axum API + SQLite + auth
+│   ├── email/         # SES email Lambda (non-VPC)
+│   └── llm-proxy/     # Anthropic API proxy Lambda (non-VPC)
+├── web/               # React SPA (Vite + TypeScript)
+├── infra/             # OpenTofu HCL (Lambda + EFS + S3 + CloudFront + Cognito)
+├── xtask/             # Internal CLI (resume gen, deploy, cache, secrets)
+├── examples/          # 4 runnable examples demonstrating crate usage
+├── plans/             # Modular plan system (35 modules, 27 ADRs)
+└── justfile           # Developer interface — all commands go through just
 ```
 
 ## Crate Map
 
 | Crate | Purpose |
 |-------|---------|
+| **Config Layer** | |
 | `config-core` | Universal traits: `ConfigParser<T>`, `ConfigValidator<T>` |
 | `config-toml` | TOML implementation |
 | `config-yaml` | YAML implementation |
 | `config-json` | JSON implementation |
+| **API Spec Layer** | |
 | `api-core` | Universal traits: `ApiSpecGenerator` |
-| `api-openapi` | OpenAPI 3.0 generator (via utoipa) |
+| `api-openapi` | OpenAPI 3.0 generator + model registry (SSOT for all API types) |
 | `api-graphql` | GraphQL SDL generator |
 | `api-grpc` | Protocol Buffers / gRPC generator |
 | `api-merger` | Multi-format spec merging with conflict resolution |
+| **LLM Layer** | |
+| `llm-core` | Vendor-agnostic LLM provider traits and grounding contract |
+| `llm-anthropic` | Anthropic Claude adapter |
+| **RAG Layer** | |
+| `rag-core` | Retrieval traits and document chunkers |
+| `rag-sqlite` | SQLite FTS5 retrieval backend |
+| `portfolio-rag-mcp` | MCP server for RAG integration |
+| **Infrastructure** | |
 | `infra-types` | Cloud-agnostic Stack, Service, Network, SQLite + S3 types |
 
 ## Development
@@ -61,16 +79,27 @@ let config: MyConfig = TomlParser::parse(r#"
 All commands go through the [justfile](justfile). Run `just` to see everything.
 
 ```bash
-just dev          # format + lint + test
-just ui           # run the portfolio site locally at localhost:3000
-just quality      # full quality gate
-just docs         # build and open rustdoc
+just dev            # format + lint + test
+just dev-stack      # Vite on :3000 + Rust API on :3001 (hot reload)
+just quality        # full quality gate (fmt + clippy + test + audit)
+just dev-doctor     # verify all prerequisites are installed
+```
+
+## Frontend
+
+The SPA lives in `web/` — React + TypeScript, built with Vite.
+
+```bash
+just web            # start Vite dev server on :3000
+just web-build      # production build to web/dist/
+just web-types-offline  # regenerate TypeScript types from OpenAPI spec
+just web-test       # run Vitest unit tests
 ```
 
 ## Examples
 
 Runnable examples are in [`examples/`](examples/). Each is a standalone package
-in the workspace — use `just example <name>` to run them.
+in the workspace.
 
 ```bash
 just example 01_multi_format_config   # Parse the same config as TOML, YAML, and JSON
@@ -79,27 +108,36 @@ just example 03_spec_merger           # Merge multiple specs with conflict resol
 just example 04_infra_types           # Build and serialize a Stack definition
 ```
 
-## Deploy to AWS (Optional)
+## Deploy to AWS
 
-The portfolio site runs on AWS Lambda with a Function URL — near-zero cost.
+The platform runs on AWS Lambda with near-zero cost. Infrastructure is managed with OpenTofu.
 
 ```bash
-just aws-check deploy-baba       # validate your AWS profile
-just infra-bootstrap deploy-baba  # first-time setup
-just infra-apply deploy-baba      # provision infrastructure
-just deploy deploy-baba           # build + push + update Lambda
-just ui-open deploy-baba          # open the live site
+just sso-login                   # authenticate via AWS SSO
+just infra-plan deploy-baba      # preview infrastructure changes
+just infra-apply deploy-baba     # provision infrastructure
+just deploy deploy-baba          # quality gate + Lambda build + update
+just resume deploy-baba          # generate + upload resume files to S3
 ```
 
 See [docs/aws-setup.md](docs/aws-setup.md) for full setup instructions.
 
 ## Architecture
 
-See [docs/architecture.md](docs/architecture.md) for the full crate dependency
-graph and layer descriptions.
+Key decisions are documented as ADRs in [`plans/adr/`](plans/adr/):
+
+- **ADR-001**: justfile-only interface (xtask is internal plumbing)
+- **ADR-002**: SQLite on EFS + S3 backup (no PostgreSQL, no RDS)
+- **ADR-003**: Lambda Function URL (no API Gateway, except ADR-009)
+- **ADR-007**: OpenTofu over Terraform
+- **ADR-008**: Cognito hosted UI auth with JWT RS256
+- **ADR-012**: OpenAPI SSOT — all API types defined in `api-openapi`
+- **ADR-015**: LLM provider abstraction with grounding contract
+
+See [plans/INDEX.md](plans/INDEX.md) for the full project plan and module status.
 
 See [docs/zero-cost-philosophy.md](docs/zero-cost-philosophy.md) for why
-everything uses generics over `dyn` dispatch.
+the library crates use generics over `dyn` dispatch.
 
 ## License
 

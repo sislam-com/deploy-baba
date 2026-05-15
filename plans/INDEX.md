@@ -1,5 +1,5 @@
 # deploy-baba — Plan Index
-**GitHub:** `shantopagla/deploy-baba` | **Last updated:** 2026-05-09
+**GitHub:** `sislam-com/deploy-baba` | **Last updated:** 2026-05-14
 **Source repo:** `~/shanto` (Baba Toolchain, ~85K LOC) | **Status:** ~95% complete
 
 See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming rules.
@@ -41,6 +41,10 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | ci | W-CI | `.github/workflows/` | WIP | Code complete (C.1 + C.2 DONE). W-CI.4.9 RESOLVED 2026-05-04 — GH Variables replaced by SM fetch (DRL-2026-05-04-sislam-outage); bootstrap ARNs set. Remaining: W-CI.4.5 (dev Lambda workspace), W-CI.4.10 (production env gate) |
 | web (SPA) | W-WEB | `web/` | DONE | All 15 Askama templates replaced; Askama removed; CF→S3 direct serving (EFS sync dropped 2026-05-04, DRL-2026-05-04-sislam-outage); SEO prerender deferred to W-WEB.5 (P3) |
 | dev-environment | W-DEV | `scripts/`, `.devcontainer/` | DONE | bootstrap-tfstate.sh; dev-doctor.sh; devcontainer; initial-setup.md |
+| api-versioning | W-VER | `services/ui/src/middleware/`, `services/ui/src/router.rs` | TODO | URL-based versioning middleware; deprecation headers; OpenAPI version metadata |
+| observability | W-OBS | `services/ui/src/telemetry.rs`, `services/ui/migrations/` | TODO | Structured logging (tracing); SQLite metrics tables; metrics query endpoint; p50/p95/p99 latency calculation |
+| resilience | W-RES | `services/ui/src/middleware/` | TODO | Rate limiting (in-memory); retry with exponential backoff; circuit breaker for LLM calls; request validation middleware |
+| module-decomposition | W-MOD | `services/ui/src/modules/` | TODO | Logical module separation (portfolio, rag, admin, auth); independent testing per module; module-specific metrics |
 
 ---
 
@@ -105,6 +109,12 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 11. **W-PUB.2** — Tag `v0.1.0` + `just publish`
 11. ~~**W-UI.4.1**~~ — Wire utoipa-rapidoc properly — **DONE** (inline HTML approach works fine; loads RapiDoc from CDN)
 
+### P2.6 — Zero-Cost Microservices Enhancements
+22. **W-VER.4.1–4.4** — API versioning strategy (ADR-024) — TODO (URL-based routing, version extraction middleware, deprecation headers, OpenAPI version metadata)
+23. **W-OBS.4.1–4.4** — SQLite-based observability (ADR-025) — TODO (structured logging with tracing, metrics tables + query endpoint, p50/p95/p99 calculation, no CloudWatch Metrics cost)
+24. **W-RES.4.1–4.4** — Code-level resilience patterns (ADR-026) — TODO (in-memory rate limiting, retry with exponential backoff, circuit breaker for LLM calls, request validation middleware)
+25. **W-MOD.4.1–4.3** — Module-based service decomposition (ADR-027) — TODO (logical module separation, independent testing per module, module-specific metrics collection)
+
 ### P3 — LLM + RAG Subsystem (phased)
 12. ~~**W-LLM**~~ — `crates/llm-core` + `crates/llm-anthropic` + ADR-015 — **DONE** (W-LLM.4.1–4.5)
 13. ~~**W-RAG.2.1–3.4**~~ — `rag-core` + `rag-sqlite` crates, chunkers, xtask rag, justfile verbs — **DONE** (P1 FTS-only)
@@ -146,6 +156,10 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | ADR-021 | Automated Release Tagging via xtask — `dev-vX.Y.Z` on CI; `vX.Y.Z` via `just release-promote`; conventional-commits versioning | W-CI, W-XT |
 | ADR-022 | Developer First-Run Environment — scripts/bootstrap-tfstate.sh; scripts/dev-doctor.sh; .devcontainer/; initial-setup.md | W-DEV, W-DX |
 | ADR-023 | Agentic Tool-Dispatch Architecture — provider-agnostic agent loop in llm-core; HTTP call-back from llm-proxy to UI Lambda for tool execution; ChatMessage breaking change | W-LLM, W-RAG, W-UI, W-APIO |
+| ADR-024 | API Versioning Strategy — URL-based versioning with Function URL routing; version extraction middleware; deprecation headers; OpenAPI version metadata | W-VER, W-UI, W-APIO |
+| ADR-025 | SQLite-Based Metrics Collection — Zero-cost observability via SQLite metrics tables; structured logging with tracing; p50/p95/p99 latency calculation; no CloudWatch Metrics cost | W-OBS, W-UI, W-RAG |
+| ADR-026 | Code-Level Resilience Patterns — In-memory rate limiting; retry with exponential backoff; circuit breaker for LLM calls; request validation middleware; zero infra cost | W-RES, W-UI, W-LLM |
+| ADR-027 | Module-Based Service Decomposition — Logical separation within single Lambda (portfolio, rag, admin, auth modules); independent testing per module; future extraction path to separate Lambdas if needed | W-MOD, W-UI, W-RAG, W-AUTH |
 
 ---
 
@@ -206,6 +220,7 @@ Implementation sequencing for W-LLM/W-RST/W-RAG/W-GDR: `plans/cross-cutting/exec
 | `quality-gates.md` | Quality gate definitions (Rust + Web + OpenTofu) |
 | `integration-tests.md` | W-QA test infrastructure plan |
 | `ai-dlc.md` | AI Development Lifecycle — session protocol + quality gates + maintenance agents |
+| `zero-cost-microservices.md` | Zero-cost microservices patterns — API versioning, observability, resilience, module decomposition |
 | `initial-setup.md` | Developer first-run guide (prerequisites, bootstrap, local dev loop) |
 | `agentic-execution-steps.md` | Stepped implementation plan for Phases 9–11 (extended corpora → agentic core) |
 
@@ -229,7 +244,7 @@ shantopagla/deploy-baba/
 │   ├── api-grpc/
 │   ├── api-merger/
 │   └── infra-types/
-├── services/ui/            # Portfolio site + deployed Lambda binary
+├── services/ui/            # Portfolio site + deployed Lambda binary (with modular structure: modules/, middleware/, telemetry/)
 ├── services/email/         # Email Lambda (SES sender, no VPC)
 ├── xtask/                  # Internal tooling (called by justfile)
 ├── infra/                  # OpenTofu (Lambda + EFS + S3 + EventBridge)
@@ -259,5 +274,6 @@ shantopagla/deploy-baba/
 | 7 | Examples + docs | TODO |
 | 8 | Quality pass | WIP (`just quality` passes: coverage floors ✅, audit ✅; per-crate READMEs + examples TODO) |
 | 9 | Publish | TODO |
+| 10 | Zero-cost microservices enhancements | TODO (W-VER, W-OBS, W-RES, W-MOD) |
 
 **Overall: ~95% complete**

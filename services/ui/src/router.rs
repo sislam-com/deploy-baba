@@ -1,5 +1,6 @@
 use axum::{
-    response::Html,
+    http::StatusCode,
+    response::{Html, Redirect},
     routing::{get, post},
     Router,
 };
@@ -37,14 +38,24 @@ pub fn build(state: AppState) -> Router {
         .route("/api/contact", post(routes::contact::contact_submit))
         // ── Resume file downloads ────────────────────────────────────────────
         .nest_service("/resume", ServeDir::new("target/resume"))
-        // ── API routes ───────────────────────────────────────────────────────
-        .nest("/api", routes::api::router())
-        .nest("/api/admin", admin_routes)
+        // ── API Versioning (ADR-024) ─────────────────────────────────────────
+        // Phase 2: Routes migrated to /api/v1/ with backward-compatible redirects
+        // ── Versioned API routes (v1) ─────────────────────────────────────────
+        .nest("/api/v1", routes::api::router())
+        .nest("/api/v1/admin", admin_routes)
+        // Apply deprecation middleware to versioned routes
+        // Currently a no-op (v1 is current); will add headers when v1 is deprecated
+        .layer(axum::middleware::from_fn(
+            crate::middleware::deprecation_middleware,
+        ))
+        // ── Backward-compatible redirects ─────────────────────────────────────
+        // Redirect /api/* → /api/v1/* for existing clients
+        // Preserves /api/contact, /api/openapi.json, /api/openapi-admin.json
+        .route("/api/*path", get(api_redirect_handler))
         // ── Auth routes (server-side Cognito redirects) ─────────────────────
         .nest("/auth", routes::auth::router())
         // ── OpenAPI spec ─────────────────────────────────────────────────────
         // Full combined spec — served unauthenticated so /docs shows all routes.
-        // /api/openapi-admin.json kept as an alias for backward compatibility.
         .route(
             "/api/openapi.json",
             get(move || async move { axum::Json(spec_clone) }),
@@ -70,4 +81,33 @@ async fn docs_handler() -> Html<&'static str> {
   show-header="false" allow-try="true"></rapi-doc>
 </body></html>"#,
     )
+}
+
+/// Redirect handler for backward-compatible API versioning.
+///
+/// Redirects unversioned `/api/*` requests to `/api/v1/*`.
+/// Preserves special paths: /api/contact, /api/openapi.json, /api/openapi-admin.json
+///
+/// Example:
+/// - `/api/jobs` → `/api/v1/jobs`
+/// - `/api/about` → `/api/v1/about`
+async fn api_redirect_handler(
+    axum::extract::Path(path): axum::extract::Path<String>,
+) -> Result<Redirect, StatusCode> {
+    // Preserve special paths that should not be redirected
+    let preserved_paths = [
+        "contact",
+        "contact/challenge",
+        "openapi.json",
+        "openapi-admin.json",
+    ];
+
+    if preserved_paths.contains(&path.as_str()) {
+        // These paths are handled by explicit routes above, so this handler
+        // should not match them. But just in case, return a not found.
+        return Err(StatusCode::NOT_FOUND);
+    }
+
+    // Redirect /api/<path> → /api/v1/<path>
+    Ok(Redirect::temporary(&format!("/api/v1/{}", path)))
 }
