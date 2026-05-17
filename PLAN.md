@@ -18,7 +18,7 @@
 | Name | `deploy-baba` |
 | Developer interface | `justfile` only — xtask is an internal impl detail |
 | crates.io publish | After polish (Phase 5 complete) |
-| License | MIT + Apache-2.0 dual-license |
+| License | MIT |
 | Scope | Universal crates + infra-types + xtask + AWS deployment |
 | Database | SQLite on EFS + S3 backup (no PostgreSQL) |
 | AWS compute | Lambda + Function URL (free tier) OR ECS Fargate Spot (~$5/mo) |

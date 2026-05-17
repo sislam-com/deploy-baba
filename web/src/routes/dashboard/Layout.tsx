@@ -1,3 +1,4 @@
+import { type ReactNode } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { useAuth } from '../../hooks/useAuth'
@@ -11,7 +12,7 @@ const NAV_ITEMS = [
   { to: '/dashboard/challenges', label: 'Challenges' },
 ]
 
-export default function DashboardLayout() {
+export default function DashboardLayout({ children }: { children?: ReactNode }) {
   const { loading, email } = useAuth()
 
   if (loading) {
@@ -66,6 +67,7 @@ export default function DashboardLayout() {
 
         <main className="flex-1 overflow-auto">
           <Outlet />
+          {children}
         </main>
       </div>
     </>

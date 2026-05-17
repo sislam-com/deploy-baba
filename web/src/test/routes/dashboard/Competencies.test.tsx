@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, waitFor } from '../../utils/test-render'
 import Competencies from '../../../routes/dashboard/Competencies'
+import DashboardLayout from '../../../routes/dashboard/Layout'
 
 // Mock useAuth
 vi.mock('../../../hooks/useAuth', () => ({
@@ -9,24 +10,44 @@ vi.mock('../../../hooks/useAuth', () => ({
 
 describe('Competencies', () => {
   it('renders competencies heading', () => {
-    render(<Competencies />, { router: 'memory', route: '/dashboard/competencies' })
-    expect(screen.getByText('Competencies')).toBeInTheDocument()
+    render(
+      <DashboardLayout>
+        <Competencies />
+      </DashboardLayout>,
+      { router: 'memory', route: '/dashboard/competencies' }
+    )
+    expect(screen.getByRole('heading', { name: 'Competencies' })).toBeInTheDocument()
   })
 
   it('renders new competency button', () => {
-    render(<Competencies />, { router: 'memory', route: '/dashboard/competencies' })
+    render(
+      <DashboardLayout>
+        <Competencies />
+      </DashboardLayout>,
+      { router: 'memory', route: '/dashboard/competencies' }
+    )
     const newButton = screen.getByText('+ New competency')
     expect(newButton).toBeInTheDocument()
     expect(newButton).toHaveAttribute('href', '/dashboard/competencies/new')
   })
 
   it('renders loading state initially', () => {
-    render(<Competencies />, { router: 'memory', route: '/dashboard/competencies' })
+    render(
+      <DashboardLayout>
+        <Competencies />
+      </DashboardLayout>,
+      { router: 'memory', route: '/dashboard/competencies' }
+    )
     expect(screen.getByText('Loading…')).toBeInTheDocument()
   })
 
   it('fetches and renders competencies list', async () => {
-    render(<Competencies />, { router: 'memory', route: '/dashboard/competencies' })
+    render(
+      <DashboardLayout>
+        <Competencies />
+      </DashboardLayout>,
+      { router: 'memory', route: '/dashboard/competencies' }
+    )
 
     await waitFor(() => {
       expect(screen.queryByText('Loading…')).not.toBeInTheDocument()
@@ -36,7 +57,12 @@ describe('Competencies', () => {
   })
 
   it('renders competency name', async () => {
-    render(<Competencies />, { router: 'memory', route: '/dashboard/competencies' })
+    render(
+      <DashboardLayout>
+        <Competencies />
+      </DashboardLayout>,
+      { router: 'memory', route: '/dashboard/competencies' }
+    )
 
     await waitFor(() => {
       expect(screen.getByText('Rust Systems Programming')).toBeInTheDocument()
@@ -44,7 +70,12 @@ describe('Competencies', () => {
   })
 
   it('renders competency description', async () => {
-    render(<Competencies />, { router: 'memory', route: '/dashboard/competencies' })
+    render(
+      <DashboardLayout>
+        <Competencies />
+      </DashboardLayout>,
+      { router: 'memory', route: '/dashboard/competencies' }
+    )
 
     await waitFor(() => {
       expect(screen.getByText('Expert in Rust systems programming')).toBeInTheDocument()
@@ -52,7 +83,12 @@ describe('Competencies', () => {
   })
 
   it('renders competency icon', async () => {
-    render(<Competencies />, { router: 'memory', route: '/dashboard/competencies' })
+    render(
+      <DashboardLayout>
+        <Competencies />
+      </DashboardLayout>,
+      { router: 'memory', route: '/dashboard/competencies' }
+    )
 
     await waitFor(() => {
       expect(screen.getByText('🦀')).toBeInTheDocument()
@@ -60,7 +96,12 @@ describe('Competencies', () => {
   })
 
   it('renders competency cards as links', async () => {
-    render(<Competencies />, { router: 'memory', route: '/dashboard/competencies' })
+    render(
+      <DashboardLayout>
+        <Competencies />
+      </DashboardLayout>,
+      { router: 'memory', route: '/dashboard/competencies' }
+    )
 
     await waitFor(() => {
       const card = screen.getByText('Rust Systems Programming').closest('a')
@@ -69,7 +110,12 @@ describe('Competencies', () => {
   })
 
   it('applies correct styling to competency cards', async () => {
-    render(<Competencies />, { router: 'memory', route: '/dashboard/competencies' })
+    render(
+      <DashboardLayout>
+        <Competencies />
+      </DashboardLayout>,
+      { router: 'memory', route: '/dashboard/competencies' }
+    )
 
     await waitFor(() => {
       const card = screen.getByText('Rust Systems Programming').closest('a')
@@ -82,7 +128,12 @@ describe('Competencies', () => {
       Promise.reject(new Error('API Error'))
     )
 
-    render(<Competencies />, { router: 'memory', route: '/dashboard/competencies' })
+    render(
+      <DashboardLayout>
+        <Competencies />
+      </DashboardLayout>,
+      { router: 'memory', route: '/dashboard/competencies' }
+    )
 
     await waitFor(() => {
       expect(screen.getByText('Failed to load competencies')).toBeInTheDocument()

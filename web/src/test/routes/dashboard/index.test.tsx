@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, waitFor } from '../../utils/test-render'
+import { render, screen, waitFor, within } from '../../utils/test-render'
 import DashboardHome from '../../../routes/dashboard/index'
+import { http, HttpResponse } from 'msw'
+import { server } from '../../mocks/server'
 
 // Mock useAuth
 vi.mock('../../../hooks/useAuth', () => ({
@@ -9,19 +11,12 @@ vi.mock('../../../hooks/useAuth', () => ({
 
 describe('DashboardHome', () => {
   it('renders overview heading', () => {
-    render(
-      <DashboardHome />,
-      { router: 'memory', route: '/dashboard' }
-    )
-
+    render(<DashboardHome />, { router: 'memory', route: '/dashboard' })
     expect(screen.getByText('Overview')).toBeInTheDocument()
   })
 
   it('renders stat tiles', async () => {
-    render(
-      <DashboardHome />,
-      { router: 'memory', route: '/dashboard' }
-    )
+    render(<DashboardHome />, { router: 'memory', route: '/dashboard' })
 
     await waitFor(() => {
       expect(screen.getByText('Jobs')).toBeInTheDocument()
@@ -32,71 +27,69 @@ describe('DashboardHome', () => {
   })
 
   it('displays job count', async () => {
-    render(
-      <DashboardHome />,
-      { router: 'memory', route: '/dashboard' }
-    )
+    render(<DashboardHome />, { router: 'memory', route: '/dashboard' })
 
     await waitFor(() => {
-      expect(screen.getByText('1')).toBeInTheDocument()
+      const jobsTile = screen.getByText('Jobs').closest('div')!
+      expect(within(jobsTile).getByText('1')).toBeInTheDocument()
     })
   })
 
   it('displays competency count', async () => {
-    render(
-      <DashboardHome />,
-      { router: 'memory', route: '/dashboard' }
-    )
+    render(<DashboardHome />, { router: 'memory', route: '/dashboard' })
 
     await waitFor(() => {
-      expect(screen.getByText('1')).toBeInTheDocument()
+      const compTile = screen.getByText('Competencies').closest('div')!
+      expect(within(compTile).getByText('1')).toBeInTheDocument()
     })
   })
 
   it('displays about sections count', async () => {
-    render(
-      <DashboardHome />,
-      { router: 'memory', route: '/dashboard' }
-    )
+    render(<DashboardHome />, { router: 'memory', route: '/dashboard' })
 
     await waitFor(() => {
-      expect(screen.getByText('1')).toBeInTheDocument()
+      const aboutTile = screen.getByText('About sections').closest('div')!
+      expect(within(aboutTile).getByText('1')).toBeInTheDocument()
     })
   })
 
   it('displays social links count', async () => {
-    render(
-      <DashboardHome />,
-      { router: 'memory', route: '/dashboard' }
-    )
+    render(<DashboardHome />, { router: 'memory', route: '/dashboard' })
 
     await waitFor(() => {
-      expect(screen.getByText('2')).toBeInTheDocument()
+      const socialTile = screen.getByText('Social links').closest('div')!
+      expect(within(socialTile).getByText('2')).toBeInTheDocument()
     })
   })
 
-  it('shows dash when count is null', () => {
-    // Mock empty responses
-    global.fetch = vi.fn(() =>
-      Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve([]),
+  it('shows dashes while loading', () => {
+    // Delay all responses so the initial null state is visible
+    server.use(
+      http.get('/api/jobs', async () => {
+        await new Promise(r => setTimeout(r, 1000))
+        return HttpResponse.json([])
+      }),
+      http.get('/api/competencies', async () => {
+        await new Promise(r => setTimeout(r, 1000))
+        return HttpResponse.json([])
+      }),
+      http.get('/api/about/sections', async () => {
+        await new Promise(r => setTimeout(r, 1000))
+        return HttpResponse.json([])
+      }),
+      http.get('/api/social-links', async () => {
+        await new Promise(r => setTimeout(r, 1000))
+        return HttpResponse.json([])
       })
     )
 
-    render(
-      <DashboardHome />,
-      { router: 'memory', route: '/dashboard' }
-    )
+    render(<DashboardHome />, { router: 'memory', route: '/dashboard' })
 
-    expect(screen.getByText('—')).toBeInTheDocument()
+    expect(screen.getAllByText('—').length).toBe(4)
   })
 
   it('applies correct styling to stat tiles', async () => {
-    render(
-      <DashboardHome />,
-      { router: 'memory', route: '/dashboard' }
-    )
+    render(<DashboardHome />, { router: 'memory', route: '/dashboard' })
 
     await waitFor(() => {
       const tile = screen.getByText('Jobs').closest('div')
@@ -105,22 +98,17 @@ describe('DashboardHome', () => {
   })
 
   it('applies correct styling to count values', async () => {
-    render(
-      <DashboardHome />,
-      { router: 'memory', route: '/dashboard' }
-    )
+    render(<DashboardHome />, { router: 'memory', route: '/dashboard' })
 
     await waitFor(() => {
-      const count = screen.getByText('1')
+      const jobsTile = screen.getByText('Jobs').closest('div')!
+      const count = within(jobsTile).getByText('1')
       expect(count).toHaveClass('text-3xl', 'font-bold', 'text-white')
     })
   })
 
   it('applies correct styling to labels', async () => {
-    render(
-      <DashboardHome />,
-      { router: 'memory', route: '/dashboard' }
-    )
+    render(<DashboardHome />, { router: 'memory', route: '/dashboard' })
 
     await waitFor(() => {
       const label = screen.getByText('Jobs')
@@ -129,30 +117,41 @@ describe('DashboardHome', () => {
   })
 
   it('fetches data from multiple endpoints', async () => {
-    render(
-      <DashboardHome />,
-      { router: 'memory', route: '/dashboard' }
+    server.use(
+      http.get('/api/jobs', () => HttpResponse.json([{ id: 1 }])),
+      http.get('/api/competencies', () => HttpResponse.json([{ id: 1 }])),
+      http.get('/api/about/sections', () => HttpResponse.json([{ id: 1 }])),
+      http.get('/api/social-links', () => HttpResponse.json([{ id: 1 }]))
     )
 
+    render(<DashboardHome />, { router: 'memory', route: '/dashboard' })
+
+    // All endpoints returned one item, so every count should be 1
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/api/jobs')
-      expect(global.fetch).toHaveBeenCalledWith('/api/competencies')
-      expect(global.fetch).toHaveBeenCalledWith('/api/about/sections')
-      expect(global.fetch).toHaveBeenCalledWith('/api/social-links')
+      const jobsTile = screen.getByText('Jobs').closest('div')!
+      const compTile = screen.getByText('Competencies').closest('div')!
+      const aboutTile = screen.getByText('About sections').closest('div')!
+      const socialTile = screen.getByText('Social links').closest('div')!
+      expect(within(jobsTile).getByText('1')).toBeInTheDocument()
+      expect(within(compTile).getByText('1')).toBeInTheDocument()
+      expect(within(aboutTile).getByText('1')).toBeInTheDocument()
+      expect(within(socialTile).getByText('1')).toBeInTheDocument()
     })
   })
 
   it('handles API errors gracefully', async () => {
-    global.fetch = vi.fn(() =>
-      Promise.reject(new Error('API Error'))
+    server.use(
+      http.get('/api/jobs', () => HttpResponse.error()),
+      http.get('/api/competencies', () => HttpResponse.error()),
+      http.get('/api/about/sections', () => HttpResponse.error()),
+      http.get('/api/social-links', () => HttpResponse.error())
     )
 
-    render(
-      <DashboardHome />,
-      { router: 'memory', route: '/dashboard' }
-    )
+    render(<DashboardHome />, { router: 'memory', route: '/dashboard' })
 
-    // Should not crash, just show dashes
-    expect(screen.getByText('—')).toBeInTheDocument()
+    // Should not crash; on error counts stays null so dashes persist
+    await waitFor(() => {
+      expect(screen.getAllByText('—').length).toBe(4)
+    })
   })
 })

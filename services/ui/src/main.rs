@@ -122,6 +122,18 @@ async fn handle_http(payload: Value, app: axum::Router) -> Result<Value, lambda_
         }
     }
 
+    // Inject the API Gateway v2 sourceIp as a trusted header so handlers can
+    // extract the real client IP behind CloudFront + API Gateway without
+    // relying on x-forwarded-for (which can be spoofed or stripped).
+    if let Some(source_ip) = payload
+        .get("requestContext")
+        .and_then(|rc| rc.get("http"))
+        .and_then(|h| h.get("sourceIp"))
+        .and_then(|v| v.as_str())
+    {
+        builder = builder.header("x-apigw-source-ip", source_ip);
+    }
+
     let body_bytes: Vec<u8> = match payload.get("body") {
         Some(Value::String(s)) if !s.is_empty() => {
             if payload["isBase64Encoded"].as_bool().unwrap_or(false) {

@@ -77,6 +77,7 @@ export default function SvgIcon({
       stroke={isFilled ? 'none' : 'currentColor'}
       strokeWidth={isFilled ? undefined : 1.5}
       aria-hidden="true"
+      role="img"
     >
       <path d={d} fillRule="evenodd" clipRule="evenodd" />
     </svg>

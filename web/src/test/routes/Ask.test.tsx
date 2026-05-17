@@ -1,12 +1,14 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '../utils/test-render'
 import userEvent from '@testing-library/user-event'
+import { http, HttpResponse } from 'msw'
+import { server } from '../mocks/server'
 import Ask from '../../routes/Ask'
 
 describe('Ask', () => {
   it('renders heading when not embedded', () => {
     render(<Ask />)
-    expect(screen.getByText('Ask')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Ask' })).toBeInTheDocument()
   })
 
   it('renders description when not embedded', () => {
@@ -93,7 +95,7 @@ describe('Ask', () => {
     await user.click(submitButton)
 
     await waitFor(() => {
-      expect(screen.getByText('claude-3-haiku-20240307')).toBeInTheDocument()
+      expect(screen.getByText(/claude-3-haiku-20240307/)).toBeInTheDocument()
     })
   })
 
@@ -121,13 +123,21 @@ describe('Ask', () => {
     await user.click(submitButton)
 
     await waitFor(() => {
-      const citationLink = screen.getByText('portfolio://README.md')
+      const citationLink = screen.getByText('README.md')
       expect(citationLink).toBeInTheDocument()
       expect(citationLink).toHaveAttribute('href', 'https://github.com/shantopagla/portfolio/blob/main/README.md')
     })
   })
 
   it('shows loading state during submission', async () => {
+    // Delay the MSW response so loading state is visible
+    server.use(
+      http.post('/api/ask', async () => {
+        await new Promise(r => setTimeout(r, 50))
+        return HttpResponse.json({ answer: 'Delayed', citations: [], model: 'test', input_tokens: 1, output_tokens: 1 })
+      })
+    )
+
     render(<Ask />)
     const user = userEvent.setup()
 
@@ -136,18 +146,23 @@ describe('Ask', () => {
     const submitButton = screen.getByRole('button', { name: 'Ask' })
     await user.click(submitButton)
 
-    expect(submitButton).toHaveTextContent('Asking...')
-    expect(submitButton).toBeDisabled()
+    await waitFor(() => {
+      expect(submitButton).toHaveTextContent('Asking...')
+      expect(submitButton).toBeDisabled()
+    })
+
+    // Ensure the async handler fully completes before the test ends
+    await waitFor(() => {
+      expect(submitButton).toHaveTextContent('Ask')
+      expect(submitButton).toBeEnabled()
+    })
   })
 
   it('displays error message on rate limit', async () => {
-    // Mock rate limit response
-    global.fetch = vi.fn(() =>
-      Promise.resolve({
-        ok: false,
-        status: 429,
-        json: () => Promise.resolve({ error: 'Rate limit exceeded' }),
-      })
+    server.use(
+      http.post('/api/ask', () =>
+        HttpResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
+      )
     )
 
     render(<Ask />)
@@ -161,16 +176,15 @@ describe('Ask', () => {
     await waitFor(() => {
       expect(screen.getByText(/Rate limit reached/)).toBeInTheDocument()
     })
+
+    await waitFor(() => expect(submitButton).toBeEnabled())
   })
 
   it('displays error message on service unavailable', async () => {
-    // Mock service unavailable response
-    global.fetch = vi.fn(() =>
-      Promise.resolve({
-        ok: false,
-        status: 503,
-        json: () => Promise.resolve({ error: 'Service unavailable' }),
-      })
+    server.use(
+      http.post('/api/ask', () =>
+        HttpResponse.json({ error: 'Service unavailable' }, { status: 503 })
+      )
     )
 
     render(<Ask />)
@@ -184,11 +198,12 @@ describe('Ask', () => {
     await waitFor(() => {
       expect(screen.getByText(/not available right now/)).toBeInTheDocument()
     })
+
+    await waitFor(() => expect(submitButton).toBeEnabled())
   })
 
   it('displays error message on network error', async () => {
-    // Mock network error
-    global.fetch = vi.fn(() => Promise.reject(new Error('Network error')))
+    server.use(http.post('/api/ask', () => HttpResponse.error()))
 
     render(<Ask />)
     const user = userEvent.setup()
@@ -201,11 +216,13 @@ describe('Ask', () => {
     await waitFor(() => {
       expect(screen.getByText(/Network error/)).toBeInTheDocument()
     })
+
+    await waitFor(() => expect(submitButton).toBeEnabled())
   })
 
   it('does not render heading when embedded', () => {
     render(<Ask embedded />)
-    expect(screen.queryByText('Ask')).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Ask' })).not.toBeInTheDocument()
     expect(screen.queryByText(/Questions about this portfolio/)).not.toBeInTheDocument()
   })
 

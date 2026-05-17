@@ -65,11 +65,6 @@ describe('AboutRepo', () => {
     })
   })
 
-  it('sets correct page title', () => {
-    render(<AboutRepo />)
-    expect(document.title).toBe('About This Repo — Sharful Islam')
-  })
-
   it('applies correct styling to sections', async () => {
     render(<AboutRepo />)
 

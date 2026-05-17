@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw'
 
-// Mock data for testing
+// Mock data for testing - matches OpenAPI types from types.gen.ts
 export const mockJobs = [
   {
     id: 1,
@@ -34,18 +34,29 @@ export const mockAboutSections = [
     slug: 'background',
     heading: 'Background',
     body: 'I am a software engineer with 10 years of experience.',
+    icon: null,
     sort_order: 1,
   },
 ]
 
 export const mockSocialLinks = [
   {
+    id: 1,
+    platform: 'linkedin',
     url: 'https://linkedin.com/in/shantopagla',
     label: 'LinkedIn',
+    icon: null,
+    visible: true,
+    sort_order: 1,
   },
   {
+    id: 2,
+    platform: 'github',
     url: 'https://github.com/shantopagla',
     label: 'GitHub',
+    icon: null,
+    visible: false,
+    sort_order: 2,
   },
 ]
 
@@ -61,6 +72,7 @@ export const mockChallenges = [
     category: 'technical',
     url: 'https://github.com/shantopagla/portfolio',
     featured: true,
+    image_url: null,
     sort_order: 1,
   },
 ]
@@ -75,7 +87,7 @@ export const handlers = [
     })
   }),
 
-  // Resume endpoints
+  // Resume endpoint
   http.get('/api/resume', () => {
     return HttpResponse.json({
       name: 'Sharful Islam',
@@ -85,6 +97,7 @@ export const handlers = [
       jobs: mockJobs,
       competencies: mockCompetencies,
       challenges: mockChallenges,
+      social_links: mockSocialLinks,
     })
   }),
 
@@ -118,7 +131,7 @@ export const handlers = [
     const comp = mockCompetencies.find(c => c.slug === params.slug)
     if (comp) {
       return HttpResponse.json({
-        competency: comp,
+        ...comp,
         evidence: [
           {
             id: 1,
@@ -127,6 +140,8 @@ export const handlers = [
             company: 'Tech Corp',
             highlight_text: 'Built Rust systems',
             detail_text: 'Developed high-performance Rust systems',
+            detail_id: 1,
+            sort_order: 1,
           },
         ],
       })
@@ -138,7 +153,7 @@ export const handlers = [
   http.get('/api/about/sections', ({ request }) => {
     const url = new URL(request.url)
     const page = url.searchParams.get('page')
-    if (page === 'me' || page === 'repo') {
+    if (!page || page === 'me' || page === 'repo') {
       return HttpResponse.json(mockAboutSections)
     }
     return HttpResponse.json([])
@@ -163,7 +178,7 @@ export const handlers = [
   }),
 
   // Contact form
-  http.post('/api/contact/challenge', () => {
+  http.get('/api/contact/challenge', () => {
     return HttpResponse.json({
       nonce: 'test-nonce',
       difficulty: 1,

@@ -161,6 +161,17 @@ fn extract_client_ip(
     headers: &HeaderMap,
     connect_info: Option<&ConnectInfo<SocketAddr>>,
 ) -> String {
+    // API Gateway v2 provides the authoritative client IP in
+    // requestContext.http.sourceIp; our Lambda handler injects it as
+    // x-apigw-source-ip to avoid trusting x-forwarded-for (spoofable).
+    if let Some(ip) = headers
+        .get("x-apigw-source-ip")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+    {
+        return ip.to_string();
+    }
     if let Some(ip) = headers
         .get("x-forwarded-for")
         .and_then(|v| v.to_str().ok())

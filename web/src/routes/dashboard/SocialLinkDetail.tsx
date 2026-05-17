@@ -84,8 +84,9 @@ export default function SocialLinkDetail() {
       <form onSubmit={handleSubmit} className="space-y-4">
         {(['platform', 'url', 'label', 'icon'] as const).map(field => (
           <div key={field}>
-            <label className="block text-xs font-medium text-gray-400 mb-1 capitalize">{field}</label>
+            <label htmlFor={`social-${field}`} className="block text-xs font-medium text-gray-400 mb-1 capitalize">{field}</label>
             <input
+              id={`social-${field}`}
               type={field === 'url' ? 'url' : 'text'}
               value={form[field]}
               onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
@@ -99,17 +100,18 @@ export default function SocialLinkDetail() {
         <div className="flex items-center gap-3">
           <input
             type="checkbox"
-            id="visible"
+            id="social-visible"
             checked={form.visible}
             onChange={e => setForm(f => ({ ...f, visible: e.target.checked }))}
             className="h-4 w-4 rounded border-gray-600 bg-gray-800 text-cyan-500 focus:ring-cyan-500"
           />
-          <label htmlFor="visible" className="text-sm text-gray-300">Visible in nav</label>
+          <label htmlFor="social-visible" className="text-sm text-gray-300">Visible in nav</label>
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1">Sort order</label>
+          <label htmlFor="social-sort-order" className="block text-xs font-medium text-gray-400 mb-1">Sort order</label>
           <input
+            id="social-sort-order"
             type="number"
             value={form.sort_order}
             onChange={e => setForm(f => ({ ...f, sort_order: Number(e.target.value) }))}

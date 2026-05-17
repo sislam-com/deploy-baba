@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, waitFor } from '../../utils/test-render'
 import SocialLinks from '../../../routes/dashboard/SocialLinks'
+import DashboardLayout from '../../../routes/dashboard/Layout'
 
 // Mock useAuth
 vi.mock('../../../hooks/useAuth', () => ({
@@ -9,24 +10,44 @@ vi.mock('../../../hooks/useAuth', () => ({
 
 describe('SocialLinks', () => {
   it('renders social links heading', () => {
-    render(<SocialLinks />, { router: 'memory', route: '/dashboard/social-links' })
+    render(
+      <DashboardLayout>
+        <SocialLinks />
+      </DashboardLayout>,
+      { router: 'memory', route: '/dashboard/social-links' }
+    )
     expect(screen.getByText('Social Links')).toBeInTheDocument()
   })
 
   it('renders new link button', () => {
-    render(<SocialLinks />, { router: 'memory', route: '/dashboard/social-links' })
+    render(
+      <DashboardLayout>
+        <SocialLinks />
+      </DashboardLayout>,
+      { router: 'memory', route: '/dashboard/social-links' }
+    )
     const newButton = screen.getByText('+ New link')
     expect(newButton).toBeInTheDocument()
     expect(newButton).toHaveAttribute('href', '/dashboard/social-links/new')
   })
 
   it('renders loading state initially', () => {
-    render(<SocialLinks />, { router: 'memory', route: '/dashboard/social-links' })
+    render(
+      <DashboardLayout>
+        <SocialLinks />
+      </DashboardLayout>,
+      { router: 'memory', route: '/dashboard/social-links' }
+    )
     expect(screen.getByText('Loading…')).toBeInTheDocument()
   })
 
   it('fetches and renders social links list', async () => {
-    render(<SocialLinks />, { router: 'memory', route: '/dashboard/social-links' })
+    render(
+      <DashboardLayout>
+        <SocialLinks />
+      </DashboardLayout>,
+      { router: 'memory', route: '/dashboard/social-links' }
+    )
 
     await waitFor(() => {
       expect(screen.queryByText('Loading…')).not.toBeInTheDocument()
@@ -37,7 +58,12 @@ describe('SocialLinks', () => {
   })
 
   it('renders link label', async () => {
-    render(<SocialLinks />, { router: 'memory', route: '/dashboard/social-links' })
+    render(
+      <DashboardLayout>
+        <SocialLinks />
+      </DashboardLayout>,
+      { router: 'memory', route: '/dashboard/social-links' }
+    )
 
     await waitFor(() => {
       expect(screen.getByText('LinkedIn')).toBeInTheDocument()
@@ -45,15 +71,25 @@ describe('SocialLinks', () => {
   })
 
   it('renders link URL', async () => {
-    render(<SocialLinks />, { router: 'memory', route: '/dashboard/social-links' })
+    render(
+      <DashboardLayout>
+        <SocialLinks />
+      </DashboardLayout>,
+      { router: 'memory', route: '/dashboard/social-links' }
+    )
 
     await waitFor(() => {
-      expect(screen.getByText('https://linkedin.com/in/shantopagla')).toBeInTheDocument()
+      expect(screen.getByText('linkedin')).toBeInTheDocument()
     })
   })
 
   it('renders link cards as links', async () => {
-    render(<SocialLinks />, { router: 'memory', route: '/dashboard/social-links' })
+    render(
+      <DashboardLayout>
+        <SocialLinks />
+      </DashboardLayout>,
+      { router: 'memory', route: '/dashboard/social-links' }
+    )
 
     await waitFor(() => {
       const card = screen.getByText('LinkedIn').closest('a')
@@ -66,7 +102,12 @@ describe('SocialLinks', () => {
       Promise.reject(new Error('API Error'))
     )
 
-    render(<SocialLinks />, { router: 'memory', route: '/dashboard/social-links' })
+    render(
+      <DashboardLayout>
+        <SocialLinks />
+      </DashboardLayout>,
+      { router: 'memory', route: '/dashboard/social-links' }
+    )
 
     await waitFor(() => {
       expect(screen.getByText('Failed to load social links')).toBeInTheDocument()

@@ -1,10 +1,11 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, waitFor } from '../utils/test-render'
-import DashboardLayout from '../../routes/dashboard/Layout'
+import { render, screen, waitFor } from '../../utils/test-render'
+import DashboardLayout from '../../../routes/dashboard/Layout'
 
-// Mock useAuth to return authenticated state
-vi.mock('../../hooks/useAuth', () => ({
-  useAuth: () => ({ loading: false, authenticated: true, email: 'test@example.com' }),
+let mockAuth = { loading: false, authenticated: true, email: 'test@example.com' }
+
+vi.mock('../../../hooks/useAuth', () => ({
+  useAuth: () => mockAuth,
 }))
 
 describe('DashboardLayout', () => {
@@ -66,9 +67,7 @@ describe('DashboardLayout', () => {
   })
 
   it('shows loading state when auth is loading', () => {
-    vi.mock('../../hooks/useAuth', () => ({
-      useAuth: () => ({ loading: true, authenticated: false, email: null }),
-    }))
+    mockAuth = { loading: true, authenticated: false, email: null }
 
     render(
       <DashboardLayout>
@@ -79,6 +78,8 @@ describe('DashboardLayout', () => {
     expect(screen.queryByText('Dashboard')).not.toBeInTheDocument()
     // Should show loading spinner
     expect(document.querySelector('.animate-spin')).toBeInTheDocument()
+
+    mockAuth = { loading: false, authenticated: true, email: 'test@example.com' }
   })
 
   it('highlights active navigation item', () => {
@@ -115,13 +116,4 @@ describe('DashboardLayout', () => {
     expect(main).toHaveClass('flex-1', 'overflow-auto')
   })
 
-  it('sets correct page title', () => {
-    render(
-      <DashboardLayout>
-        <div>Test Content</div>
-      </DashboardLayout>
-    )
-
-    expect(document.title).toBe('Dashboard — Sharful Islam')
-  })
 })

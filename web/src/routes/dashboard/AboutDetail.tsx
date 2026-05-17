@@ -83,8 +83,9 @@ export default function AboutDetail() {
       <form onSubmit={handleSubmit} className="space-y-4">
         {(['page', 'slug', 'heading', 'icon'] as const).map(field => (
           <div key={field}>
-            <label className="block text-xs font-medium text-gray-400 mb-1 capitalize">{field}</label>
+            <label htmlFor={`about-${field}`} className="block text-xs font-medium text-gray-400 mb-1 capitalize">{field}</label>
             <input
+              id={`about-${field}`}
               type="text"
               value={form[field]}
               onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
@@ -96,8 +97,9 @@ export default function AboutDetail() {
         ))}
 
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1">Body</label>
+          <label htmlFor="about-body" className="block text-xs font-medium text-gray-400 mb-1">Body</label>
           <textarea
+            id="about-body"
             rows={6}
             required
             value={form.body}
@@ -108,8 +110,9 @@ export default function AboutDetail() {
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1">Sort order</label>
+          <label htmlFor="about-sort-order" className="block text-xs font-medium text-gray-400 mb-1">Sort order</label>
           <input
+            id="about-sort-order"
             type="number"
             value={form.sort_order}
             onChange={e => setForm(f => ({ ...f, sort_order: Number(e.target.value) }))}

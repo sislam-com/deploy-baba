@@ -24,10 +24,10 @@ export function renderWithProviders(
       if (routes) {
         return (
           <HelmetProvider>
-            <MemoryRouter initialEntries={[route]}>
+            <MemoryRouter initialEntries={[route]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
               <Routes>
                 {routes.map(r => (
-                  <Route key={r.path} path={r.path} element={r.element} />
+                  <Route key={r.path} path={r.path} element={r.element ?? children} />
                 ))}
               </Routes>
             </MemoryRouter>
@@ -36,14 +36,14 @@ export function renderWithProviders(
       }
       return (
         <HelmetProvider>
-          <MemoryRouter initialEntries={[route]}>{children}</MemoryRouter>
+          <MemoryRouter initialEntries={[route]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>{children}</MemoryRouter>
         </HelmetProvider>
       )
     }
 
     return (
       <HelmetProvider>
-        <BrowserRouter>{children}</BrowserRouter>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>{children}</BrowserRouter>
       </HelmetProvider>
     )
   }
@@ -56,3 +56,6 @@ export function renderWithProviders(
 // Re-export everything from RTL
 export * from '@testing-library/react'
 export { default as userEvent } from '@testing-library/user-event'
+
+// Override render so tests importing from this module get the wrapped version
+export { renderWithProviders as render }

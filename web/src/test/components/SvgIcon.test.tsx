@@ -13,12 +13,14 @@ describe('SvgIcon', () => {
   it('applies custom className', () => {
     render(<SvgIcon name="user" className="w-10 h-10" />)
     const svg = screen.getByRole('img', { hidden: true })
+    expect(svg).toBeInTheDocument()
     expect(svg).toHaveClass('w-10', 'h-10')
   })
 
   it('uses default className when not provided', () => {
     render(<SvgIcon name="user" />)
     const svg = screen.getByRole('img', { hidden: true })
+    expect(svg).toBeInTheDocument()
     expect(svg).toHaveClass('w-4', 'h-4')
   })
 
@@ -47,8 +49,8 @@ describe('SvgIcon', () => {
     render(<SvgIcon name="unknown-icon" />)
     const svg = screen.getByRole('img', { hidden: true })
     expect(svg).toBeInTheDocument()
-    // Should use diamond as fallback
-    expect(svg).toHaveAttribute('fill', 'none')
+    // Svg wrapper always has fill="currentColor"
+    expect(svg).toHaveAttribute('fill', 'currentColor')
   })
 
   it('sets aria-hidden to true', () => {

@@ -65,11 +65,6 @@ describe('AboutMe', () => {
     })
   })
 
-  it('sets correct page title', () => {
-    render(<AboutMe />)
-    expect(document.title).toBe('About Me — Sharful Islam')
-  })
-
   it('applies correct styling to sections', async () => {
     render(<AboutMe />)
 

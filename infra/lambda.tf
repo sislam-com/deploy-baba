@@ -36,6 +36,7 @@ resource "aws_lambda_function" "baba" {
       LLM_PROXY_LAMBDA_NAME  = aws_lambda_function.llm_proxy.function_name
       ANTHROPIC_API_KEY_ARN  = aws_secretsmanager_secret.anthropic_api_key.arn
       RAG_PUBLIC_ENABLED     = "1"
+      ASK_RATE_LIMIT         = "10"
       S3_BACKUP_BUCKET       = aws_s3_bucket.backups.id
       PORTFOLIO_API_BASE_URL = "https://${var.domain_name}"
     }

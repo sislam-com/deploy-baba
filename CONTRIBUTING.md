@@ -45,4 +45,4 @@ Run `just` with no arguments to see all available commands.
 ## License
 
 By contributing, you agree that your contributions will be licensed under the
-MIT OR Apache-2.0 dual license.
+MIT license.

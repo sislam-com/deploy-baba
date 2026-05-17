@@ -36,6 +36,7 @@ pub fn build(state: AppState) -> Router {
             get(routes::contact::challenge_issue),
         )
         .route("/api/contact", post(routes::contact::contact_submit))
+        .route("/api/ask", post(routes::api::ask::ask))
         // ── Resume file downloads ────────────────────────────────────────────
         .nest_service("/resume", ServeDir::new("target/resume"))
         // ── API Versioning (ADR-024) ─────────────────────────────────────────

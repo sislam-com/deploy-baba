@@ -81,8 +81,9 @@ export default function CompetencyDetail() {
       <form onSubmit={handleSubmit} className="space-y-4">
         {(['slug', 'name', 'icon'] as const).map(field => (
           <div key={field}>
-            <label className="block text-xs font-medium text-gray-400 mb-1 capitalize">{field}</label>
+            <label htmlFor={`comp-${field}`} className="block text-xs font-medium text-gray-400 mb-1 capitalize">{field}</label>
             <input
+              id={`comp-${field}`}
               type="text"
               value={form[field]}
               onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
@@ -94,8 +95,9 @@ export default function CompetencyDetail() {
         ))}
 
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1">Description</label>
+          <label htmlFor="comp-description" className="block text-xs font-medium text-gray-400 mb-1">Description</label>
           <textarea
+            id="comp-description"
             rows={3}
             value={form.description}
             onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
@@ -105,8 +107,9 @@ export default function CompetencyDetail() {
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1">Sort order</label>
+          <label htmlFor="comp-sort-order" className="block text-xs font-medium text-gray-400 mb-1">Sort order</label>
           <input
+            id="comp-sort-order"
             type="number"
             value={form.sort_order}
             onChange={e => setForm(f => ({ ...f, sort_order: Number(e.target.value) }))}
