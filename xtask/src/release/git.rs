@@ -17,12 +17,7 @@ pub fn last_prod_tag() -> Result<Option<String>> {
 
 fn latest_matching_tag(pattern: &str) -> Result<Option<String>> {
     let out = Command::new("git")
-        .args([
-            "tag",
-            "-l",
-            pattern,
-            "--sort=-version:refname",
-        ])
+        .args(["tag", "-l", pattern, "--sort=-version:refname"])
         .output()
         .context("git tag -l")?;
     let lines = String::from_utf8(out.stdout)?;
