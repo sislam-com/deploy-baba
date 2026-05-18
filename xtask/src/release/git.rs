@@ -17,14 +17,16 @@ pub fn last_prod_tag() -> Result<Option<String>> {
 
 fn latest_matching_tag(pattern: &str) -> Result<Option<String>> {
     let out = Command::new("git")
-        .args(["describe", "--tags", "--abbrev=0", "--match", pattern])
+        .args([
+            "tag",
+            "-l",
+            pattern,
+            "--sort=-version:refname",
+        ])
         .output()
-        .context("git describe")?;
-    if out.status.success() {
-        Ok(Some(String::from_utf8(out.stdout)?.trim().to_string()))
-    } else {
-        Ok(None)
-    }
+        .context("git tag -l")?;
+    let lines = String::from_utf8(out.stdout)?;
+    Ok(lines.lines().next().map(|s| s.trim().to_string()))
 }
 
 pub fn commits_since(since_tag: Option<&str>) -> Result<Vec<CommitInfo>> {

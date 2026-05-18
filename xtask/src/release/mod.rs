@@ -1,5 +1,4 @@
 use clap::{Args, Subcommand};
-use tracing::info;
 
 mod changelog;
 pub mod git;
@@ -95,7 +94,7 @@ fn cmd_tag(args: TagArgs) -> anyhow::Result<()> {
     let tag_name = format!("{prefix}{next_ver}");
 
     if git::tag_exists_at_head(&tag_name)? {
-        info!("{tag_name} already exists at HEAD — nothing to do");
+        println!("{tag_name} already exists at HEAD — nothing to do");
         return Ok(());
     }
     if git::tag_exists(&tag_name)? {
@@ -104,11 +103,11 @@ fn cmd_tag(args: TagArgs) -> anyhow::Result<()> {
 
     let body = changelog::render(&tag_name, &bump, &range_desc, &commits);
     git::create_annotated_tag(&tag_name, &body)?;
-    info!("created {tag_name}");
+    println!("created {tag_name}");
 
     if args.push {
         git::push_tag(&tag_name)?;
-        info!("pushed {tag_name}");
+        println!("pushed {tag_name}");
     }
     Ok(())
 }
@@ -131,11 +130,11 @@ fn cmd_promote(args: PromoteArgs) -> anyhow::Result<()> {
     let dev_sha = git::tag_sha(&latest_dev)?;
     let body = format!("Promote {latest_dev} → {prod_tag}");
     git::create_annotated_tag_at(&prod_tag, &body, &dev_sha)?;
-    info!("created {prod_tag} at {dev_sha}");
+    println!("created {prod_tag} at {dev_sha}");
 
     if args.push {
         git::push_tag(&prod_tag)?;
-        info!("pushed {prod_tag}");
+        println!("pushed {prod_tag}");
     }
     Ok(())
 }
