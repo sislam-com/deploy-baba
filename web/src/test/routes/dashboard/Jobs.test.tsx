@@ -168,10 +168,7 @@ describe('Jobs', () => {
 
   it('renders empty state when no jobs', async () => {
     global.fetch = vi.fn(() =>
-      Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve([]),
-      })
+      Promise.resolve(new Response(JSON.stringify([]), { status: 200 }))
     )
 
     render(

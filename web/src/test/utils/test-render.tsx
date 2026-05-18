@@ -7,7 +7,7 @@ import { HelmetProvider } from 'react-helmet-async'
 interface CustomRenderOptions extends Omit<RenderOptions, 'wrapper'> {
   router?: 'memory' | 'browser'
   route?: string
-  routes?: { path: string; element: ReactElement }[]
+  routes?: { path: string; element?: ReactElement }[]
 }
 
 export function renderWithProviders(

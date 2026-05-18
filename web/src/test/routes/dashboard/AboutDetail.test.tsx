@@ -44,7 +44,7 @@ describe('AboutDetail', () => {
   })
 
   it('submits form and navigates back', async () => {
-    global.fetch = vi.fn(() => Promise.resolve({ ok: true }))
+    global.fetch = vi.fn(() => Promise.resolve(new Response(null, { status: 200 })))
     render(
       <DashboardLayout>
         <AboutDetail />

@@ -1,4 +1,5 @@
 import { setupServer } from 'msw/node'
+import { beforeAll, beforeEach, afterEach, afterAll } from 'vitest'
 import { handlers } from './handlers'
 
 // Setup MSW server for Node.js environment (Vitest)

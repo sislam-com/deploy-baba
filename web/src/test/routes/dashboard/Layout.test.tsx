@@ -1,8 +1,9 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, waitFor } from '../../utils/test-render'
+import { render, screen } from '../../utils/test-render'
 import DashboardLayout from '../../../routes/dashboard/Layout'
+import type { AuthState } from '../../../hooks/useAuth'
 
-let mockAuth = { loading: false, authenticated: true, email: 'test@example.com' }
+let mockAuth: AuthState = { loading: false, authenticated: true, email: 'test@example.com' }
 
 vi.mock('../../../hooks/useAuth', () => ({
   useAuth: () => mockAuth,

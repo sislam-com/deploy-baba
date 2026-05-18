@@ -113,10 +113,7 @@ describe('JobDetail', () => {
 
   it('submits form and navigates back', async () => {
     global.fetch = vi.fn(() =>
-      Promise.resolve({
-        ok: true,
-        text: () => Promise.resolve('Success'),
-      })
+      Promise.resolve(new Response('Success', { status: 200 }))
     )
 
     render(
@@ -143,10 +140,7 @@ describe('JobDetail', () => {
 
   it('shows error message on save failure', async () => {
     global.fetch = vi.fn(() =>
-      Promise.resolve({
-        ok: false,
-        text: () => Promise.resolve('Save failed'),
-      })
+      Promise.resolve(new Response('Save failed', { status: 400 }))
     )
 
     render(
@@ -172,9 +166,7 @@ describe('JobDetail', () => {
 
   it('deletes job and navigates back', async () => {
     global.fetch = vi.fn(() =>
-      Promise.resolve({
-        ok: true,
-      })
+      Promise.resolve(new Response(null, { status: 200 }))
     )
 
     // Mock confirm
@@ -249,8 +241,8 @@ describe('JobDetail', () => {
   })
 
   it('disables save button while saving', async () => {
-    let resolvePromise: (value: any) => void
-    global.fetch = vi.fn(() => new Promise(resolve => {
+    let resolvePromise: (value: Response) => void
+    global.fetch = vi.fn(() => new Promise<Response>(resolve => {
       resolvePromise = resolve
     }))
 
@@ -275,7 +267,7 @@ describe('JobDetail', () => {
 
     // Cleanup: resolve and let React finish state updates inside act()
     await act(async () => {
-      resolvePromise!({ ok: true, text: () => Promise.resolve('Success') })
+      resolvePromise!(new Response('Success', { status: 200 }))
     })
   })
 })

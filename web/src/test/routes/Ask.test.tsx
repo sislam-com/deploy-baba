@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '../utils/test-render'
+import { describe, it, expect } from 'vitest'
+import { render, screen, waitFor } from '../utils/test-render'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { server } from '../mocks/server'
@@ -226,9 +226,8 @@ describe('Ask', () => {
     expect(screen.queryByText(/Questions about this portfolio/)).not.toBeInTheDocument()
   })
 
-  it('respects max length on textarea', async () => {
+  it('respects max length on textarea', () => {
     render(<Ask />)
-    const user = userEvent.setup()
 
     const textarea = screen.getByLabelText('Your question')
     expect(textarea).toHaveAttribute('maxLength', '6000')

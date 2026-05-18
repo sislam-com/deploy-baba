@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '../utils/test-render'
+import { describe, it, expect } from 'vitest'
+import { render, screen, waitFor } from '../utils/test-render'
 import userEvent from '@testing-library/user-event'
 import Home from '../../routes/Home'
 
@@ -216,7 +216,7 @@ describe('Home', () => {
       expect(screen.getByText('Tech Corp')).toBeInTheDocument()
     })
 
-    const jobCard = screen.getByText('Tech Corp').closest('div[role="button"]')
+    const jobCard = screen.getByText('Tech Corp').closest('div[role="button"]') as HTMLElement | null
     if (jobCard) {
       jobCard.focus()
       await user.keyboard('{Enter}')

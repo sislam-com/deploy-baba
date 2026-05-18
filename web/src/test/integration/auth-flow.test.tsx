@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, waitFor } from '../utils/test-render'
+import { waitFor } from '../utils/test-render'
 import { renderHook } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { http, HttpResponse, delay } from 'msw'
