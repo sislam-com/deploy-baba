@@ -47,11 +47,11 @@ coverage:
 
 # fmt + lint + test (the standard inner loop)
 dev:
-    just web-types-offline && just fmt && just lint && just test
+    just web-types-offline && just fmt && just lint && just test && just web-typecheck && just web-test
 
 # Full quality gate (fmt + lint + test + coverage floors + audit + HCL fmt check)
 quality:
-    just web-types-offline && cargo xtask quality all && tofu fmt -check -recursive infra/
+    just web-types-offline && cargo xtask quality all && just web-coverage && tofu fmt -check -recursive infra/
 
 # Build all crates (release)
 build:
@@ -121,14 +121,14 @@ infra-verify DOMAIN="sislam.com":
 # Run the portfolio site locally on :3000, serving the pre-built SPA from web/dist/.
 # Run `just web-build` first if web/dist/ is missing or stale.
 # For hot-reloading frontend dev, use `just dev-stack` instead (Vite on :3000 + API on :3001).
-ui:
+ui ENV="dev":
     #!/usr/bin/env bash
     set -euo pipefail
     if [ ! -f web/dist/index.html ]; then
         echo "web/dist/ missing — building SPA first..."
         just web-build
     fi
-    eval "$(just dev-env)"
+    eval "$(just dev-env {{ENV}})"
     env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN \
         cargo watch -x 'run --package deploy-baba-ui'
 
@@ -190,16 +190,16 @@ sso-login:
 # ── Developer Environment ─────────────────────────────────────────────────────
 
 # Print `export X=Y` lines for all env vars the local Rust binary needs.
-# Fetches Cognito config from SSM (/deploy-baba/prod/cognito-*) and JWKS from the
+# Fetches Cognito config from SSM (/deploy-baba/<ENV>/cognito-*) and JWKS from the
 # public Cognito endpoint. Consumed via `eval "$(just dev-env)"` in `just ui`.
 # Requires a valid SSO session — run `just sso-login` first.
-dev-env:
+dev-env ENV="dev":
     #!/usr/bin/env bash
     set -euo pipefail
     AWS="env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN AWS_PROFILE={{PROFILE}} aws"
-    pool_id=$($AWS ssm get-parameter --name /deploy-baba/prod/cognito-pool-id    --query Parameter.Value --output text)
-    client_id=$($AWS ssm get-parameter --name /deploy-baba/prod/cognito-client-id --query Parameter.Value --output text)
-    domain=$($AWS    ssm get-parameter --name /deploy-baba/prod/cognito-domain    --query Parameter.Value --output text)
+    pool_id=$($AWS ssm get-parameter --name /deploy-baba/{{ENV}}/cognito-pool-id    --query Parameter.Value --output text)
+    client_id=$($AWS ssm get-parameter --name /deploy-baba/{{ENV}}/cognito-client-id --query Parameter.Value --output text)
+    domain=$($AWS    ssm get-parameter --name /deploy-baba/{{ENV}}/cognito-domain    --query Parameter.Value --output text)
     jwks=$(curl -fsSL "https://cognito-idp.us-east-1.amazonaws.com/${pool_id}/.well-known/jwks.json")
     echo "export AWS_PROFILE={{PROFILE}}"
     echo "export ANTHROPIC_API_KEY_ARN=root-anthropic-access-key"
@@ -228,6 +228,10 @@ web-build:
 # Run Vitest unit tests
 web-test:
     pnpm --dir web run test
+
+# Run Vitest coverage report for web/
+web-coverage:
+    pnpm --dir web run coverage
 
 # TypeScript type check (no emit)
 web-typecheck:

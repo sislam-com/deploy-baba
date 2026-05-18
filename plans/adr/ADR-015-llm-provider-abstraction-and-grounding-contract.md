@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-10
 **Status:** Accepted
-**Affected modules:** W-LLM (primary — new crate pair), W-RST (primary consumer), W-RSM (via `polish_bio_to_summary` upgrade), W-SEC (new secret), W-APIO (new models), W-UI (new route + feature flag), W-DX (per-crate READMEs)
+**Affected modules:** W-LLM (primary — new crate pair: llm-core, llm-anthropic, llm-openai), W-RST (primary consumer), W-RSM (via `polish_bio_to_summary` upgrade), W-SEC (new secrets), W-APIO (new models), W-UI (new route + runtime provider selector), W-DX (per-crate READMEs)
 
 ## Context
 
@@ -30,7 +30,8 @@ providers — not in any individual adapter.
 > generator operates under a **universal grounding contract** enforced at
 > the `llm-core` prompt-assembly layer. The **reference implementation
 > shipped with MVP is Anthropic Claude**, reusing the author's existing
-> account. Provider selection is a cargo feature flag.
+> account. Provider selection is runtime-configurable via `LLM_PROVIDER`
+> env var (default: `anthropic`).
 
 Specific rules:
 
@@ -47,13 +48,17 @@ Specific rules:
    API key stored in AWS Secrets Manager as
    `deploy-baba/prod/anthropic-api-key` per W-SEC.
 
-3. **`services/ui`** selects the active adapter at compile time via a cargo
-   feature flag (`features = ["llm-anthropic"]` as default). Future adapters
-   slot in by flipping the feature without touching `services/ui/src/tailor/`.
+3. **`crates/llm-openai`** (added 2026-05-XX) is the second concrete
+   `LlmProvider` implementation, using direct HTTP against the OpenAI Chat
+   Completions API. Default model: `gpt-4o-mini`. Upgrade model: `gpt-4o`.
+   API key stored in AWS Secrets Manager as
+   `deploy-baba/prod/openai-api-key` per W-SEC.
 
-4. **Adapter injection**: adapters receive secrets via constructor injection
-   (not env var lookup inside the adapter). The secret plumbing stays in
-   `services/ui`; adapters remain unit-testable without real credentials.
+4. **Runtime provider selection**: The `llm-proxy` Lambda selects the active
+   adapter at runtime via a `provider` field in the request (default:
+   `anthropic`). Local dev uses the `LLM_PROVIDER` env var (default:
+   `anthropic`). Future adapters slot in by adding a runtime selector
+   branch without touching consumer code.
 
 5. **Grounding contract**: `LlmRequest::grounding: Option<GroundingContract>`
    carries a whitelist of `allowed_source_text` strings (exact bullet text
@@ -85,7 +90,7 @@ Specific rules:
 - Consistent with the workspace idiom: readers already familiar with
   `api-core` + adapters pattern immediately understand `llm-core` +
   adapters.
-- Future provider swap is a one-crate write + one feature-flag flip.
+- Future provider swap is a one-crate write + runtime selector branch.
   No changes to `services/ui/src/tailor/`.
 - Grounding contract is inherited automatically by every future adapter —
   new providers cannot accidentally bypass it.
@@ -95,9 +100,11 @@ Specific rules:
 - Dogfooding: building the resume tailor on the same model family that
   architected it tightens the feedback loop and validates the workflow
   described on the portfolio site itself.
+- Runtime selection enables A/B testing between providers without
+  recompilation or redeployment.
 
 ### Negative / Trade-offs
-- Introduces two new crates (`llm-core`, `llm-anthropic`) and a new domain
+- Introduces three crates (`llm-core`, `llm-anthropic`, `llm-openai`) and a new domain
   code (`W-LLM`). Additional compile surface.
 - No embeddings at MVP — purely keyword matching. Semantic relevance will
   be lower than embedding-based approaches, especially for non-obvious
@@ -107,6 +114,9 @@ Specific rules:
   required API call changes its runtime contract. Mitigation: make the LLM
   call optional behind a `--ai` flag so the local offline path remains
   available.
+- Runtime selection requires both adapter crates to be compiled into the
+  llm-proxy Lambda binary, increasing binary size slightly compared to a
+  compile-time feature flag approach.
 
 ### Neutral
 - `llm-anthropic` integration tests require `ANTHROPIC_API_KEY` env var;
@@ -118,7 +128,7 @@ Specific rules:
 | Option | Rejected because |
 |--------|-----------------|
 | Hardcode Anthropic SDK in `services/ui/src/tailor/` | Abandons the workspace's core-plus-adapter idiom; creates vendor lock-in |
-| OpenAI as the first provider | Would require a second vendor relationship (billing, API key, SDK); no qualitative advantage for this use case. Remains a future adapter option. |
+| OpenAI as the first provider | Would require a second vendor relationship (billing, API key, SDK); no qualitative advantage for this use case. **Implemented 2026-05-XX as runtime-selectable option** via `crates/llm-openai`. |
 | Bedrock (AWS-hosted Claude) | Keeps billing in AWS but loses account alignment with Claude Code; adds IAM model-access permissions and region constraints. Future adapter option. |
 | Self-hosted via Ollama / ECS Fargate GPU | Violates ADR-005 (zero-cost philosophy). Future adapter option if the author ever wants to run private models. |
 | Embeddings from OpenAI / Cohere at MVP | Introduces a second vendor just for embeddings. Breaks the pluggable-first-impl principle by coupling MVP to a non-Claude secret. Deferred to W-RST.4.11. |
@@ -126,10 +136,10 @@ Specific rules:
 
 ## Cross-References
 
-- → W-LLM (primary — `crates/llm-core` + `crates/llm-anthropic`)
+- → W-LLM (primary — `crates/llm-core` + `crates/llm-anthropic` + `crates/llm-openai`)
 - → W-RST (primary consumer — resume-tailor pipeline)
 - → W-RSM (via `polish_bio_to_summary` seam, W-RST.4.3)
-- → W-SEC (new secret `deploy-baba/prod/anthropic-api-key`)
+- → W-SEC (new secrets `deploy-baba/prod/anthropic-api-key`, `deploy-baba/prod/openai-api-key`)
 - → W-APIO (ADR-012 SSOT — `tailor.rs` models register in `ALL_MODELS`)
 - → ADR-005 (zero-cost philosophy — guides provider selection)
 - → ADR-010 (upsert-reseed — `tailor_cache` is not seeded, by design)

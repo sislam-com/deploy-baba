@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-interface AuthState {
+export interface AuthState {
   loading: boolean
   authenticated: boolean
   email: string | null

@@ -13,9 +13,10 @@ grounding contract), see **ADR-015**.
 
 ## Active Provider Registry
 
-| Adapter crate | Provider | Default model | Upgrade model | Secret name (AWS SM) | Feature flag |
-|---------------|----------|--------------|---------------|----------------------|--------------|
-| `llm-anthropic` | Anthropic Claude | `claude-haiku-4-5-20251001` | `claude-sonnet-4-6` | `deploy-baba/prod/anthropic-api-key` | `llm-anthropic` (default) |
+| Adapter crate | Provider | Default model | Upgrade model | Secret name (AWS SM) | Runtime selector |
+|---------------|----------|--------------|---------------|----------------------|------------------|
+| `llm-anthropic` | Anthropic Claude | `claude-haiku-4-5-20251001` | `claude-sonnet-4-6` | `deploy-baba/prod/anthropic-api-key` | `LLM_PROVIDER=anthropic` (default) |
+| `llm-openai` | OpenAI | `gpt-4o-mini` | `gpt-4o` | `deploy-baba/prod/openai-api-key` | `LLM_PROVIDER=openai` |
 
 Any change to this table (new provider, model swap, secret rename) requires
 a revision to **ADR-015** (alternatives and affected modules sections) and a
@@ -116,13 +117,13 @@ W-LLM.4.6):
 
 When switching LLM providers for generation:
 
-1. Update the active-provider registry row (or add a new row + flip the
-   cargo feature flag in `services/ui/Cargo.toml`).
-2. Bump `prompt_version` for every affected prompt.
-3. `tailor_cache` entries are automatically bypassed for new
+1. Update the active-provider registry row (or add a new row).
+2. Set `LLM_PROVIDER` env var on the llm-proxy Lambda (default: `anthropic`).
+3. Bump `prompt_version` for every affected prompt.
+4. `tailor_cache` entries are automatically bypassed for new
    `(provider_id, model, prompt_version)` combinations — no manual purge
    needed.
-4. Update ADR-015 alternatives section to note the old provider as
+5. Update ADR-015 alternatives section to note the old provider as
    "retired" with date.
 
 ---
@@ -135,7 +136,10 @@ When adding a new `LlmProvider` impl (e.g. `crates/llm-openai`):
 - [ ] Declare required secret name(s) in the adapter's `Cargo.toml` metadata
   or in a `const REQUIRED_SECRET: &str = "..."` at crate root
 - [ ] Add a row to the Active Provider Registry table above
-- [ ] Add the cargo feature flag to `services/ui/Cargo.toml`
+- [ ] Add the secret to `infra/secrets.tf` and wire it to the llm-proxy Lambda
+- [ ] Add the secret name to `xtask/src/secret.rs` KNOWN_SECRETS array
+- [ ] Update `services/llm-proxy/src/main.rs` to support runtime provider selection
+- [ ] Update `services/ui/src/routes/api/ask.rs` for local dev direct-call support
 - [ ] Add integration test that runs when the provider's API key env var is
   present; skips otherwise
 - [ ] Add token-counting implementation (required by the cost-cap middleware
@@ -175,7 +179,7 @@ A 3-tool agentic conversation adds ~300 ms total beyond the LLM generation time.
 
 - → ADR-015 (structural decision: pluggable framework + grounding contract)
 - → ADR-023 (agentic tool-dispatch architecture — agent loop + portfolio tools)
-- → W-LLM (llm-core + llm-anthropic module plan, incl. W-LLM.4.8–4.14)
+- → W-LLM (llm-core + llm-anthropic + llm-openai module plan, incl. W-LLM.4.8–4.14, W-LLM.4.15)
 - → W-RST (resume-tailor — primary consumer)
 - → W-RAG (retrieval-augmented generation — incl. W-RAG.7.x–10.x agentic extension)
 - → W-SEC (secrets management — API key storage + rotation)

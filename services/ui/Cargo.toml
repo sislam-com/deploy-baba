@@ -23,6 +23,7 @@ rag-core = { workspace = true }
 rag-sqlite = { workspace = true }
 llm-core = { workspace = true }
 llm-anthropic = { workspace = true }
+llm-openai = { workspace = true }
 async-trait = { workspace = true }
 
 # Web framework

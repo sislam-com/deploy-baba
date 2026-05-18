@@ -38,6 +38,7 @@ resource "aws_lambda_function" "llm_proxy" {
     variables = {
       RUST_LOG              = "info"
       ANTHROPIC_API_KEY_ARN = aws_secretsmanager_secret.anthropic_api_key.arn
+      OPENAI_API_KEY_ARN    = aws_secretsmanager_secret.openai_api_key.arn
     }
   }
 
@@ -90,6 +91,7 @@ resource "aws_iam_role_policy" "llm_proxy_secretsmanager" {
       Action = "secretsmanager:GetSecretValue"
       Resource = [
         aws_secretsmanager_secret.anthropic_api_key.arn,
+        aws_secretsmanager_secret.openai_api_key.arn,
       ]
     }]
   })

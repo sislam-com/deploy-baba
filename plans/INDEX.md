@@ -33,7 +33,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | challenges | W-CHL | `services/ui/src/routes/api/challenges.rs`, `services/ui/migrations/022`, `web/src/routes/dashboard/Challenges.tsx` | DONE | Basic CRUD DONE; RAG corpus integration DONE; admin UI DONE; public pages DONE (W-CHL.4.11); search/filter DONE (W-CHL.4.13); evaluation metrics deferred (W-CHL.4.12) |
 | secrets-manager | W-SEC | `xtask/src/secret.rs`, `infra/secrets.tf`, `infra/vpc-endpoints.tf`, `services/ui/src/routes/contact.rs` | DONE | Deploy: `just infra-apply` + `just secret-put pow-secret $(openssl rand -hex 32)` + `just lambda-deploy` |
 | dashboard-sync | W-SYNC | `plans/modules/dashboard-sync.md`, `services/ui/migrations/`, `services/ui/src/db.rs`, `services/ui/src/routes/api/admin.rs`, `.claude/skills/sync-dashboard-data/` | DONE | 4.1–4.5 complete; zero drift on first run 2026-04-08; .4.6/.4.7 deferred (on-demand) |
-| llm-core + llm-anthropic | W-LLM | `crates/llm-core/`, `crates/llm-anthropic/` | WIP | W-LLM.4.1–4.5 DONE; W-LLM.4.8–4.14 DONE (tool-dispatch loop, ADR-023); W-LLM.4.4 (READMEs), 4.6 DEFERRED |
+| llm-core + llm-anthropic + llm-openai | W-LLM | `crates/llm-core/`, `crates/llm-anthropic/`, `crates/llm-openai/` | WIP | W-LLM.4.1–4.5 DONE; W-LLM.4.8–4.14 DONE (tool-dispatch loop, ADR-023); W-LLM.4.4 (READMEs) DONE; W-LLM.4.15 TODO (OpenAI adapter) |
 | resume-tailor | W-RST | `services/ui/src/tailor/`, `crates/api-openapi/src/models/tailor.rs`, `services/ui/migrations/016` | TODO | All items; BLOCKED-on-deploy for 4.3/4.4/4.5 until W-SEC deployed + `anthropic-api-key` in SM |
 | rag | W-RAG | `crates/rag-core/`, `crates/rag-sqlite/` | WIP | P1 DONE; P3 DONE; P4 DONE; P5 DONE; hybrid retrieval fix (W-RAG.9.5–9.6) DONE 2026-05-09; challenges corpus integration (W-RAG.5.x) DONE; P2 (embedding/ANN) TODO |
 | gdrive-planning | W-GDR | `justfile`, `.claude/settings.json`, `.github/workflows/` | TODO | Drive MCP plan export/import (W-GDR.4.1–4.3); Stop hook quality gate (W-GDR.4.4); evaluated from Gemini proposal 2026-04-15 |
@@ -41,7 +41,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | ci | W-CI | `.github/workflows/` | WIP | Code complete (C.1 + C.2 DONE). W-CI.4.9 RESOLVED 2026-05-04 — GH Variables replaced by SM fetch (DRL-2026-05-04-sislam-outage); bootstrap ARNs set. Remaining: W-CI.4.5 (dev Lambda workspace), W-CI.4.10 (production env gate) |
 | web (SPA) | W-WEB | `web/` | DONE | All 15 Askama templates replaced; Askama removed; CF→S3 direct serving (EFS sync dropped 2026-05-04, DRL-2026-05-04-sislam-outage); SEO prerender deferred to W-WEB.5 (P3) |
 | dev-environment | W-DEV | `scripts/`, `.devcontainer/` | DONE | bootstrap-tfstate.sh; dev-doctor.sh; devcontainer; initial-setup.md |
-| api-versioning | W-VER | `services/ui/src/middleware/`, `services/ui/src/router.rs` | TODO | URL-based versioning middleware; deprecation headers; OpenAPI version metadata |
+| api-versioning | W-VER | `services/ui/src/middleware/`, `services/ui/src/router.rs` | DONE | URL-based versioning with /api/v1/ paths; backward-compatible redirects; deprecation middleware; OpenAPI version metadata |
 | observability | W-OBS | `services/ui/src/telemetry.rs`, `services/ui/migrations/` | TODO | Structured logging (tracing); SQLite metrics tables; metrics query endpoint; p50/p95/p99 latency calculation |
 | resilience | W-RES | `services/ui/src/middleware/` | TODO | Rate limiting (in-memory); retry with exponential backoff; circuit breaker for LLM calls; request validation middleware |
 | module-decomposition | W-MOD | `services/ui/src/modules/` | TODO | Logical module separation (portfolio, rag, admin, auth); independent testing per module; module-specific metrics |
@@ -110,7 +110,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 11. ~~**W-UI.4.1**~~ — Wire utoipa-rapidoc properly — **DONE** (inline HTML approach works fine; loads RapiDoc from CDN)
 
 ### P2.6 — Zero-Cost Microservices Enhancements
-22. **W-VER.4.1–4.4** — API versioning strategy (ADR-024) — TODO (URL-based routing, version extraction middleware, deprecation headers, OpenAPI version metadata)
+22. ~~**W-VER.4.1–4.4**~~ **DONE** — API versioning strategy (ADR-024) — URL-based /api/v1/ routing, version extraction middleware, deprecation headers, OpenAPI version metadata
 23. **W-OBS.4.1–4.4** — SQLite-based observability (ADR-025) — TODO (structured logging with tracing, metrics tables + query endpoint, p50/p95/p99 calculation, no CloudWatch Metrics cost)
 24. **W-RES.4.1–4.4** — Code-level resilience patterns (ADR-026) — TODO (in-memory rate limiting, retry with exponential backoff, circuit breaker for LLM calls, request validation middleware)
 25. **W-MOD.4.1–4.3** — Module-based service decomposition (ADR-027) — TODO (logical module separation, independent testing per module, module-specific metrics collection)
@@ -274,6 +274,6 @@ shantopagla/deploy-baba/
 | 7 | Examples + docs | TODO |
 | 8 | Quality pass | WIP (`just quality` passes: coverage floors ✅, audit ✅; per-crate READMEs + examples TODO) |
 | 9 | Publish | TODO |
-| 10 | Zero-cost microservices enhancements | TODO (W-VER, W-OBS, W-RES, W-MOD) |
+| 10 | Zero-cost microservices enhancements | WIP (~~W-VER~~ DONE, W-OBS, W-RES, W-MOD) |
 
 **Overall: ~95% complete**

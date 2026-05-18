@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/llm-core",
     "crates/llm-anthropic",
+    "crates/llm-openai",
     "crates/rag-core",
     "crates/rag-sqlite",
     "crates/config-core",
@@ -29,7 +30,7 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-license = "MIT OR Apache-2.0"
+license = "MIT"
 repository = "https://github.com/shantopagla/deploy-baba"
 authors = ["shantopagla <it@shantopagla.com>"]
 rust-version = "1.94"
@@ -115,6 +116,7 @@ api-merger = { path = "crates/api-merger" }
 infra-types = { path = "crates/infra-types" }
 llm-core = { path = "crates/llm-core" }
 llm-anthropic = { path = "crates/llm-anthropic" }
+llm-openai = { path = "crates/llm-openai" }
 rag-core = { path = "crates/rag-core" }
 rag-sqlite = { path = "crates/rag-sqlite" }
 

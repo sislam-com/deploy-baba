@@ -1,0 +1,347 @@
+//! OpenAI adapter for `llm-core`.
+//!
+//! Implements [`LlmProvider`] against the OpenAI Chat Completions API using
+//! `reqwest` as the HTTP client. No OpenAI-specific SDK dependency —
+//! direct HTTP keeps the dependency surface minimal and gives us full control
+//! over serialisation.
+//!
+//! # Usage
+//!
+//! ```rust,no_run
+//! use llm_openai::OpenAIProvider;
+//! use llm_core::{LlmProvider, LlmRequest, GenerationConfig, ChatMessage, MessageRole};
+//!
+//! #[tokio::main]
+//! async fn main() {
+//!     let api_key = std::env::var("OPENAI_API_KEY").unwrap();
+//!     let provider = OpenAIProvider::new(api_key);
+//!
+//!     let req = LlmRequest {
+//!         model: provider.default_model().to_owned(),
+//!         messages: vec![ChatMessage::text(MessageRole::User, "Hello!")],
+//!         system: None,
+//!         tools: vec![],
+//!         grounding: None,
+//!         config: GenerationConfig { max_tokens: 50, temperature: 0.5, prompt_version: "demo-v1" },
+//!     };
+//!     let resp = provider.generate(req).await.unwrap();
+//!     println!("{}", resp.content);
+//! }
+//! ```
+
+use async_trait::async_trait;
+use llm_core::{
+    grounding::assemble_grounded_prompt, LlmError, LlmProvider, LlmRequest, LlmResponse,
+    MessageContent, StopReason, ToolCall,
+};
+use serde::{Deserialize, Serialize};
+
+const OPENAI_API_URL: &str = "https://api.openai.com/v1/chat/completions";
+
+/// Default model for cost-efficient generation (fast, cheap).
+pub const DEFAULT_MODEL: &str = "gpt-4o-mini";
+/// Upgrade model for higher-quality generation.
+pub const UPGRADE_MODEL: &str = "gpt-4o";
+
+// ── Wire types for the OpenAI Chat Completions API ─────────────────────────────
+
+#[derive(Serialize)]
+struct ApiRequest<'a> {
+    model: &'a str,
+    messages: Vec<ApiMessage>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    system: Option<&'a str>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    tools: Vec<ApiTool<'a>>,
+    max_tokens: u32,
+    temperature: f32,
+}
+
+#[derive(Serialize)]
+struct ApiMessage {
+    role: String,
+    content: serde_json::Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tool_call_id: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    tool_calls: Vec<ApiToolCall>,
+}
+
+#[derive(Serialize)]
+struct ApiTool<'a> {
+    #[serde(rename = "type")]
+    tool_type: &'static str,
+    function: ApiFunction<'a>,
+}
+
+#[derive(Serialize)]
+struct ApiFunction<'a> {
+    name: &'a str,
+    description: &'a str,
+    parameters: &'a serde_json::Value,
+}
+
+#[derive(Serialize)]
+struct ApiToolCall {
+    id: String,
+    #[serde(rename = "type")]
+    tool_type: &'static str,
+    function: ApiFunctionCall,
+}
+
+#[derive(Serialize)]
+struct ApiFunctionCall {
+    name: String,
+    arguments: String,
+}
+
+#[derive(Deserialize, Debug)]
+struct ApiResponse {
+    choices: Vec<Choice>,
+    usage: Usage,
+    model: String,
+}
+
+#[derive(Deserialize, Debug)]
+struct Choice {
+    message: Message,
+    #[serde(default)]
+    finish_reason: Option<String>,
+}
+
+#[derive(Deserialize, Debug)]
+struct Message {
+    #[serde(default)]
+    content: Option<String>,
+    #[serde(default)]
+    tool_calls: Option<Vec<ApiToolCallResponse>>,
+}
+
+#[derive(Deserialize, Debug)]
+struct ApiToolCallResponse {
+    id: String,
+    function: ApiFunctionResponse,
+}
+
+#[derive(Deserialize, Debug)]
+struct ApiFunctionResponse {
+    name: String,
+    arguments: String,
+}
+
+#[derive(Deserialize, Debug)]
+struct Usage {
+    prompt_tokens: u32,
+    completion_tokens: u32,
+}
+
+#[derive(Deserialize, Debug)]
+struct ApiError {
+    error: ApiErrorBody,
+}
+
+#[derive(Deserialize, Debug)]
+struct ApiErrorBody {
+    message: String,
+    #[serde(rename = "type")]
+    kind: String,
+}
+
+// ── Provider ─────────────────────────────────────────────────────────────
+
+/// OpenAI implementation of [`LlmProvider`].
+///
+/// Constructed with a plain API key string. The key is loaded by the caller
+/// (e.g. from AWS Secrets Manager via `init_api_key()` in `services/ui`) and
+/// injected here — the adapter never reads environment variables or secrets
+/// directly.
+pub struct OpenAIProvider {
+    api_key: String,
+    client: reqwest::Client,
+}
+
+impl OpenAIProvider {
+    /// Create a new provider with the given OpenAI API key.
+    pub fn new(api_key: impl Into<String>) -> Self {
+        Self {
+            api_key: api_key.into(),
+            client: reqwest::Client::new(),
+        }
+    }
+}
+
+fn message_to_api(msg: &llm_core::ChatMessage) -> ApiMessage {
+    let role = match msg.role {
+        llm_core::MessageRole::User => "user",
+        llm_core::MessageRole::Assistant => "assistant",
+        llm_core::MessageRole::System => "system",
+    };
+
+    let mut api_msg = ApiMessage {
+        role: role.to_string(),
+        content: serde_json::Value::Null,
+        tool_call_id: None,
+        tool_calls: vec![],
+    };
+
+    match &msg.content {
+        MessageContent::Text { text } => {
+            api_msg.content = serde_json::Value::String(text.clone());
+        }
+        MessageContent::ToolResult {
+            tool_use_id,
+            content,
+            is_error,
+        } => {
+            api_msg.content = serde_json::Value::String(content.clone());
+            api_msg.tool_call_id = Some(tool_use_id.clone());
+            // OpenAI doesn't have an explicit is_error field in tool results
+            // We include it in the content string if needed
+            if *is_error {
+                api_msg.content = serde_json::Value::String(format!("[ERROR] {}", content));
+            }
+        }
+    }
+
+    api_msg
+}
+
+#[async_trait]
+impl LlmProvider for OpenAIProvider {
+    fn provider_id(&self) -> &'static str {
+        "openai"
+    }
+
+    fn default_model(&self) -> &str {
+        DEFAULT_MODEL
+    }
+
+    async fn generate(&self, req: LlmRequest) -> Result<LlmResponse, LlmError> {
+        let req = assemble_grounded_prompt(req)?;
+
+        let model = if req.model.is_empty() {
+            DEFAULT_MODEL
+        } else {
+            req.model.as_str()
+        };
+
+        let messages: Vec<ApiMessage> = req.messages.iter().map(message_to_api).collect();
+
+        // Add system prompt as a separate message if provided
+        let mut all_messages = messages;
+        if let Some(system) = &req.system {
+            all_messages.insert(
+                0,
+                ApiMessage {
+                    role: "system".to_string(),
+                    content: serde_json::Value::String(system.clone()),
+                    tool_call_id: None,
+                    tool_calls: vec![],
+                },
+            );
+        }
+
+        let tools: Vec<ApiTool<'_>> = req
+            .tools
+            .iter()
+            .map(|t| ApiTool {
+                tool_type: "function",
+                function: ApiFunction {
+                    name: &t.name,
+                    description: &t.description,
+                    parameters: &t.input_schema,
+                },
+            })
+            .collect();
+
+        let body = ApiRequest {
+            model,
+            messages: all_messages,
+            system: None, // System is already in messages array
+            tools,
+            max_tokens: req.config.max_tokens,
+            temperature: req.config.temperature,
+        };
+
+        let http_resp = self
+            .client
+            .post(OPENAI_API_URL)
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .header("content-type", "application/json")
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| LlmError::Network(e.to_string()))?;
+
+        let status = http_resp.status();
+
+        if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
+            let retry = http_resp
+                .headers()
+                .get("retry-after")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|s| s.parse::<u64>().ok())
+                .unwrap_or(5);
+            return Err(LlmError::RateLimited {
+                retry_after_secs: retry,
+            });
+        }
+
+        if !status.is_success() {
+            let text = http_resp
+                .text()
+                .await
+                .unwrap_or_else(|_| status.to_string());
+            if let Ok(api_err) = serde_json::from_str::<ApiError>(&text) {
+                return Err(LlmError::Upstream {
+                    message: format!("[{}] {}", api_err.error.kind, api_err.error.message),
+                });
+            }
+            return Err(LlmError::Upstream { message: text });
+        }
+
+        let api: ApiResponse = http_resp
+            .json()
+            .await
+            .map_err(|e| LlmError::Parse(e.to_string()))?;
+
+        let choice = api
+            .choices
+            .first()
+            .ok_or_else(|| LlmError::Other("No choices in response".to_string()))?;
+
+        let text_content = choice.message.content.clone().unwrap_or_default();
+
+        let tool_calls = if let Some(calls) = &choice.message.tool_calls {
+            calls
+                .iter()
+                .map(|c| ToolCall {
+                    id: c.id.clone(),
+                    name: c.function.name.clone(),
+                    arguments: serde_json::from_str(&c.function.arguments)
+                        .unwrap_or(serde_json::Value::Null),
+                })
+                .collect()
+        } else {
+            vec![]
+        };
+
+        let stop_reason = match choice.finish_reason.as_deref() {
+            Some("stop") => StopReason::EndTurn,
+            Some("length") => StopReason::MaxTokens,
+            Some("tool_calls") => StopReason::ToolUse,
+            Some("content_filter") => StopReason::StopSequence,
+            Some(other) => StopReason::Other(other.to_string()),
+            None => StopReason::EndTurn,
+        };
+
+        Ok(LlmResponse {
+            content: text_content,
+            tool_calls,
+            input_tokens: api.usage.prompt_tokens,
+            output_tokens: api.usage.completion_tokens,
+            model: api.model,
+            stop_reason,
+        })
+    }
+}

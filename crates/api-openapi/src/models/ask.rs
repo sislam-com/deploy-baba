@@ -107,6 +107,12 @@ pub struct AskProxyRequest {
     pub tools: Vec<serde_json::Value>,
     #[serde(default)]
     pub api_base_url: Option<String>,
+    #[serde(default = "default_provider")]
+    pub provider: String,
+}
+
+fn default_provider() -> String {
+    "anthropic".to_string()
 }
 
 /// Response from the LLM-proxy Lambda.
@@ -120,6 +126,7 @@ pub struct AskProxyResponse {
     pub tools_used: Vec<String>,
     #[serde(default)]
     pub turns: u32,
+    pub provider: String,
 }
 
 #[cfg(test)]
@@ -142,11 +149,13 @@ mod tests {
             temperature: 0.2,
             tools: vec![],
             api_base_url: None,
+            provider: "anthropic".into(),
         };
         let json = serde_json::to_string(&req).unwrap();
         let back: AskProxyRequest = serde_json::from_str(&json).unwrap();
         assert_eq!(back.max_tokens, 1024);
         assert!(back.tools.is_empty());
+        assert_eq!(back.provider, "anthropic");
 
         let resp = AskProxyResponse {
             content: "Auth uses Cognito.".into(),
@@ -155,10 +164,12 @@ mod tests {
             output_tokens: 5,
             tools_used: vec![],
             turns: 1,
+            provider: "anthropic".into(),
         };
         let json = serde_json::to_string(&resp).unwrap();
         let back: AskProxyResponse = serde_json::from_str(&json).unwrap();
         assert_eq!(back.output_tokens, 5);
         assert_eq!(back.turns, 1);
+        assert_eq!(back.provider, "anthropic");
     }
 }

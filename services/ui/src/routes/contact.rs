@@ -297,12 +297,20 @@ pub async fn contact_submit(
             .into_response();
     }
 
-    // Rate limit by client IP
+    // Rate limit by client IP — prefer the API Gateway v2 sourceIp injected by
+    // the Lambda handler (x-apigw-source-ip) over x-forwarded-for (spoofable).
     let source_ip = headers
-        .get("x-forwarded-for")
+        .get("x-apigw-source-ip")
         .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.split(',').next())
         .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .or_else(|| {
+            headers
+                .get("x-forwarded-for")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| v.split(',').next())
+                .map(|s| s.trim())
+        })
         .unwrap_or("unknown");
 
     if !rate_limiter().check_and_increment(source_ip) {

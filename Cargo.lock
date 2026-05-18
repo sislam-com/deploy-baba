@@ -1299,6 +1299,7 @@ dependencies = [
  "lambda_runtime",
  "llm-anthropic",
  "llm-core",
+ "llm-openai",
  "rag-core",
  "rag-sqlite",
  "rand 0.8.6",
@@ -2368,6 +2369,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "llm-openai"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "llm-core",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "llm-proxy"
 version = "0.1.0"
 dependencies = [
@@ -2378,6 +2392,7 @@ dependencies = [
  "lambda_runtime",
  "llm-anthropic",
  "llm-core",
+ "llm-openai",
  "reqwest",
  "serde_json",
  "thiserror",
@@ -4469,6 +4484,7 @@ dependencies = [
  "flate2",
  "llm-anthropic",
  "llm-core",
+ "llm-openai",
  "rag-core",
  "rag-sqlite",
  "regex",

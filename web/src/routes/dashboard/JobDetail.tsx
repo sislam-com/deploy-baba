@@ -98,8 +98,9 @@ export default function JobDetail() {
       <form onSubmit={handleSubmit} className="space-y-4">
         {(['slug', 'company', 'title', 'location', 'start_date', 'end_date'] as const).map(field => (
           <div key={field}>
-            <label className="block text-xs font-medium text-gray-400 mb-1 capitalize">{field.replace('_', ' ')}</label>
+            <label htmlFor={`job-${field}`} className="block text-xs font-medium text-gray-400 mb-1 capitalize">{field.replace('_', ' ')}</label>
             <input
+              id={`job-${field}`}
               type="text"
               value={form[field]}
               onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
@@ -111,8 +112,9 @@ export default function JobDetail() {
         ))}
 
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1">Summary</label>
+          <label htmlFor="job-summary" className="block text-xs font-medium text-gray-400 mb-1">Summary</label>
           <textarea
+            id="job-summary"
             rows={3}
             value={form.summary}
             onChange={e => setForm(f => ({ ...f, summary: e.target.value }))}
@@ -122,8 +124,9 @@ export default function JobDetail() {
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1">Tech stack (comma-separated)</label>
+          <label htmlFor="job-tech-stack" className="block text-xs font-medium text-gray-400 mb-1">Tech stack (comma-separated)</label>
           <input
+            id="job-tech-stack"
             type="text"
             value={form.tech_stack}
             onChange={e => setForm(f => ({ ...f, tech_stack: e.target.value }))}
@@ -134,8 +137,9 @@ export default function JobDetail() {
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1">Sort order</label>
+          <label htmlFor="job-sort-order" className="block text-xs font-medium text-gray-400 mb-1">Sort order</label>
           <input
+            id="job-sort-order"
             type="number"
             value={form.sort_order}
             onChange={e => setForm(f => ({ ...f, sort_order: Number(e.target.value) }))}
