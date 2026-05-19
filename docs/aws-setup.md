@@ -251,6 +251,48 @@ this exact failure mode, the interim mitigation, and the resolution evidence.
 
 ---
 
+## 3f. CloudFront SPA Serving
+
+The React SPA is served via CloudFront with S3 Origin Access Control (OAC). See [ADR-019](../plans/adr/ADR-019-spa-replaces-askama.md).
+
+- **S3 bucket** (`infra/s3-spa.tf`): stores built SPA assets (`web/dist/`)
+- **CloudFront distribution** (`infra/cdn.tf`): two origins — S3 for static assets, Lambda Function URL for `/api/*`
+- **OAC**: CloudFront signs requests to S3 — the bucket is not publicly accessible
+- **SPA routing**: CloudFront custom error responses return `index.html` for 403/404 on non-API paths, enabling client-side routing
+
+CI deploys SPA assets via `aws s3 sync web/dist/ s3://$SPA_BUCKET` followed by a CloudFront invalidation.
+
+## 3g. EventBridge Backup
+
+A daily EventBridge rule triggers a SQLite backup to S3 (`infra/eventbridge.tf`):
+
+1. EventBridge fires the backup target on the UI Lambda
+2. The handler runs `VACUUM INTO` to create a consistent snapshot
+3. The snapshot is uploaded to the S3 backup bucket with a date-stamped key
+
+No manual setup needed — this is fully managed by OpenTofu.
+
+## 3h. API Versioning
+
+API endpoints use URL-based versioning: `/api/v1/jobs`, `/api/v1/competencies`, etc. See [ADR-024](../plans/adr/ADR-024-api-versioning-strategy.md).
+
+The versioning middleware adds deprecation headers when an API version is scheduled for removal. The Function URL routes all `/api/*` traffic to the UI Lambda, which handles version dispatch internally.
+
+## 3i. LLM Proxy Lambda
+
+The `llm-proxy` Lambda (`infra/llm-proxy-lambda.tf`) routes LLM requests to the Anthropic API.
+
+- **Secrets**: the Anthropic API key is stored in Secrets Manager (`deploy-baba/prod/anthropic-api-key`)
+- **No VPC**: needs direct internet access for the Anthropic Messages API
+- **Invocation**: called by the UI Lambda via `aws_sdk_lambda::Client::invoke()`
+
+To set up the API key:
+```bash
+just secret-put anthropic-api-key <your-key> deploy-baba
+```
+
+---
+
 ## 4. Bootstrap (First Time Only)
 
 ```bash

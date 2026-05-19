@@ -1,5 +1,5 @@
 # W-CTF: Contact Form + SES Email
-**Service:** `services/email/` + `services/ui/` | **Status:** WIP (Secrets Manager pending)
+**Service:** `services/email/` + `services/ui/` | **Status:** DONE
 **Depends on:** W-UI, W-AUTH (nav rendering) | **Depended on by:** —
 
 ## W-CTF.1 Purpose

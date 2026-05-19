@@ -16,7 +16,7 @@ Built on a composable crate ecosystem using trait-based composition with monomor
 │  services/ui        │  services/email   │  services/llm-proxy   │
 │  (main Lambda)      │  (SES Lambda)     │  (Anthropic proxy)    │
 ├─────────────────────┴───────────────────┴───────────────────────┤
-│  SQLite on EFS (26 migrations) + S3 backup                      │
+│  SQLite on EFS (28 migrations) + S3 backup                      │
 ├─────────────────────────────────────────────────────────────────┤
 │  Library Crates                                                  │
 │  config-* │ api-* │ infra-types │ llm-* │ rag-* │ mcp          │
@@ -136,8 +136,19 @@ Key decisions are documented as ADRs in [`plans/adr/`](plans/adr/):
 
 See [plans/INDEX.md](plans/INDEX.md) for the full project plan and module status.
 
-See [docs/zero-cost-philosophy.md](docs/zero-cost-philosophy.md) for why
-the library crates use generics over `dyn` dispatch.
+### Documentation
+
+| Doc | What it covers |
+|-----|---------------|
+| [Architecture](docs/architecture.md) | System overview, crate layers, services, design principles |
+| [Services](docs/services.md) | All 3 Lambda functions, inter-service communication |
+| [Web SPA](docs/web-spa.md) | React frontend, route map, API client, auth |
+| [Database](docs/database.md) | SQLite migrations, schema, upsert convention, backup |
+| [CI/CD](docs/ci-cd.md) | GitHub Actions, OIDC deployment, release tagging |
+| [AWS Setup](docs/aws-setup.md) | IAM, SES, Cognito, bootstrap, deploy workflow |
+| [Crate Guide](docs/crate-guide.md) | Per-crate API reference for all 16 library crates |
+| [Zero-Cost Philosophy](docs/zero-cost-philosophy.md) | Why generics over `dyn`, why SQLite over RDS |
+| [Skills](docs/skills.md) | Claude Code slash commands for this project |
 
 ## License
 

@@ -58,9 +58,7 @@ What it does:
 1. Creates a handler in `services/ui/src/routes/<name>.rs`
 2. Registers the module in `routes/mod.rs`
 3. Adds the route to `router.rs`
-4. Creates the Askama template in `services/ui/templates/`
-
-**Important:** Always includes `social_links: Vec<SocialLink>` in the template struct — required for nav rendering in `base.html`.
+4. Creates a React component in `web/src/routes/` (since ADR-019)
 
 See: `.claude/skills/add-route/SKILL.md`
 
@@ -74,12 +72,12 @@ Adds full admin management for a new DB-backed entity (list/detail/new/edit/dele
 /add-dashboard-crud blog_post
 ```
 
-What it does: follows the W-ABT / W-SL reference pattern across 6 steps:
+What it does: follows the W-ABT / W-SL / W-CHL reference pattern across 6 steps:
 1. Migration(s) for the new table
 2. DB query helpers in `db.rs`
-3. Dashboard route handlers in `routes/dashboard.rs`
-4. HTML templates under `templates/dashboard/`
-5. Admin JSON API endpoints in `routes/api/admin.rs`
+3. Admin JSON API endpoints in `routes/api/admin.rs`
+4. React list + detail components in `web/src/routes/dashboard/`
+5. Route registration in `web/src/App.tsx`
 6. Router registration with `require_auth()` middleware
 
 See: `.claude/skills/add-dashboard-crud/SKILL.md`
@@ -170,12 +168,87 @@ Documents a significant architectural decision.
 ```
 
 What it does:
-1. Determines the next ADR number (currently ADR-009 is the highest)
+1. Determines the next ADR number (currently ADR-027 is the highest)
 2. Creates `plans/adr/ADR-<NNN>-<title>.md` from the template
 3. Registers it in INDEX.md
 4. Cross-references affected module plans
 
 See: `.claude/skills/add-adr/SKILL.md`
+
+---
+
+### `/cache-refresh` — Refresh Agent Cache
+
+Re-derives `.agent-cache/index.json` from the current repo state.
+
+```
+/cache-refresh
+```
+
+What it does:
+1. Invokes `just cache-refresh` to re-scan the codebase
+2. Updates all component entries, git SHA, and timestamps
+3. Verifies idempotency (running twice produces the same result)
+
+Use when the cache SHA diverges from HEAD or after a session that touched multiple components.
+
+See: `.claude/skills/cache-refresh/SKILL.md`
+
+---
+
+### `/memory-curate` — Curate Agent Memory
+
+Walks `~/.claude/projects/-Users-shantopagla-portfolio/memory/`, verifies project memories against current repo and infra state, and proposes prunes with per-file confirmation.
+
+```
+/memory-curate
+```
+
+What it does:
+1. Reads all memory files and MEMORY.md index
+2. Checks each memory against current codebase state (file existence, git history)
+3. Proposes removals for stale or outdated memories
+4. Asks for confirmation before deleting each file
+
+See: `.claude/skills/memory-curate/SKILL.md`
+
+---
+
+### `/plan-sync` — Sync Plan System
+
+Audits and repairs the plan system. Safe writes only; destructive changes require confirmation.
+
+```
+/plan-sync              # full audit + auto-fix
+/plan-sync ADR-015      # scope drift check to one ADR
+```
+
+What it does:
+1. Runs `plan-doctor` and `drift-detector` subagents in parallel
+2. Auto-fixes: syncs INDEX.md status table to match module files, inserts missing ADR back-references
+3. Gates: shows proposed DRL files for approval before creating them
+4. Reports unfixed findings that need manual review
+
+See: `.claude/skills/plan-sync/SKILL.md`
+
+---
+
+### `/resume-generate` — Regenerate Resume Outputs
+
+Regenerates resume outputs (Markdown, DOCX, PDF) from the SQLite database.
+
+```
+/resume-generate
+/resume-generate --update-summary
+```
+
+What it does:
+1. Reads resume data from the database (jobs, competencies, about sections)
+2. Optionally updates the Professional Summary from the `me-bio` about section ([ADR-014](../plans/adr/ADR-014-resume-summary-from-db.md))
+3. Generates Markdown → DOCX → PDF pipeline via xtask
+4. Outputs to `target/resume/`
+
+See: `.claude/skills/resume-generate/SKILL.md`
 
 ---
 
