@@ -1,7 +1,9 @@
 # Zero-Cost Philosophy
 
-deploy-baba is built on a single principle: **abstractions should cost nothing
-at runtime.**
+Last updated: 2026-05-19
+
+deploy-baba is built on a single principle: **abstractions should cost nothing —
+not at runtime, and not on your AWS bill.**
 
 ## What Zero-Cost Means in Practice
 
@@ -54,3 +56,32 @@ format implementations, this is negligible. For a library with hundreds of
 instantiations, you'd want to measure binary size.
 
 deploy-baba stays well within the negligible range.
+
+## Zero-Cost AWS Infrastructure
+
+The same philosophy extends to infrastructure. Every architectural choice optimizes for the AWS free tier or the cheapest possible alternative ([ADR-002](../plans/adr/ADR-002-sqlite-over-postgresql.md)).
+
+| Component | deploy-baba | Typical alternative | Monthly cost delta |
+|-----------|-------------|--------------------|--------------------|
+| Database | SQLite on EFS | RDS PostgreSQL (db.t3.micro) | $0 vs ~$15 |
+| Compute | Lambda (free tier: 1M req, 400K GB-s) | ECS Fargate / EC2 | $0 vs ~$10+ |
+| CDN + hosting | CloudFront + S3 | Vercel / Amplify | Pennies vs $0–20 |
+| Scheduler | EventBridge (free tier covers daily backup) | Cron on EC2 | $0 vs ~$5+ |
+| Email | SES ($0.10/1K emails) | SendGrid / Mailgun | Pennies vs $15+ |
+| Observability | SQLite metrics tables ([ADR-025](../plans/adr/ADR-025-sqlite-metrics-collection.md)) | CloudWatch Metrics | $0 vs $0.30/metric/mo |
+
+At low traffic (a portfolio site), the total monthly AWS bill is under $1 — dominated by EFS storage and Secrets Manager.
+
+## Where We Pay
+
+Not everything is free. These are the non-zero line items:
+
+| Service | Cost | Why we pay |
+|---------|------|-----------|
+| EFS | ~$0.30/GB/month | SQLite needs a persistent filesystem. Lambda's ephemeral `/tmp` doesn't survive across invocations. |
+| Secrets Manager | $0.40/secret/month | Two secrets (PoW key, Anthropic API key). Cheaper than the compliance risk of env vars. |
+| CloudFront | Variable (pennies at low traffic) | CDN is the entry point. Data transfer to the internet is the main cost. |
+| SES | $0.10/1,000 emails | Contact form acknowledgements. Volume is negligible for a portfolio. |
+| S3 | $0.023/GB/month | SPA assets (~5 MB), backups (~3 MB), state file. Under a cent. |
+
+The architecture is designed so that a portfolio site with modest traffic runs within the AWS free tier. Costs only appear if traffic scales — and by then, the revenue justifies the spend.

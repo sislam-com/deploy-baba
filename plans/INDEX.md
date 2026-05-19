@@ -39,7 +39,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | gdrive-planning | W-GDR | `justfile`, `.claude/settings.json`, `.github/workflows/` | TODO | Drive MCP plan export/import (W-GDR.4.1–4.3); Stop hook quality gate (W-GDR.4.4); evaluated from Gemini proposal 2026-04-15 |
 | ai-dlc | W-AIL | `.claude/agents/`, `.claude/skills/` | DONE | plan-doctor + drift-detector subagents; /plan-sync, /cache-refresh, /memory-curate skills; weekly schedule |
 | ci | W-CI | `.github/workflows/` | WIP | Code complete (C.1 + C.2 DONE). W-CI.4.9 RESOLVED 2026-05-04 — GH Variables replaced by SM fetch (DRL-2026-05-04-sislam-outage); bootstrap ARNs set. Remaining: W-CI.4.5 (dev Lambda workspace), W-CI.4.10 (production env gate) |
-| web (SPA) | W-WEB | `web/` | DONE | All 15 Askama templates replaced; Askama removed; CF→S3 direct serving (EFS sync dropped 2026-05-04, DRL-2026-05-04-sislam-outage); SEO prerender deferred to W-WEB.5 (P3) |
+| web | W-WEB | `web/` | DONE | All 15 Askama templates replaced; Askama removed; CF→S3 direct serving (EFS sync dropped 2026-05-04, DRL-2026-05-04-sislam-outage); SEO prerender deferred to W-WEB.5 (P3) |
 | dev-environment | W-DEV | `scripts/`, `.devcontainer/` | DONE | bootstrap-tfstate.sh; dev-doctor.sh; devcontainer; initial-setup.md |
 | api-versioning | W-VER | `services/ui/src/middleware/`, `services/ui/src/router.rs` | DONE | URL-based versioning with /api/v1/ paths; backward-compatible redirects; deprecation middleware; OpenAPI version metadata |
 | observability | W-OBS | `services/ui/src/telemetry.rs`, `services/ui/migrations/` | TODO | Structured logging (tracing); SQLite metrics tables; metrics query endpoint; p50/p95/p99 latency calculation |
@@ -186,6 +186,9 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | DRL-2026-05-03-rustsec-webpki-cves | 2026-05-03 | `cargo audit` failing: RUSTSEC-2026-0098/0099/0104 in `rustls-webpki 0.101.7` (via `aws-sdk-*` default features → `hyper-rustls 0.24` → `rustls 0.21`) | **RESOLVED 2026-05-03** — `default-features = false` on all `aws-sdk-*` workspace deps; only `rustls-webpki 0.103.13` remains |
 | DRL-2026-05-04-sislam-outage | 2026-05-04 | sislam.com + dev.sislam.com 404ing — EFS SPA mount never applied; SPA bucket empty | **RESOLVED 2026-05-04** — CF→S3 direct serving; deploy-config SM secret; Lambda SPA code removed; both domains 200 |
 | DRL-2026-05-04-adr009-ask-api-scope | 2026-05-04 | ADR-009 claims API GW is for `POST /api/contact` only; `/api/ask` also added; rate limit not enforced | Open — update ADR-009 text; enforce 2-req rate limit in prod |
+| DRL-2026-05-04-adr005-askama-claim | 2026-05-04 | ADR-005 rule 2 references Askama, which was removed by ADR-019 | **RESOLVED 2026-05-04** — ADR-005 rule 2 updated with ADR-019 supersession |
+| DRL-2026-05-04-adr015-feature-flag-not-implemented | 2026-05-04 | ADR-015 rule 3 claims feature-flag adapter selection; actual uses llm-proxy Lambda | **RESOLVED** — ADR-015 rule 3 updated to describe runtime provider selection via llm-proxy |
+| DRL-2026-05-09-rag-challenges-corpus | 2026-05-09 | Challenges 7th corpus undocumented in plan system (W-RAG, W-CHL, ADR-016) | 7 entries; 6 RESOLVED, 1 PENDING (cache refresh) |
 
 ---
 

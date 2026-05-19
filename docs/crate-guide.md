@@ -422,6 +422,137 @@ println!("Identifier: {}", stack.identifier()); // "my-app-us-east-1"
 
 ---
 
+## LLM Layer
+
+### llm-core
+**Vendor-Agnostic LLM Provider Traits and Agent Loop**
+
+Defines the contract for LLM providers, message types, tool dispatch, and grounding. Any provider adapter (Anthropic, OpenAI) implements `LlmProvider` and plugs in without changing calling code. See [ADR-015](../plans/adr/ADR-015-llm-provider-abstraction-and-grounding-contract.md).
+
+**Key Types:**
+- `LlmProvider` — async trait: `provider_id()`, `generate()`, `generate_with_tools()`
+- `EmbeddingProvider` — async trait for text embedding
+- `ChatMessage` / `MessageContent` / `MessageRole` — conversation message types
+- `GenerationConfig` — temperature, max tokens, model selection
+- `LlmRequest` / `LlmResponse` — request/response envelopes
+- `ToolCall` / `ToolDef` / `ToolResult` — tool-use types for agentic dispatch
+- `ToolExecutor` — async trait for executing tool calls
+- `GroundingContract` / `RefusalPolicy` — prompt-assembly grounding rules
+- `LlmError` — structured error type (via `thiserror`)
+
+**Key Functions:**
+- `run_agent_loop()` — executes a multi-turn tool-dispatch loop: sends a request, receives tool calls, executes them, feeds results back, repeats until the model produces a final text response. Returns `AgentResult`.
+- `assemble_grounded_prompt()` — wraps retrieved context in citation tags following the grounding contract.
+
+**Usage Pattern:**
+```rust
+use llm_core::{LlmProvider, LlmRequest, ChatMessage, MessageRole, GenerationConfig};
+
+async fn ask(provider: &impl LlmProvider, question: &str) -> Result<String, llm_core::LlmError> {
+    let request = LlmRequest {
+        messages: vec![ChatMessage {
+            role: MessageRole::User,
+            content: question.into(),
+        }],
+        config: GenerationConfig::default(),
+        tools: vec![],
+    };
+    let response = provider.generate(request).await?;
+    Ok(response.content)
+}
+```
+
+---
+
+### llm-anthropic
+**Anthropic Claude Adapter**
+
+Implements `LlmProvider` for the Anthropic Messages API. Supports text generation, tool_use, and multi-turn conversations.
+
+**Key Types:**
+- `AnthropicProvider` — implements `LlmProvider`, holds API key and model config
+
+**Usage Pattern:**
+```rust
+use llm_anthropic::AnthropicProvider;
+use llm_core::LlmProvider;
+
+let provider = AnthropicProvider::new("your-api-key", "claude-sonnet-4-20250514");
+let response = provider.generate(request).await?;
+```
+
+See the per-crate README at `crates/llm-anthropic/README.md`.
+
+---
+
+### llm-openai
+**OpenAI Adapter (WIP)**
+
+Implements `LlmProvider` for the OpenAI Chat Completions API. Currently a work-in-progress — tracked as W-LLM.4.15.
+
+See the per-crate README at `crates/llm-openai/README.md`.
+
+---
+
+## RAG Layer
+
+### rag-core
+**Vendor-Agnostic Retrieval Traits and Chunkers**
+
+Defines the trait contract for retrieval-augmented generation: embedding, retrieval, prompt assembly, and document chunking. See [ADR-016](../plans/adr/ADR-016-rag-architecture.md).
+
+**Key Types:**
+- `Retriever` — async trait: `retrieve(query, top_k)` → `Vec<RankedChunk>`
+- `Embedder` — async trait for text embedding
+- `PromptAssembler` — trait for wrapping chunks in citation tags for the LLM
+- `DefaultPromptAssembler` — built-in implementation of `PromptAssembler`
+- `HybridRetriever` — combines multiple retrieval strategies
+- `PortfolioDataProvider` — trait for loading portfolio-specific data
+- `Chunk` / `RankedChunk` — document chunk types with relevance scores
+- `CitationRef` — source attribution for grounded generation
+- `PromptBundle` — assembled prompt with citations ready for LLM
+- `SourceKind` — enum identifying the corpus source (Rust, HCL, Plans, Cache, OpenAPI, Portfolio, Challenges)
+- `RagError` — structured error type
+
+**Usage Pattern:**
+```rust
+use rag_core::{Retriever, RankedChunk};
+
+async fn search(retriever: &impl Retriever, query: &str) -> Vec<RankedChunk> {
+    retriever.retrieve(query, 5).await.unwrap_or_default()
+}
+```
+
+---
+
+### rag-sqlite
+**SQLite FTS5 Retrieval Backend**
+
+Implements `Retriever` using SQLite's FTS5 full-text search engine for BM25-ranked retrieval across 7 indexed corpora.
+
+**Key Types:**
+- `RagStore` — main struct: manages the SQLite FTS5 index, implements `Retriever`
+
+**Usage Pattern:**
+```rust
+use rag_sqlite::RagStore;
+use rag_core::Retriever;
+
+let store = RagStore::open("deploy-baba.db")?;
+let results = store.retrieve("how does auth work", 5).await?;
+```
+
+Hybrid retrieval: combines FTS5 BM25 ranking with keyword matching for improved relevance.
+
+---
+
+### portfolio-rag-mcp
+**MCP Server for RAG Integration**
+
+A standalone binary that wraps `rag-sqlite` as a Model Context Protocol (MCP) server. This allows Claude Code to query the portfolio's indexed content directly during development sessions.
+
+---
+
 ## Architectural Insights
 
 ### Zero-Cost Abstractions
