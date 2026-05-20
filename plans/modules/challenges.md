@@ -77,7 +77,7 @@ Challenges are integrated as the 7th RAG corpus:
 | W-CHL.4.9 | Implement challenges RAG corpus integration | DONE | `get_challenges_summary()`, `challenge_to_prose()`, keyword triggers |
 | W-CHL.4.10 | Complete admin CRUD (edit/delete forms) | DONE | Admin endpoints (POST/PUT/DELETE /api/admin/challenges) implemented in admin.rs; React forms (new/edit/delete) implemented in ChallengeDetail.tsx |
 | W-CHL.4.11 | Add challenges to public portfolio pages | DONE | Challenges already integrated into Home.tsx with ChallengeCard component; accessible via "Challenges" tab; fetched via /api/resume endpoint |
-| W-CHL.4.12 | Implement challenges-specific evaluation metrics | DEFERRED | RAG evaluation for challenges corpus - defer to broader RAG evaluation framework (P2/P3) |
+| W-CHL.4.12 | Implement challenges-specific evaluation metrics | DEFERRED | `rag-core/src/eval.rs` already provides `score_groundedness()` + `verify_citation_refs()`, wired into `ask.rs` (W-RAG.12.1). Remaining: define challenge-specific criteria (e.g., assert answers cite challenge sources when query matches challenge keywords) |
 | W-CHL.4.13 | Implement challenges search/filter on public site | DONE | Added category dropdown filter and featured checkbox filter to challenges view in Home.tsx; filters are client-side with reactive state |
 
 ### Implementation Order

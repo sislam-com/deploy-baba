@@ -9,24 +9,13 @@ use axum::{
     routing::get,
     Json, Router,
 };
-use serde::Deserialize;
 use std::sync::Arc;
+
+use api_openapi::models::MetricsQuery;
 
 use crate::db::Db;
 use crate::state::AppState;
 use crate::telemetry::{query_metrics, MetricsSummary};
-
-#[derive(Debug, Deserialize)]
-pub struct MetricsQuery {
-    #[serde(default)]
-    pub endpoint: Option<String>,
-    #[serde(default = "default_hours")]
-    pub hours: u32,
-}
-
-fn default_hours() -> u32 {
-    24
-}
 
 pub fn router() -> Router<AppState> {
     Router::new().route("/", get(get_metrics))

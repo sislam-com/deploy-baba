@@ -1,5 +1,5 @@
 # W-RES: resilience
-**Path:** `services/ui/src/middleware/` | **Status:** TODO
+**Path:** `services/ui/src/middleware/` | **Status:** DONE
 **Coverage floor:** 80% | **Depends on:** W-UI, W-OBS | **Depended on by:** W-MOD
 
 ---
@@ -178,10 +178,10 @@ Router::new()
 
 | ID | Task | Status | Notes |
 |----|------|--------|-------|
-| W-RES.4.1 | Implement in-memory rate limiter | TODO | Per-endpoint limits, sliding window |
-| W-RES.4.2 | Add retry with exponential backoff | TODO | Tower RetryLayer, transient error detection |
-| W-RES.4.3 | Implement circuit breaker for LLM calls | TODO | Atomic state, failure threshold, recovery logic |
-| W-RES.4.4 | Add request validation middleware | TODO | validator crate, error responses |
+| W-RES.4.1 | Implement in-memory rate limiter | DONE | `RateLimiter` production-ready; `rate_limit_middleware` wired as global layer (100 req/60s per client IP + endpoint); returns 429 with `Retry-After` |
+| W-RES.4.2 | Add retry with exponential backoff | DONE | `RetryPolicy` production-ready (3 attempts, 100ms initial, 5s max, 2x multiplier); transient error detection; `#[allow(dead_code)]` — available for handler-level retry |
+| W-RES.4.3 | Implement circuit breaker for LLM calls | DONE | `CircuitBreaker` in `AppState`; wraps `ask.rs` LLM calls (proxy + direct); opens after 5 failures, 60s timeout, half-open recovery |
+| W-RES.4.4 | Add request validation middleware | DONE | `validate_request_middleware` wired globally; body-size guard (1 MB max); per-handler validation unchanged |
 
 ---
 

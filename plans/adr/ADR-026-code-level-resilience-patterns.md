@@ -1,7 +1,7 @@
 # ADR-026: Code-Level Resilience Patterns
 
 **Date:** 2026-05-14
-**Status:** Proposed
+**Status:** Accepted
 **Affected modules:** W-RES, W-UI, W-LLM
 
 ## Context

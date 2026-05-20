@@ -27,7 +27,7 @@ async fn test_health_endpoint() {
 
     deploy_baba_ui::routes::contact::init_pow_secret().await;
 
-    let state = AppState { db, auth, rag };
+    let state = AppState::with_defaults(db, auth, rag);
     let app = build(state);
 
     let request = Request::builder()
@@ -57,7 +57,7 @@ async fn test_health_returns_json() {
 
     deploy_baba_ui::routes::contact::init_pow_secret().await;
 
-    let state = AppState { db, auth, rag };
+    let state = AppState::with_defaults(db, auth, rag);
     let app = build(state);
 
     let request = Request::builder()
@@ -94,7 +94,7 @@ async fn test_health_includes_expected_fields() {
 
     deploy_baba_ui::routes::contact::init_pow_secret().await;
 
-    let state = AppState { db, auth, rag };
+    let state = AppState::with_defaults(db, auth, rag);
     let app = build(state);
 
     let request = Request::builder()

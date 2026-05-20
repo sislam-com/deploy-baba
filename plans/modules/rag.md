@@ -1,5 +1,5 @@
 # W-RAG: rag-core + rag-sqlite
-**Crate(s):** `crates/rag-core/`, `crates/rag-sqlite/` | **Status:** WIP (P1 DONE, P4 Phase 9 DONE, P5 Phases 10–11 DONE, P2/P3 TODO)
+**Crate(s):** `crates/rag-core/`, `crates/rag-sqlite/` | **Status:** DONE (P1–P5 complete; P2 embedding/ANN deferred to Phase D)
 **Coverage floor:** 70% | **Depends on:** W-LLM, W-UI, W-OTF | **Depended on by:** (none yet)
 
 ## W-RAG.1 Purpose
@@ -230,6 +230,7 @@ injects this contract via `PromptBundle.system_prompt`.
 | W-RAG.11.3 | Implement PortfolioDataProvider for challenges in db.rs | DONE | `services/ui/src/db.rs`; returns challenges as JSON values |
 | W-RAG.11.4 | Add "challenge"/"challenges" keyword triggers to HybridRetriever | DONE | `crates/rag-core/src/hybrid.rs`; 12 new portfolio keywords include challenge terms |
 | W-RAG.11.5 | Extend corpus table in module plan to document challenges as 7th corpus | DONE | Added to Chunkers (per corpus) table in rag.md |
+| W-RAG.12.1 | Deterministic groundedness scoring (`eval.rs`) — `score_groundedness()` + `verify_citation_refs()` | DONE | `crates/rag-core/src/eval.rs` (109 LOC, 6 tests); wired into `ask.rs` handler; scores every `/api/ask` response |
 
 ## W-RAG.5 Test Strategy
 

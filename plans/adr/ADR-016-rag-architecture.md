@@ -1,7 +1,7 @@
 # ADR-016: RAG Architecture
 
 **Date:** 2026-04-15
-**Status:** Proposed
+**Status:** Accepted (2026-05-20 — all architectural decisions validated; FTS+7-corpus+agentic fully operational)
 **Affected modules:** W-RAG, W-UI, W-LLM
 
 ## Context

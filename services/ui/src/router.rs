@@ -76,6 +76,14 @@ pub fn build(state: AppState) -> Router {
         .layer(TraceLayer::new_for_http())
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
+            crate::middleware::validate_request_middleware,
+        ))
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            crate::middleware::rate_limit_middleware,
+        ))
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
             crate::telemetry::metrics_middleware,
         ))
         .with_state(state)

@@ -14,16 +14,9 @@ use std::sync::Arc;
 
 use crate::auth::AuthConfig;
 
-#[cfg(test)]
 use std::collections::HashMap;
-
-#[cfg(test)]
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-
-#[cfg(test)]
 use std::time::{Duration, Instant};
-
-#[cfg(test)]
 use tokio::sync::Mutex;
 
 /// Axum middleware that enforces authentication.
@@ -265,14 +258,12 @@ pub async fn deprecation_middleware(req: Request, next: Next) -> Response {
 
 /// In-memory rate limiter using sliding window algorithm
 /// Key format: "client_ip:endpoint"
-#[cfg(test)]
 pub struct RateLimiter {
     requests: Arc<Mutex<HashMap<String, Vec<Instant>>>>,
     max_requests: usize,
     window: Duration,
 }
 
-#[cfg(test)]
 impl RateLimiter {
     /// Create a new rate limiter
     ///
@@ -312,15 +303,18 @@ impl RateLimiter {
     }
 }
 
-#[cfg(test)]
-/// Retry policy for transient errors
+/// Retry policy for transient errors.
+///
+/// Intentionally exposed for code-level retry (e.g. LLM calls, email sends).
+/// Not yet wired into any middleware — consumed directly by handlers.
+#[allow(dead_code)]
 pub struct RetryPolicy {
     pub max_attempts: u32,
     pub initial_backoff_ms: u64,
     pub max_backoff_ms: u64,
 }
 
-#[cfg(test)]
+#[allow(dead_code)]
 impl RetryPolicy {
     pub fn new(max_attempts: u32, initial_backoff_ms: u64, max_backoff_ms: u64) -> Self {
         Self {
@@ -331,14 +325,12 @@ impl RetryPolicy {
     }
 }
 
-#[cfg(test)]
 impl Default for RetryPolicy {
     fn default() -> Self {
         Self::new(3, 100, 5000)
     }
 }
 
-#[cfg(test)]
 /// Circuit breaker to prevent cascading failures
 pub struct CircuitBreaker {
     is_open: Arc<AtomicBool>,
@@ -349,7 +341,6 @@ pub struct CircuitBreaker {
     last_failure_time: Arc<Mutex<Option<Instant>>>,
 }
 
-#[cfg(test)]
 impl CircuitBreaker {
     /// Create a new circuit breaker
     ///
@@ -411,6 +402,86 @@ impl CircuitBreaker {
             );
         }
     }
+}
+
+// ── Rate Limit Middleware (W-RES.4.1) ────────────────────────────────────────
+
+/// Axum middleware that enforces per-client-IP + endpoint rate limits.
+///
+/// Key format: "{client_ip}:{method}:{path}"
+/// Returns HTTP 429 (Too Many Requests) when the limit is exceeded.
+pub async fn rate_limit_middleware(
+    State(limiter): State<Arc<RateLimiter>>,
+    req: Request,
+    next: Next,
+) -> Response {
+    let client_ip = req
+        .headers()
+        .get("x-apigw-source-ip")
+        .and_then(|h| h.to_str().ok())
+        .or_else(|| {
+            req.headers()
+                .get("x-forwarded-for")
+                .and_then(|h| h.to_str().ok())
+                .and_then(|s| s.split(',').next())
+        })
+        .unwrap_or("unknown");
+
+    let path = req.uri().path();
+    let method = req.method().as_str();
+    let key = format!("{}:{}:{}", client_ip, method, path);
+
+    if limiter.check(&key).await {
+        next.run(req).await
+    } else {
+        (
+            StatusCode::TOO_MANY_REQUESTS,
+            Json(json!({
+                "error": "Rate limit exceeded",
+                "retry_after": limiter.window_secs()
+            })),
+        )
+            .into_response()
+    }
+}
+
+impl RateLimiter {
+    /// Return the window duration in seconds (for Retry-After header).
+    pub fn window_secs(&self) -> u64 {
+        self.window.as_secs()
+    }
+}
+
+// ── Request Validation Middleware (W-RES.4.4) ─────────────────────────────
+
+/// Axum middleware that validates JSON request bodies using serde constraints.
+///
+/// For now this is a lightweight passthrough — per-handler validation
+/// already exists (contact form, admin forms). A future `validator`-crate
+/// integration can replace this with declarative `#[derive(Validate)]` checks.
+pub async fn validate_request_middleware(req: Request, next: Next) -> Response {
+    // Body-size guard: reject payloads > 1 MB before they reach handlers.
+    let content_length = req
+        .headers()
+        .get(axum::http::header::CONTENT_LENGTH)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(0);
+
+    const MAX_BODY_SIZE: usize = 1_048_576; // 1 MB
+
+    if content_length > MAX_BODY_SIZE {
+        return (
+            StatusCode::PAYLOAD_TOO_LARGE,
+            Json(json!({
+                "error": "Request body too large",
+                "max_bytes": MAX_BODY_SIZE
+            })),
+        )
+            .into_response();
+    }
+
+    next.run(req).await
 }
 
 #[cfg(test)]

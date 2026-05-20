@@ -225,7 +225,8 @@ is instantiated based on the runtime selector.
 | W-LLM.4.12 | Update `StubLlmProvider` for tool-use testing (`with_tool_response`) | DONE | `crates/llm-core/src/testing.rs`; `with_tool_response()`, `with_tool_response_always()` |
 | W-LLM.4.13 | Update Anthropic adapter: parse `id` from `ContentBlock::ToolUse`, serialize `MessageContent::ToolResult` as content-array | DONE | `crates/llm-anthropic/src/lib.rs`; tool_result wire format |
 | W-LLM.4.14 | Migrate all call-sites for `ChatMessage.content` breaking change | DONE | 7 files migrated: grounding.rs, testing.rs, lib.rs doc, llm-anthropic, llm-proxy, xtask/rag.rs, xtask/resume/generate.rs |
-| W-LLM.4.15 | Implement `crates/llm-openai` adapter crate | TODO (2026-05-XX) | Direct HTTP against OpenAI Chat Completions API; GPT-4o-mini default, GPT-4o upgrade; runtime selector in llm-proxy; local dev support in services/ui |
+| W-LLM.4.15 | Implement `crates/llm-openai` adapter crate (`LlmProvider`) | DONE | 347 LOC; `OpenAIProvider` implements `LlmProvider` (Chat Completions API); GPT-4o-mini default; runtime selector in llm-proxy |
+| W-LLM.4.16 | Add `EmbeddingProvider` impl to `llm-openai` (text-embedding-3-small) | TODO | Unblocks W-RAG.4.1 (embedder wiring); Anthropic has no embedding API so OpenAI is the viable path |
 
 ---
 

@@ -46,11 +46,7 @@ async fn main() -> Result<()> {
         "→ LLM backend: proxy={has_proxy}, anthropic={has_anthropic}, openai={has_openai}",
     );
 
-    let app_state = state::AppState {
-        db,
-        auth: auth_config,
-        rag,
-    };
+    let app_state = state::AppState::with_defaults(db, auth_config, rag);
 
     let app = router::build(app_state.clone());
 
