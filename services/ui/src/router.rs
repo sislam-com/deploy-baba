@@ -24,6 +24,10 @@ pub fn build(state: AppState) -> Router {
         axum::middleware::from_fn_with_state(state.clone(), crate::middleware::require_auth),
     );
 
+    let metrics_routes = routes::api::metrics::router().route_layer(
+        axum::middleware::from_fn_with_state(state.clone(), crate::middleware::require_auth),
+    );
+
     // SPA assets (/, /about, /assets/*) are served directly from S3 via CloudFront OAC.
     // Lambda handles only /api/*, /auth/*, /health, /docs, /resume/* (ADR-003 + cdn.tf behaviors).
 
@@ -44,6 +48,7 @@ pub fn build(state: AppState) -> Router {
         // ── Versioned API routes (v1) ─────────────────────────────────────────
         .nest("/api/v1", routes::api::router())
         .nest("/api/v1/admin", admin_routes)
+        .nest("/api/v1/metrics", metrics_routes)
         // Apply deprecation middleware to versioned routes
         // Currently a no-op (v1 is current); will add headers when v1 is deprecated
         .layer(axum::middleware::from_fn(
@@ -69,6 +74,18 @@ pub fn build(state: AppState) -> Router {
         .route("/docs", get(docs_handler))
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            crate::middleware::validate_request_middleware,
+        ))
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            crate::middleware::rate_limit_middleware,
+        ))
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            crate::telemetry::metrics_middleware,
+        ))
         .with_state(state)
 }
 

@@ -33,17 +33,17 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | challenges | W-CHL | `services/ui/src/routes/api/challenges.rs`, `services/ui/migrations/022`, `web/src/routes/dashboard/Challenges.tsx` | DONE | Basic CRUD DONE; RAG corpus integration DONE; admin UI DONE; public pages DONE (W-CHL.4.11); search/filter DONE (W-CHL.4.13); evaluation metrics deferred (W-CHL.4.12) |
 | secrets-manager | W-SEC | `xtask/src/secret.rs`, `infra/secrets.tf`, `infra/vpc-endpoints.tf`, `services/ui/src/routes/contact.rs` | DONE | Deploy: `just infra-apply` + `just secret-put pow-secret $(openssl rand -hex 32)` + `just lambda-deploy` |
 | dashboard-sync | W-SYNC | `plans/modules/dashboard-sync.md`, `services/ui/migrations/`, `services/ui/src/db.rs`, `services/ui/src/routes/api/admin.rs`, `.claude/skills/sync-dashboard-data/` | DONE | 4.1–4.5 complete; zero drift on first run 2026-04-08; .4.6/.4.7 deferred (on-demand) |
-| llm-core + llm-anthropic + llm-openai | W-LLM | `crates/llm-core/`, `crates/llm-anthropic/`, `crates/llm-openai/` | WIP | W-LLM.4.1–4.5 DONE; W-LLM.4.8–4.14 DONE (tool-dispatch loop, ADR-023); W-LLM.4.4 (READMEs) DONE; W-LLM.4.15 TODO (OpenAI adapter) |
+| llm-core + llm-anthropic + llm-openai | W-LLM | `crates/llm-core/`, `crates/llm-anthropic/`, `crates/llm-openai/` | WIP | W-LLM.4.1–4.5 DONE; W-LLM.4.8–4.14 DONE (tool-dispatch loop, ADR-023); W-LLM.4.15 DONE (OpenAI LlmProvider); W-LLM.4.16 TODO (OpenAI EmbeddingProvider) |
 | resume-tailor | W-RST | `services/ui/src/tailor/`, `crates/api-openapi/src/models/tailor.rs`, `services/ui/migrations/016` | TODO | All items; BLOCKED-on-deploy for 4.3/4.4/4.5 until W-SEC deployed + `anthropic-api-key` in SM |
-| rag | W-RAG | `crates/rag-core/`, `crates/rag-sqlite/` | WIP | P1 DONE; P3 DONE; P4 DONE; P5 DONE; hybrid retrieval fix (W-RAG.9.5–9.6) DONE 2026-05-09; challenges corpus integration (W-RAG.5.x) DONE; P2 (embedding/ANN) TODO |
+| rag | W-RAG | `crates/rag-core/`, `crates/rag-sqlite/` | DONE | P1–P5 complete; 7 corpora; eval.rs live (W-RAG.12.1); P2 embedding/ANN deferred (W-RAG.4.1 DEFERRED, W-RAG.6.2 TODO) |
 | gdrive-planning | W-GDR | `justfile`, `.claude/settings.json`, `.github/workflows/` | TODO | Drive MCP plan export/import (W-GDR.4.1–4.3); Stop hook quality gate (W-GDR.4.4); evaluated from Gemini proposal 2026-04-15 |
 | ai-dlc | W-AIL | `.claude/agents/`, `.claude/skills/` | DONE | plan-doctor + drift-detector subagents; /plan-sync, /cache-refresh, /memory-curate skills; weekly schedule |
 | ci | W-CI | `.github/workflows/` | WIP | Code complete (C.1 + C.2 DONE). W-CI.4.9 RESOLVED 2026-05-04 — GH Variables replaced by SM fetch (DRL-2026-05-04-sislam-outage); bootstrap ARNs set. Remaining: W-CI.4.5 (dev Lambda workspace), W-CI.4.10 (production env gate) |
 | web | W-WEB | `web/` | DONE | All 15 Askama templates replaced; Askama removed; CF→S3 direct serving (EFS sync dropped 2026-05-04, DRL-2026-05-04-sislam-outage); SEO prerender deferred to W-WEB.5 (P3) |
 | dev-environment | W-DEV | `scripts/`, `.devcontainer/` | DONE | bootstrap-tfstate.sh; dev-doctor.sh; devcontainer; initial-setup.md |
 | api-versioning | W-VER | `services/ui/src/middleware/`, `services/ui/src/router.rs` | DONE | URL-based versioning with /api/v1/ paths; backward-compatible redirects; deprecation middleware; OpenAPI version metadata |
-| observability | W-OBS | `services/ui/src/telemetry.rs`, `services/ui/migrations/` | TODO | Structured logging (tracing); SQLite metrics tables; metrics query endpoint; p50/p95/p99 latency calculation |
-| resilience | W-RES | `services/ui/src/middleware/` | TODO | Rate limiting (in-memory); retry with exponential backoff; circuit breaker for LLM calls; request validation middleware |
+| observability | W-OBS | `services/ui/src/telemetry.rs`, `services/ui/migrations/` | DONE | `metrics_middleware` (fire-and-forget SQLite writes); `GET /api/v1/metrics` (p50/p95/p99 + error rate); admin-gated |
+| resilience | W-RES | `services/ui/src/middleware/` | DONE | `rate_limit_middleware` (100 req/60s per IP+endpoint); `CircuitBreaker` around LLM calls (5 failures → 60s open); `validate_request_middleware` (1 MB body guard); `RetryPolicy` available for handler retry |
 | module-decomposition | W-MOD | `services/ui/src/modules/` | TODO | Logical module separation (portfolio, rag, admin, auth); independent testing per module; module-specific metrics |
 
 ---
@@ -111,21 +111,25 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 
 ### P2.6 — Zero-Cost Microservices Enhancements
 22. ~~**W-VER.4.1–4.4**~~ **DONE** — API versioning strategy (ADR-024) — URL-based /api/v1/ routing, version extraction middleware, deprecation headers, OpenAPI version metadata
-23. **W-OBS.4.1–4.4** — SQLite-based observability (ADR-025) — TODO (structured logging with tracing, metrics tables + query endpoint, p50/p95/p99 calculation, no CloudWatch Metrics cost)
-24. **W-RES.4.1–4.4** — Code-level resilience patterns (ADR-026) — TODO (in-memory rate limiting, retry with exponential backoff, circuit breaker for LLM calls, request validation middleware)
+23. ~~**W-OBS.4.1–4.4**~~ **DONE** — SQLite-based observability (ADR-025) — `metrics_middleware` fire-and-forget writes; `GET /api/v1/metrics` p50/p95/p99 + error rate; admin-gated
+24. ~~**W-RES.4.1–4.4**~~ **DONE** — Code-level resilience patterns (ADR-026) — `rate_limit_middleware` (100 req/60s); `CircuitBreaker` around LLM calls; `validate_request_middleware` (1 MB guard); `RetryPolicy` available for handler use
 25. **W-MOD.4.1–4.3** — Module-based service decomposition (ADR-027) — TODO (logical module separation, independent testing per module, module-specific metrics collection)
 
 ### P3 — LLM + RAG Subsystem (phased)
 12. ~~**W-LLM**~~ — `crates/llm-core` + `crates/llm-anthropic` + ADR-015 — **DONE** (W-LLM.4.1–4.5)
 13. ~~**W-RAG.2.1–3.4**~~ — `rag-core` + `rag-sqlite` crates, chunkers, xtask rag, justfile verbs — **DONE** (P1 FTS-only)
-14. **W-RAG.4.1–4.2** — Wire embedder + generate via W-LLM (BLOCKED on W-LLM)
-15. **W-RAG.5.1** — Deploy-failure diagnosis hook (P2; BLOCKED on W-RAG.4.2)
+14. **W-RAG.4.1** — Wire embedder (DEFERRED — Anthropic has no embeddings; needs W-LLM.4.16 OpenAI EmbeddingProvider)
+15. ~~**W-RAG.4.2 + 5.1**~~ — PromptAssembler + generate integration + deploy-failure diagnosis hook — **DONE** (2026-04-15)
 16. ~~**W-RAG.6.1–6.3**~~ — Public `/api/ask` endpoint + rate-limit — **DONE** (2026-05-01)
-17. **W-RAG.7.1–7.5** — Extended RAG corpora: OpenAPI spec + portfolio data chunkers, 6-corpus ingest
-18. **W-RAG.8.1–8.2** — Portfolio-aware prompt assembly + filtered retrieval
-19. **W-RAG.9.1–9.4** — Live-data retrieval: `PortfolioDataProvider` trait, `HybridRetriever`, ask handler wiring
-20. **W-LLM.4.8–4.14** — Tool-dispatch loop: `ToolExecutor` trait, `run_agent_loop()`, `ChatMessage` content enum, Anthropic adapter update (ADR-023)
-21. **W-RAG.10.1–10.6** — Agentic portfolio assistant: portfolio tools, HTTP call-back executor, agentic ask handler (ADR-023)
+17. ~~**W-RAG.7.1–7.5**~~ — Extended RAG corpora: OpenAPI spec + portfolio data chunkers, 7-corpus ingest — **DONE**
+18. ~~**W-RAG.8.1–8.2**~~ — Portfolio-aware prompt assembly + filtered retrieval — **DONE**
+19. ~~**W-RAG.9.1–9.6**~~ — Live-data retrieval: `PortfolioDataProvider`, `HybridRetriever`, hybrid fix — **DONE** (2026-05-09)
+20. ~~**W-LLM.4.8–4.14**~~ — Tool-dispatch loop: `ToolExecutor` trait, `run_agent_loop()`, `ChatMessage` content enum, Anthropic adapter update (ADR-023) — **DONE**
+21. ~~**W-RAG.10.1–10.6 + 11.1–11.5**~~ — Agentic portfolio assistant + challenges corpus — **DONE**
+22. ~~**W-LLM.4.15**~~ — OpenAI `LlmProvider` adapter — **DONE** (347 LOC)
+23. **W-LLM.4.16** — OpenAI `EmbeddingProvider` adapter (text-embedding-3-small) — TODO (unblocks W-RAG.4.1)
+24. **W-RAG.6.2** — Bundle `sqlite-vec` aarch64 SO into Lambda zip — TODO
+25. ~~**W-RAG.12.1**~~ — Deterministic groundedness scoring (`eval.rs`) — **DONE** (live in ask handler)
 
 ---
 
@@ -277,6 +281,6 @@ shantopagla/deploy-baba/
 | 7 | Examples + docs | TODO |
 | 8 | Quality pass | WIP (`just quality` passes: coverage floors ✅, audit ✅; per-crate READMEs + examples TODO) |
 | 9 | Publish | TODO |
-| 10 | Zero-cost microservices enhancements | WIP (~~W-VER~~ DONE, W-OBS, W-RES, W-MOD) |
+| 10 | Zero-cost microservices enhancements | WIP (~~W-VER~~ DONE, ~~W-OBS~~ DONE, ~~W-RES~~ DONE, W-MOD) |
 
 **Overall: ~95% complete**

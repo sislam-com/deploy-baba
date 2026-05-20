@@ -29,6 +29,7 @@ use rag_core::{DefaultPromptAssembler, HybridRetriever, PromptAssembler, Retriev
 use rag_sqlite::RagStore;
 
 use crate::db::Db;
+use crate::middleware::CircuitBreaker;
 
 pub use api_openapi::models::{
     AskCitation, AskProxyRequest, AskProxyResponse, AskRequest, AskResponse,
@@ -211,6 +212,7 @@ pub async fn ask(
     connect_info: Option<ConnectInfo<SocketAddr>>,
     State(rag): State<Arc<RagStore>>,
     State(db): State<Arc<Db>>,
+    State(breaker): State<Arc<CircuitBreaker>>,
     Json(req): Json<AskRequest>,
 ) -> ApiResult<AskResponse> {
     let ip = extract_client_ip(&headers, connect_info.as_ref());
@@ -311,6 +313,14 @@ pub async fn ask(
         })
         .collect();
 
+    // Circuit breaker guard (W-RES.4.3)
+    if breaker.is_open().await {
+        return Err(err(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "LLM backend temporarily unavailable (circuit breaker open)",
+        ));
+    }
+
     // Dual-mode generation (ADR-004):
     //   Production: invoke llm-proxy Lambda
     //   Local dev:  call provider directly
@@ -322,9 +332,20 @@ pub async fn ask(
             &bundle.user_message,
             provider_id,
         )
-        .await?
+        .await
     } else {
-        generate_direct(provider_id, &bundle.system_prompt, &bundle.user_message).await?
+        generate_direct(provider_id, &bundle.system_prompt, &bundle.user_message).await
+    };
+
+    let proxy_resp = match proxy_resp {
+        Ok(resp) => {
+            breaker.record_success();
+            resp
+        }
+        Err(e) => {
+            breaker.record_failure().await;
+            return Err(e);
+        }
     };
 
     let latency_ms = pipeline_start.elapsed().as_millis() as i64;

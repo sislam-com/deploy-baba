@@ -26,7 +26,7 @@ async fn test_openapi_spec_endpoint() {
 
     deploy_baba_ui::routes::contact::init_pow_secret().await;
 
-    let state = AppState { db, auth, rag };
+    let state = AppState::with_defaults(db, auth, rag);
     let app = build(state);
 
     let request = Request::builder()
@@ -64,7 +64,7 @@ async fn test_contact_challenge_endpoint() {
     // Initialize PoW secret before building app
     deploy_baba_ui::routes::contact::init_pow_secret().await;
 
-    let state = AppState { db, auth, rag };
+    let state = AppState::with_defaults(db, auth, rag);
     let app = build(state);
 
     let request = Request::builder()
@@ -99,7 +99,7 @@ async fn test_admin_requires_auth() {
 
     deploy_baba_ui::routes::contact::init_pow_secret().await;
 
-    let state = AppState { db, auth, rag };
+    let state = AppState::with_defaults(db, auth, rag);
     let app = build(state);
 
     let request = Request::builder()
@@ -130,7 +130,7 @@ async fn test_public_api_accessible() {
 
     deploy_baba_ui::routes::contact::init_pow_secret().await;
 
-    let state = AppState { db, auth, rag };
+    let state = AppState::with_defaults(db, auth, rag);
     let app = build(state);
 
     let request = Request::builder()
@@ -162,7 +162,7 @@ async fn test_docs_endpoint() {
 
     deploy_baba_ui::routes::contact::init_pow_secret().await;
 
-    let state = AppState { db, auth, rag };
+    let state = AppState::with_defaults(db, auth, rag);
     let app = build(state);
 
     let request = Request::builder().uri("/docs").body(Body::empty()).unwrap();

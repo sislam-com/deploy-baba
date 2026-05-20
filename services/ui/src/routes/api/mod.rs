@@ -7,6 +7,7 @@ pub mod competencies;
 pub mod crates;
 pub mod demo;
 pub mod jobs;
+pub mod metrics;
 pub mod resume_data;
 pub mod social_links;
 pub mod stack;

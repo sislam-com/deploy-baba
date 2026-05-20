@@ -40,6 +40,7 @@ pub mod contact;
 pub mod crates;
 pub mod demo;
 pub mod health;
+pub mod metrics;
 pub mod portfolio;
 pub mod resume;
 pub mod social;
@@ -50,6 +51,7 @@ pub mod tailor;
 pub use common::*;
 pub use crates::*;
 pub use health::*;
+pub use metrics::*;
 // stack module is empty — no re-export needed
 pub use about::*;
 pub use admin::*;

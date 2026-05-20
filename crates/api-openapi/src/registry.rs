@@ -116,6 +116,10 @@ pub const ALL_MODELS: &[(&str, ModelFactory)] = &[
     ("TailorResponse", || {
         serde_json::to_value(TailorResponse::example()).expect("TailorResponse example")
     }),
+    // metrics
+    ("MetricsQuery", || {
+        serde_json::to_value(MetricsQuery::example()).expect("MetricsQuery example")
+    }),
     // ask
     ("AskRequest", || {
         serde_json::to_value(AskRequest::example()).expect("AskRequest example")
