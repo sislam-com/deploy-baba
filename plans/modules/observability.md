@@ -1,5 +1,5 @@
 # W-OBS: observability
-**Path:** `services/ui/src/telemetry.rs`, `services/ui/migrations/` | **Status:** TODO
+**Path:** `services/ui/src/telemetry.rs`, `services/ui/migrations/` | **Status:** DONE
 **Coverage floor:** 80% | **Depends on:** W-UI, W-RAG | **Depended on by:** W-RES, W-MOD
 
 ---
@@ -153,10 +153,10 @@ pub async fn record_rag_metric(
 
 | ID | Task | Status | Notes |
 |----|------|--------|-------|
-| W-OBS.4.1 | Create telemetry initialization module | TODO | Structured JSON logging with tracing |
-| W-OBS.4.2 | Add SQLite metrics tables migration | TODO | api_metrics table, indexes |
-| W-OBS.4.3 | Implement metrics recording middleware | TODO | Async recording, error handling |
-| W-OBS.4.4 | Add metrics query endpoint | TODO | p50/p95/p99 calculation, filtering |
+| W-OBS.4.1 | Create telemetry initialization module | DONE | `telemetry.rs`: JSON logs in Lambda, human-readable locally |
+| W-OBS.4.2 | Add SQLite metrics tables migration | DONE | Migration `026_metrics_tables.sql`: `api_metrics` + 4 indexes |
+| W-OBS.4.3 | Implement metrics recording middleware | DONE | `metrics_middleware`: fire-and-forget `tokio::spawn` write to `api_metrics` |
+| W-OBS.4.4 | Add metrics query endpoint | DONE | `GET /api/v1/metrics?endpoint=&hours=`: p50/p95/p99 + error rate; admin-gated |
 
 ---
 

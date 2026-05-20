@@ -42,7 +42,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | web | W-WEB | `web/` | DONE | All 15 Askama templates replaced; Askama removed; CF→S3 direct serving (EFS sync dropped 2026-05-04, DRL-2026-05-04-sislam-outage); SEO prerender deferred to W-WEB.5 (P3) |
 | dev-environment | W-DEV | `scripts/`, `.devcontainer/` | DONE | bootstrap-tfstate.sh; dev-doctor.sh; devcontainer; initial-setup.md |
 | api-versioning | W-VER | `services/ui/src/middleware/`, `services/ui/src/router.rs` | DONE | URL-based versioning with /api/v1/ paths; backward-compatible redirects; deprecation middleware; OpenAPI version metadata |
-| observability | W-OBS | `services/ui/src/telemetry.rs`, `services/ui/migrations/` | TODO | Structured logging (tracing); SQLite metrics tables; metrics query endpoint; p50/p95/p99 latency calculation |
+| observability | W-OBS | `services/ui/src/telemetry.rs`, `services/ui/migrations/` | DONE | `metrics_middleware` (fire-and-forget SQLite writes); `GET /api/v1/metrics` (p50/p95/p99 + error rate); admin-gated |
 | resilience | W-RES | `services/ui/src/middleware/` | TODO | Rate limiting (in-memory); retry with exponential backoff; circuit breaker for LLM calls; request validation middleware |
 | module-decomposition | W-MOD | `services/ui/src/modules/` | TODO | Logical module separation (portfolio, rag, admin, auth); independent testing per module; module-specific metrics |
 
@@ -111,7 +111,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 
 ### P2.6 — Zero-Cost Microservices Enhancements
 22. ~~**W-VER.4.1–4.4**~~ **DONE** — API versioning strategy (ADR-024) — URL-based /api/v1/ routing, version extraction middleware, deprecation headers, OpenAPI version metadata
-23. **W-OBS.4.1–4.4** — SQLite-based observability (ADR-025) — TODO (structured logging with tracing, metrics tables + query endpoint, p50/p95/p99 calculation, no CloudWatch Metrics cost)
+23. ~~**W-OBS.4.1–4.4**~~ **DONE** — SQLite-based observability (ADR-025) — `metrics_middleware` fire-and-forget writes; `GET /api/v1/metrics` p50/p95/p99 + error rate; admin-gated
 24. **W-RES.4.1–4.4** — Code-level resilience patterns (ADR-026) — TODO (in-memory rate limiting, retry with exponential backoff, circuit breaker for LLM calls, request validation middleware)
 25. **W-MOD.4.1–4.3** — Module-based service decomposition (ADR-027) — TODO (logical module separation, independent testing per module, module-specific metrics collection)
 
@@ -277,6 +277,6 @@ shantopagla/deploy-baba/
 | 7 | Examples + docs | TODO |
 | 8 | Quality pass | WIP (`just quality` passes: coverage floors ✅, audit ✅; per-crate READMEs + examples TODO) |
 | 9 | Publish | TODO |
-| 10 | Zero-cost microservices enhancements | WIP (~~W-VER~~ DONE, W-OBS, W-RES, W-MOD) |
+| 10 | Zero-cost microservices enhancements | WIP (~~W-VER~~ DONE, ~~W-OBS~~ DONE, W-RES, W-MOD) |
 
 **Overall: ~95% complete**
