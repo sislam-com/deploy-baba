@@ -129,6 +129,7 @@ fn collect_schema_type_refs(schema: &Schema, refs: &mut BTreeSet<String>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
     use utoipa::openapi::{
         path::{Operation, OperationBuilder, PathItemBuilder, PathsBuilder},
         ContentBuilder, OpenApiBuilder, ResponseBuilder,
@@ -187,6 +188,146 @@ mod tests {
     fn filter_clears_top_level_security() {
         let spec = OpenApiBuilder::new().build();
         let filtered = public_view(&spec);
+        assert!(filtered.security.is_none());
+    }
+
+    #[test]
+    fn collect_schema_type_refs_traverses_nested_variants() {
+        let object_schema: Schema = serde_json::from_value(json!({
+            "type": "object",
+            "properties": {
+                "child": { "$ref": "#/components/schemas/Child" }
+            },
+            "additionalProperties": { "$ref": "#/components/schemas/Metadata" }
+        }))
+        .unwrap();
+        let array_schema: Schema = serde_json::from_value(json!({
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ArrayItem" }
+        }))
+        .unwrap();
+        let all_of_schema: Schema = serde_json::from_value(json!({
+            "allOf": [{ "$ref": "#/components/schemas/AllOfItem" }]
+        }))
+        .unwrap();
+        let one_of_schema: Schema = serde_json::from_value(json!({
+            "oneOf": [{ "$ref": "#/components/schemas/OneOfItem" }]
+        }))
+        .unwrap();
+        let any_of_schema: Schema = serde_json::from_value(json!({
+            "anyOf": [{ "$ref": "#/components/schemas/AnyOfItem" }]
+        }))
+        .unwrap();
+
+        let mut refs = BTreeSet::new();
+        collect_schema_type_refs(&object_schema, &mut refs);
+        collect_schema_type_refs(&array_schema, &mut refs);
+        collect_schema_type_refs(&all_of_schema, &mut refs);
+        collect_schema_type_refs(&one_of_schema, &mut refs);
+        collect_schema_type_refs(&any_of_schema, &mut refs);
+
+        assert_eq!(
+            refs,
+            BTreeSet::from([
+                "AllOfItem".to_string(),
+                "AnyOfItem".to_string(),
+                "ArrayItem".to_string(),
+                "Child".to_string(),
+                "Metadata".to_string(),
+                "OneOfItem".to_string(),
+            ])
+        );
+    }
+
+    #[test]
+    fn public_view_removes_unreachable_schemas_and_auth_schemes() {
+        let spec: OpenApi = serde_json::from_value(json!({
+            "openapi": "3.0.3",
+            "info": { "title": "Test", "version": "1.0.0" },
+            "paths": {
+                "/public": {
+                    "post": {
+                        "tags": ["public"],
+                        "requestBody": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "items": {
+                                                "type": "array",
+                                                "items": { "$ref": "#/components/schemas/PublicItem" }
+                                            }
+                                        },
+                                        "additionalProperties": {
+                                            "$ref": "#/components/schemas/PublicMetadata"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "responses": {
+                            "200": {
+                                "description": "ok",
+                                "content": {
+                                    "application/json": {
+                                        "schema": {
+                                            "oneOf": [
+                                                { "$ref": "#/components/schemas/PublicItem" },
+                                                { "$ref": "#/components/schemas/PublicMetadata" }
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "/admin": {
+                    "get": {
+                        "tags": ["admin"],
+                        "responses": {
+                            "200": {
+                                "description": "ok",
+                                "content": {
+                                    "application/json": {
+                                        "schema": { "$ref": "#/components/schemas/AdminResponse" }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "components": {
+                "schemas": {
+                    "PublicItem": { "type": "object" },
+                    "PublicMetadata": { "type": "object" },
+                    "AdminResponse": { "type": "object" },
+                    "UnusedSchema": { "type": "object" }
+                },
+                "securitySchemes": {
+                    "cookieAuth": { "type": "apiKey", "in": "cookie", "name": "session" },
+                    "bearerAuth": { "type": "http", "scheme": "bearer" },
+                    "apiKeyAuth": { "type": "apiKey", "in": "header", "name": "x-api-key" }
+                }
+            },
+            "security": [{ "cookieAuth": [] }]
+        }))
+        .unwrap();
+
+        let filtered = public_view(&spec);
+        let components = filtered.components.as_ref().unwrap();
+
+        assert!(filtered.paths.paths.contains_key("/public"));
+        assert!(!filtered.paths.paths.contains_key("/admin"));
+        assert!(components.schemas.contains_key("PublicItem"));
+        assert!(components.schemas.contains_key("PublicMetadata"));
+        assert!(!components.schemas.contains_key("AdminResponse"));
+        assert!(!components.schemas.contains_key("UnusedSchema"));
+        assert!(!components.security_schemes.contains_key("cookieAuth"));
+        assert!(!components.security_schemes.contains_key("bearerAuth"));
+        assert!(components.security_schemes.contains_key("apiKeyAuth"));
         assert!(filtered.security.is_none());
     }
 }

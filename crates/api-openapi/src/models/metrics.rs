@@ -29,3 +29,33 @@ impl ApiModel for MetricsQuery {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn metrics_query_example_matches_schema_defaults() {
+        let query = MetricsQuery::example();
+
+        assert_eq!(MetricsQuery::schema_name(), "MetricsQuery");
+        assert_eq!(query.endpoint, None);
+        assert_eq!(query.hours, 24);
+    }
+
+    #[test]
+    fn metrics_query_deserializes_missing_hours_to_default() {
+        let query: MetricsQuery = serde_json::from_str(r#"{"endpoint":"/api/v1/jobs"}"#).unwrap();
+
+        assert_eq!(query.endpoint.as_deref(), Some("/api/v1/jobs"));
+        assert_eq!(query.hours, 24);
+    }
+
+    #[test]
+    fn metrics_query_deserializes_explicit_hours() {
+        let query: MetricsQuery = serde_json::from_str(r#"{"hours":48}"#).unwrap();
+
+        assert_eq!(query.endpoint, None);
+        assert_eq!(query.hours, 48);
+    }
+}
