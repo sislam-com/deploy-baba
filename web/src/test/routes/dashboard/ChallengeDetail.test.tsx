@@ -80,4 +80,82 @@ describe('ChallengeDetail', () => {
       expect(screen.queryByText('New Challenge')).not.toBeInTheDocument()
     })
   })
+
+  it('shows error on save failure', async () => {
+    global.fetch = vi.fn(() => Promise.resolve(new Response('Save failed', { status: 400 })))
+    render(
+      <DashboardLayout>
+        <ChallengeDetail />
+      </DashboardLayout>,
+      { router: 'memory', route: '/dashboard/challenges/new', routes: [{ path: '/dashboard/challenges/:id' }] }
+    )
+    const user = userEvent.setup()
+
+    await user.type(screen.getByLabelText('slug'), 'test-challenge')
+    await user.type(screen.getByLabelText('title'), 'Test Challenge')
+    await user.type(screen.getByLabelText('Description'), 'Test description')
+
+    await user.click(screen.getByRole('button', { name: 'Create' }))
+    await waitFor(() => {
+      expect(screen.getByText('Save failed')).toBeInTheDocument()
+    })
+  })
+
+  it('deletes existing challenge after confirmation', async () => {
+    global.fetch = vi.fn(() => Promise.resolve(new Response(null, { status: 200 })))
+
+    render(
+      <DashboardLayout>
+        <ChallengeDetail />
+      </DashboardLayout>,
+      { router: 'memory', route: '/dashboard/challenges/1', routes: [{ path: '/dashboard/challenges/:id' }] }
+    )
+    const user = userEvent.setup()
+
+    await waitFor(() => {
+      expect(screen.queryByText('Loading…')).not.toBeInTheDocument()
+    })
+
+    // Step 1: click Delete to enter confirmation mode
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    // Step 2: click Confirm delete
+    await user.click(screen.getByRole('button', { name: 'Confirm delete' }))
+
+    await waitFor(() => {
+      expect(screen.queryByText('Edit Challenge')).not.toBeInTheDocument()
+    })
+  })
+
+  it('shows delete error after confirmation', async () => {
+    global.fetch = vi.fn(() => Promise.resolve(new Response('Delete failed', { status: 500 })))
+
+    render(
+      <DashboardLayout>
+        <ChallengeDetail />
+      </DashboardLayout>,
+      { router: 'memory', route: '/dashboard/challenges/1', routes: [{ path: '/dashboard/challenges/:id' }] }
+    )
+    const user = userEvent.setup()
+
+    await waitFor(() => {
+      expect(screen.queryByText('Loading…')).not.toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm delete' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Delete failed')).toBeInTheDocument()
+    })
+  })
+
+  it('shows loading state for existing challenge', async () => {
+    render(
+      <DashboardLayout>
+        <ChallengeDetail />
+      </DashboardLayout>,
+      { router: 'memory', route: '/dashboard/challenges/1', routes: [{ path: '/dashboard/challenges/:id' }] }
+    )
+    expect(screen.getByText('Loading…')).toBeInTheDocument()
+  })
 })

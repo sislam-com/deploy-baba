@@ -180,6 +180,62 @@ describe('Ask', () => {
     await waitFor(() => expect(submitButton).toBeEnabled())
   })
 
+  it('displays generic error message on non-429/503 failure', async () => {
+    server.use(
+      http.post('/api/ask', () =>
+        HttpResponse.json({ error: 'Bad request' }, { status: 400 })
+      )
+    )
+
+    render(<Ask />)
+    const user = userEvent.setup()
+
+    await user.type(screen.getByLabelText('Your question'), 'What are your skills?')
+
+    const submitButton = screen.getByRole('button', { name: 'Ask' })
+    await user.click(submitButton)
+
+    await waitFor(() => {
+      expect(screen.getByText('Bad request')).toBeInTheDocument()
+    })
+
+    await waitFor(() => expect(submitButton).toBeEnabled())
+  })
+
+  it('displays non-portfolio citation with external link', async () => {
+    server.use(
+      http.post('/api/ask', () =>
+        HttpResponse.json({
+          answer: 'See source [source 1]',
+          citations: [
+            {
+              path: 'src/main.rs',
+              kind: 'rust',
+              sha: 'abc123',
+              url: 'https://github.com/shantopagla/portfolio/blob/abc123/src/main.rs',
+              ord: 1,
+            },
+          ],
+          model: 'test',
+          input_tokens: 1,
+          output_tokens: 1,
+        })
+      )
+    )
+
+    render(<Ask />)
+    const user = userEvent.setup()
+
+    await user.type(screen.getByLabelText('Your question'), 'What are your skills?')
+    await user.click(screen.getByRole('button', { name: 'Ask' }))
+
+    await waitFor(() => {
+      const citationLink = screen.getByText('src/main.rs')
+      expect(citationLink).toBeInTheDocument()
+      expect(citationLink).toHaveAttribute('target', '_blank')
+    })
+  })
+
   it('displays error message on service unavailable', async () => {
     server.use(
       http.post('/api/ask', () =>
@@ -224,6 +280,72 @@ describe('Ask', () => {
     render(<Ask embedded />)
     expect(screen.queryByRole('heading', { name: 'Ask' })).not.toBeInTheDocument()
     expect(screen.queryByText(/Questions about this portfolio/)).not.toBeInTheDocument()
+  })
+
+  it('renders markdown with code blocks, blockquotes and links', async () => {
+    server.use(
+      http.post('/api/ask', () =>
+        HttpResponse.json({
+          answer: 'Here is some code: `println!("hello")`\n\n> This is a blockquote\n\n**Bold text** and [a link](https://example.com)\n\n```rust\nfn main() {}\n```',
+          citations: [],
+          model: 'test',
+          input_tokens: 1,
+          output_tokens: 1,
+        })
+      )
+    )
+
+    render(<Ask />)
+    const user = userEvent.setup()
+
+    await user.type(screen.getByLabelText('Your question'), 'Show me markdown')
+    await user.click(screen.getByRole('button', { name: 'Ask' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Answer')).toBeInTheDocument()
+    })
+
+    // Inline code
+    expect(screen.getByText('println!("hello")')).toBeInTheDocument()
+    // Blockquote
+    expect(screen.getByText('This is a blockquote')).toBeInTheDocument()
+    // Bold
+    expect(screen.getByText('Bold text')).toBeInTheDocument()
+    // Link
+    const link = screen.getByRole('link', { name: 'a link' })
+    expect(link).toHaveAttribute('href', 'https://example.com')
+  })
+
+  it('renders markdown headings and lists', async () => {
+    server.use(
+      http.post('/api/ask', () =>
+        HttpResponse.json({
+          answer: '# Heading 1\n\n## Heading 2\n\n### Heading 3\n\n- Item one\n- Item two\n\n1. First\n2. Second',
+          citations: [],
+          model: 'test',
+          input_tokens: 1,
+          output_tokens: 1,
+        })
+      )
+    )
+
+    render(<Ask />)
+    const user = userEvent.setup()
+
+    await user.type(screen.getByLabelText('Your question'), 'Show me markdown')
+    await user.click(screen.getByRole('button', { name: 'Ask' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Answer')).toBeInTheDocument()
+    })
+
+    expect(screen.getByText('Heading 1')).toBeInTheDocument()
+    expect(screen.getByText('Heading 2')).toBeInTheDocument()
+    expect(screen.getByText('Heading 3')).toBeInTheDocument()
+    expect(screen.getByText('Item one')).toBeInTheDocument()
+    expect(screen.getByText('Item two')).toBeInTheDocument()
+    expect(screen.getByText('First')).toBeInTheDocument()
+    expect(screen.getByText('Second')).toBeInTheDocument()
   })
 
   it('respects max length on textarea', () => {

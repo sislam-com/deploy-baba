@@ -230,6 +230,60 @@ describe('JobDetail', () => {
     expect(screen.getByLabelText('company')).toHaveValue('Tech Corp')
   })
 
+  it('types into all form fields and submits', async () => {
+    global.fetch = vi.fn(() =>
+      Promise.resolve(new Response('Success', { status: 200 }))
+    )
+
+    render(
+      <DashboardLayout>
+        <JobDetail />
+      </DashboardLayout>,
+      { router: 'memory', route: '/dashboard/jobs/new', routes: [{ path: '/dashboard/jobs/:id' }] }
+    )
+    const user = userEvent.setup()
+
+    await user.type(screen.getByLabelText('slug'), 'test-job')
+    await user.type(screen.getByLabelText('company'), 'Test Company')
+    await user.type(screen.getByLabelText('title'), 'Test Title')
+    await user.type(screen.getByLabelText('location'), 'Remote')
+    await user.type(screen.getByLabelText('start date'), '2020-01-01')
+    await user.type(screen.getByLabelText('end date'), '2023-12-31')
+    await user.type(screen.getByLabelText('Summary'), 'A test job summary')
+    await user.type(screen.getByLabelText('Tech stack (comma-separated)'), 'Rust, React')
+    await user.type(screen.getByLabelText('Sort order'), '5')
+
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => {
+      expect(screen.queryByText('New job')).not.toBeInTheDocument()
+    })
+  })
+
+  it('shows error on delete failure', async () => {
+    global.fetch = vi.fn(() =>
+      Promise.resolve(new Response('Delete failed', { status: 400 }))
+    )
+    global.confirm = vi.fn(() => true)
+
+    render(
+      <DashboardLayout>
+        <JobDetail />
+      </DashboardLayout>,
+      { router: 'memory', route: '/dashboard/jobs/1', routes: [{ path: '/dashboard/jobs/:id' }] }
+    )
+    const user = userEvent.setup()
+
+    await waitFor(() => {
+      expect(screen.queryByText('Loading…')).not.toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    await waitFor(() => {
+      expect(screen.getByText('Delete failed')).toBeInTheDocument()
+    })
+  })
+
   it('shows loading state initially', () => {
     render(
       <DashboardLayout>
