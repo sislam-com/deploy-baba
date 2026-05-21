@@ -134,3 +134,6 @@ jobs:
 
       - name: Create dev-vX.Y.Z tag
         run: cargo run -q -p xtask -- release tag --kind dev --push
+
+      - name: Promote dev-vX.Y.Z to vX.Y.Z (triggers prod deploy)
+        run: cargo run -q -p xtask -- release promote --push
