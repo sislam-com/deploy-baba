@@ -28,7 +28,7 @@ llm-openai = { workspace = true }
 
 # RAG
 rag-core = { workspace = true }
-rag-sqlite = { workspace = true }
+rag-sqlite = { workspace = true, features = ["llm-bridge"] }
 async-trait = { workspace = true }
 
 # OpenAPI spec (for RAG ingest)

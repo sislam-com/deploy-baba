@@ -90,7 +90,7 @@ pub async fn execute(action: RagAction) -> anyhow::Result<()> {
             db_path,
             repo_root,
             include_cache,
-        } => ingest(&db_path, &repo_root, include_cache),
+        } => ingest(&db_path, &repo_root, include_cache).await,
         RagAction::Query {
             db_path,
             query,
@@ -126,7 +126,7 @@ pub async fn execute(action: RagAction) -> anyhow::Result<()> {
 
 // ── Ingest ────────────────────────────────────────────────────────────────
 
-fn ingest(db_path: &Path, repo_root: &Path, include_cache: bool) -> anyhow::Result<()> {
+async fn ingest(db_path: &Path, repo_root: &Path, include_cache: bool) -> anyhow::Result<()> {
     println!("Opening RAG store at {}", db_path.display());
     let conn = Connection::open(db_path)
         .with_context(|| format!("Failed to open database: {}", db_path.display()))?;
@@ -215,6 +215,28 @@ fn ingest(db_path: &Path, repo_root: &Path, include_cache: bool) -> anyhow::Resu
     }
 
     println!("Done. Total: {total_docs} documents, {total_chunks} chunks indexed.");
+
+    // ── Optional: embed chunks when OPENAI_API_KEY is set ──────────
+    if let Ok(api_key) = std::env::var("OPENAI_API_KEY") {
+        println!("  Embedding chunks (OPENAI_API_KEY detected)...");
+        let embedder = rag_sqlite::embed_bridge::LlmEmbedder::new(std::sync::Arc::new(
+            llm_openai::OpenAIProvider::new(api_key),
+        ));
+        match store.upsert_embeddings(&embedder).await {
+            Ok(stats) => {
+                println!(
+                    "    {} embedded, {} skipped, {} errors",
+                    stats.embedded, stats.skipped, stats.errors
+                );
+            }
+            Err(e) => {
+                println!("    Embedding failed (FTS-only mode): {e}");
+            }
+        }
+    } else {
+        println!("  No OPENAI_API_KEY — skipping embedding (FTS-only mode).");
+    }
+
     Ok(())
 }
 
@@ -1235,10 +1257,28 @@ async fn query_cmd(db_path: &Path, query: &str, top_k: usize) -> anyhow::Result<
         .with_context(|| format!("Failed to open database: {}", db_path.display()))?;
     let store = RagStore::new(conn).context("Failed to initialise RAG schema")?;
 
-    let results = store
-        .retrieve(query, top_k)
-        .await
-        .map_err(|e| anyhow::anyhow!("retrieval failed: {e}"))?;
+    // Use hybrid (FTS + ANN) retrieval when OPENAI_API_KEY is set and embeddings exist
+    let results = if let Ok(api_key) = std::env::var("OPENAI_API_KEY") {
+        use rag_core::Embedder;
+        let embedder = rag_sqlite::embed_bridge::LlmEmbedder::new(std::sync::Arc::new(
+            llm_openai::OpenAIProvider::new(api_key),
+        ));
+        let query_vecs: Vec<Vec<f32>> = embedder
+            .embed(&[query])
+            .await
+            .map_err(|e| anyhow::anyhow!("query embedding failed: {e}"))?;
+        let qe = query_vecs.first().map(|v: &Vec<f32>| v.as_slice());
+        println!("  Using hybrid retrieval (FTS + ANN)");
+        store
+            .retrieve_hybrid(query, qe, top_k)
+            .await
+            .map_err(|e| anyhow::anyhow!("hybrid retrieval failed: {e}"))?
+    } else {
+        store
+            .retrieve(query, top_k)
+            .await
+            .map_err(|e| anyhow::anyhow!("retrieval failed: {e}"))?
+    };
 
     if results.is_empty() {
         println!("No results found.");

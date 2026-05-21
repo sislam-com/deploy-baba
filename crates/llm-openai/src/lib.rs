@@ -31,17 +31,22 @@
 
 use async_trait::async_trait;
 use llm_core::{
-    grounding::assemble_grounded_prompt, LlmError, LlmProvider, LlmRequest, LlmResponse,
-    MessageContent, StopReason, ToolCall,
+    grounding::assemble_grounded_prompt, EmbeddingProvider, LlmError, LlmProvider, LlmRequest,
+    LlmResponse, MessageContent, StopReason, ToolCall,
 };
 use serde::{Deserialize, Serialize};
 
 const OPENAI_API_URL: &str = "https://api.openai.com/v1/chat/completions";
+const OPENAI_EMBEDDINGS_URL: &str = "https://api.openai.com/v1/embeddings";
 
 /// Default model for cost-efficient generation (fast, cheap).
 pub const DEFAULT_MODEL: &str = "gpt-4o-mini";
 /// Upgrade model for higher-quality generation.
 pub const UPGRADE_MODEL: &str = "gpt-4o";
+/// Default embedding model (1536 dimensions, $0.02/1M tokens).
+pub const DEFAULT_EMBEDDING_MODEL: &str = "text-embedding-3-small";
+/// Dimension of vectors produced by `text-embedding-3-small`.
+pub const EMBEDDING_DIM: usize = 1536;
 
 // ── Wire types for the OpenAI Chat Completions API ─────────────────────────────
 
@@ -343,5 +348,217 @@ impl LlmProvider for OpenAIProvider {
             model: api.model,
             stop_reason,
         })
+    }
+}
+
+// ── Wire types for the OpenAI Embeddings API ─────────────────────────────────
+
+#[derive(Serialize)]
+struct EmbeddingApiRequest<'a> {
+    model: &'a str,
+    input: &'a [String],
+}
+
+#[derive(Deserialize, Debug)]
+struct EmbeddingApiResponse {
+    data: Vec<EmbeddingData>,
+    #[allow(dead_code)]
+    usage: EmbeddingUsage,
+}
+
+#[derive(Deserialize, Debug)]
+struct EmbeddingData {
+    embedding: Vec<f32>,
+    index: usize,
+}
+
+#[derive(Deserialize, Debug)]
+struct EmbeddingUsage {
+    #[allow(dead_code)]
+    prompt_tokens: u32,
+    #[allow(dead_code)]
+    total_tokens: u32,
+}
+
+// ── EmbeddingProvider ────────────────────────────────────────────────────────
+
+#[async_trait]
+impl EmbeddingProvider for OpenAIProvider {
+    fn provider_id(&self) -> &'static str {
+        "openai"
+    }
+
+    fn embedding_dim(&self) -> usize {
+        EMBEDDING_DIM
+    }
+
+    async fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>, LlmError> {
+        if texts.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let body = EmbeddingApiRequest {
+            model: DEFAULT_EMBEDDING_MODEL,
+            input: texts,
+        };
+
+        let http_resp = self
+            .client
+            .post(OPENAI_EMBEDDINGS_URL)
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .header("content-type", "application/json")
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| LlmError::Network(e.to_string()))?;
+
+        let status = http_resp.status();
+
+        if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
+            let retry = http_resp
+                .headers()
+                .get("retry-after")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|s| s.parse::<u64>().ok())
+                .unwrap_or(5);
+            return Err(LlmError::RateLimited {
+                retry_after_secs: retry,
+            });
+        }
+
+        if !status.is_success() {
+            let text = http_resp
+                .text()
+                .await
+                .unwrap_or_else(|_| status.to_string());
+            if let Ok(api_err) = serde_json::from_str::<ApiError>(&text) {
+                return Err(LlmError::Upstream {
+                    message: format!("[{}] {}", api_err.error.kind, api_err.error.message),
+                });
+            }
+            return Err(LlmError::Upstream { message: text });
+        }
+
+        let api: EmbeddingApiResponse = http_resp
+            .json()
+            .await
+            .map_err(|e| LlmError::Parse(e.to_string()))?;
+
+        // Return vectors sorted by input order (API may return out-of-order)
+        let mut sorted: Vec<(usize, Vec<f32>)> = api
+            .data
+            .into_iter()
+            .map(|d| (d.index, d.embedding))
+            .collect();
+        sorted.sort_by_key(|(idx, _)| *idx);
+
+        Ok(sorted.into_iter().map(|(_, emb)| emb).collect())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use llm_core::{ChatMessage, EmbeddingProvider, LlmProvider, MessageRole};
+
+    #[test]
+    fn provider_id_is_openai() {
+        let p = OpenAIProvider::new("test-key");
+        assert_eq!(LlmProvider::provider_id(&p), "openai");
+    }
+
+    #[test]
+    fn default_model_is_gpt4o_mini() {
+        let p = OpenAIProvider::new("test-key");
+        assert_eq!(p.default_model(), "gpt-4o-mini");
+    }
+
+    #[test]
+    fn embedding_provider_id_is_openai() {
+        let p = OpenAIProvider::new("test-key");
+        assert_eq!(EmbeddingProvider::provider_id(&p), "openai");
+    }
+
+    #[test]
+    fn embedding_dim_is_1536() {
+        let p = OpenAIProvider::new("test-key");
+        assert_eq!(p.embedding_dim(), 1536);
+    }
+
+    #[test]
+    fn message_to_api_text() {
+        let msg = ChatMessage::text(MessageRole::User, "hello");
+        let api = message_to_api(&msg);
+        assert_eq!(api.role, "user");
+        assert_eq!(api.content, serde_json::Value::String("hello".into()));
+        assert!(api.tool_call_id.is_none());
+    }
+
+    #[test]
+    fn message_to_api_tool_result() {
+        let msg = ChatMessage::tool_result("call-1", "result text", false);
+        let api = message_to_api(&msg);
+        assert_eq!(api.tool_call_id, Some("call-1".into()));
+        assert_eq!(api.content, serde_json::Value::String("result text".into()));
+    }
+
+    #[test]
+    fn message_to_api_error_tool_result() {
+        let msg = ChatMessage::tool_result("call-2", "bad input", true);
+        let api = message_to_api(&msg);
+        assert_eq!(
+            api.content,
+            serde_json::Value::String("[ERROR] bad input".into())
+        );
+    }
+
+    #[test]
+    fn embedding_response_parse() {
+        let json = r#"{
+            "data": [
+                {"embedding": [0.1, 0.2, 0.3], "index": 0},
+                {"embedding": [0.4, 0.5, 0.6], "index": 1}
+            ],
+            "usage": {"prompt_tokens": 10, "total_tokens": 10}
+        }"#;
+        let resp: EmbeddingApiResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(resp.data.len(), 2);
+        assert_eq!(resp.data[0].embedding, vec![0.1, 0.2, 0.3]);
+        assert_eq!(resp.data[1].index, 1);
+        assert_eq!(resp.usage.prompt_tokens, 10);
+    }
+
+    #[test]
+    fn embedding_response_reorder() {
+        // Simulate API returning out of order
+        let data = vec![
+            EmbeddingData {
+                embedding: vec![0.4, 0.5],
+                index: 1,
+            },
+            EmbeddingData {
+                embedding: vec![0.1, 0.2],
+                index: 0,
+            },
+            EmbeddingData {
+                embedding: vec![0.7, 0.8],
+                index: 2,
+            },
+        ];
+        let mut sorted: Vec<(usize, Vec<f32>)> =
+            data.into_iter().map(|d| (d.index, d.embedding)).collect();
+        sorted.sort_by_key(|(idx, _)| *idx);
+        let result: Vec<Vec<f32>> = sorted.into_iter().map(|(_, emb)| emb).collect();
+
+        assert_eq!(result[0], vec![0.1, 0.2]);
+        assert_eq!(result[1], vec![0.4, 0.5]);
+        assert_eq!(result[2], vec![0.7, 0.8]);
+    }
+
+    #[tokio::test]
+    async fn embed_empty_returns_empty() {
+        let p = OpenAIProvider::new("test-key");
+        let result = p.embed(&[]).await.unwrap();
+        assert!(result.is_empty());
     }
 }

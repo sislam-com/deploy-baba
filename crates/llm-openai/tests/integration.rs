@@ -15,7 +15,9 @@
 //!
 //! These tests use `max_tokens: 10` to minimise cost and latency.
 
-use llm_core::{ChatMessage, GenerationConfig, LlmProvider, LlmRequest, MessageRole};
+use llm_core::{
+    ChatMessage, EmbeddingProvider, GenerationConfig, LlmProvider, LlmRequest, MessageRole,
+};
 use llm_openai::OpenAIProvider;
 
 /// Resolve the API key from env, returning `None` if not present.
@@ -57,7 +59,7 @@ fn minimal_req(provider: &OpenAIProvider, content: &str) -> LlmRequest {
 fn provider_id_is_openai() {
     // No API call — safe to run in CI
     let provider = OpenAIProvider::new("dummy");
-    assert_eq!(provider.provider_id(), "openai");
+    assert_eq!(LlmProvider::provider_id(&provider), "openai");
 }
 
 #[test]
@@ -132,4 +134,56 @@ async fn live_generate_invalid_key_returns_upstream_error() {
         Err(other) => panic!("expected Upstream error, got: {other:?}"),
         Ok(_) => panic!("expected error for invalid key, got success"),
     }
+}
+
+// ── live embed ──────────────────────────────────────────────────────────────
+
+#[tokio::test]
+#[ignore = "requires OPENAI_API_KEY — run with: OPENAI_API_KEY=... cargo test -p llm-openai -- --ignored"]
+async fn live_embed_single_text() {
+    let key = skip_without_key!();
+    let provider = OpenAIProvider::new(key);
+
+    let texts = vec!["Rust is a systems programming language.".to_string()];
+    let result = provider.embed(&texts).await.expect("embed should succeed");
+
+    assert_eq!(result.len(), 1);
+    assert_eq!(
+        result[0].len(),
+        provider.embedding_dim(),
+        "vector dimension should match embedding_dim()"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires OPENAI_API_KEY — run with: OPENAI_API_KEY=... cargo test -p llm-openai -- --ignored"]
+async fn live_embed_batch() {
+    let key = skip_without_key!();
+    let provider = OpenAIProvider::new(key);
+
+    let texts = vec![
+        "SQLite is an embedded database.".to_string(),
+        "Lambda runs serverless functions.".to_string(),
+        "OpenTofu manages infrastructure.".to_string(),
+    ];
+    let result = provider.embed(&texts).await.expect("embed should succeed");
+
+    assert_eq!(result.len(), 3);
+    for (i, vec) in result.iter().enumerate() {
+        assert_eq!(
+            vec.len(),
+            provider.embedding_dim(),
+            "vector {i} should have correct dimension"
+        );
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires OPENAI_API_KEY — run with: OPENAI_API_KEY=... cargo test -p llm-openai -- --ignored"]
+async fn live_embed_empty_returns_empty() {
+    let key = skip_without_key!();
+    let provider = OpenAIProvider::new(key);
+
+    let result = provider.embed(&[]).await.expect("embed should succeed");
+    assert!(result.is_empty());
 }

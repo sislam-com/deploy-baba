@@ -17,9 +17,14 @@
 //!
 //! All `INSERT` statements use `ON CONFLICT DO UPDATE` (ADR-010).
 
+#[cfg(feature = "llm-bridge")]
+pub mod embed_bridge;
+
 use async_trait::async_trait;
 use rag_core::{RagError, RankedChunk, Retriever};
 use rusqlite::{params, Connection};
+use sha2::{Digest, Sha256};
+use std::collections::HashMap;
 use std::sync::Mutex;
 
 // ── Schema migration ──────────────────────────────────────────────────────
@@ -39,6 +44,13 @@ pub const MIGRATION_SQL: &str = include_str!("migration.sql");
 /// `Arc<RagStore>` can be shared across tokio tasks.
 pub struct RagStore {
     conn: Mutex<Connection>,
+}
+
+/// Statistics returned by [`RagStore::upsert_embeddings`].
+pub struct EmbedStats {
+    pub embedded: usize,
+    pub skipped: usize,
+    pub errors: usize,
 }
 
 impl RagStore {
@@ -148,6 +160,196 @@ impl RagStore {
         let conn = self.conn.lock().unwrap();
         conn.query_row("SELECT COUNT(*) FROM rag_documents", [], |row| row.get(0))
             .map_err(|e| RagError::Database(e.to_string()))
+    }
+
+    // ── Embeddings ─────────────────────────────────────────────────────────
+
+    /// Upsert embeddings for all chunks, skipping those whose content hash
+    /// has not changed. Requires migration 024 (`rag_embeddings` table).
+    pub async fn upsert_embeddings(
+        &self,
+        embedder: &dyn rag_core::Embedder,
+    ) -> Result<EmbedStats, RagError> {
+        let chunks_to_embed: Vec<(i64, String)> = {
+            let conn = self.conn.lock().unwrap();
+            let mut stmt = conn
+                .prepare("SELECT id, content FROM rag_chunks ORDER BY id")
+                .map_err(|e| RagError::Database(e.to_string()))?;
+
+            let rows: Vec<(i64, String)> = stmt
+                .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+                .map_err(|e| RagError::Database(e.to_string()))?
+                .filter_map(|r| r.ok())
+                .collect();
+
+            // Filter out chunks whose hash matches the stored embedding
+            let mut need_embed = Vec::new();
+            for (id, content) in rows {
+                let hash = content_hash(&content);
+                let existing_hash: Option<String> = conn
+                    .query_row(
+                        "SELECT content_hash FROM rag_embeddings WHERE chunk_id = ?1",
+                        params![id],
+                        |row| row.get(0),
+                    )
+                    .ok();
+                if existing_hash.as_deref() != Some(&hash) {
+                    need_embed.push((id, content));
+                }
+            }
+            need_embed
+        };
+
+        let mut stats = EmbedStats {
+            embedded: 0,
+            skipped: 0,
+            errors: 0,
+        };
+
+        let total = chunks_to_embed.len();
+        if total == 0 {
+            let conn = self.conn.lock().unwrap();
+            let existing: i64 = conn
+                .query_row("SELECT COUNT(*) FROM rag_embeddings", [], |row| row.get(0))
+                .unwrap_or(0);
+            stats.skipped = existing as usize;
+            return Ok(stats);
+        }
+
+        // Batch embed (max 100 per call to stay under API limits)
+        for batch in chunks_to_embed.chunks(100) {
+            let texts: Vec<&str> = batch.iter().map(|(_, c)| c.as_str()).collect();
+            match embedder.embed(&texts).await {
+                Ok(vectors) => {
+                    let conn = self.conn.lock().unwrap();
+                    for ((id, content), vec) in batch.iter().zip(vectors.iter()) {
+                        let hash = content_hash(content);
+                        let blob = embedding_to_blob(vec);
+                        conn.execute(
+                            "INSERT INTO rag_embeddings (chunk_id, content_hash, embedding, model, dim)
+                             VALUES (?1, ?2, ?3, ?4, ?5)
+                             ON CONFLICT(chunk_id) DO UPDATE SET
+                               content_hash = excluded.content_hash,
+                               embedding = excluded.embedding,
+                               model = excluded.model,
+                               dim = excluded.dim,
+                               updated_at = datetime('now')",
+                            params![*id, hash, blob, embedder.provider_id(), embedder.dim() as i64],
+                        )
+                        .map_err(|e| RagError::Database(e.to_string()))?;
+                        stats.embedded += 1;
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("Embedding batch failed: {e}");
+                    stats.errors += batch.len();
+                }
+            }
+        }
+
+        // Count skipped (already-cached embeddings not in the embed set)
+        let conn = self.conn.lock().unwrap();
+        let total_chunks: i64 = conn
+            .query_row("SELECT COUNT(*) FROM rag_chunks", [], |row| row.get(0))
+            .unwrap_or(0);
+        stats.skipped = total_chunks as usize - stats.embedded - stats.errors;
+
+        Ok(stats)
+    }
+
+    /// Retrieve using both FTS5 and ANN (if embeddings exist), merged via RRF.
+    pub async fn retrieve_hybrid(
+        &self,
+        query: &str,
+        query_embedding: Option<&[f32]>,
+        top_k: usize,
+    ) -> Result<Vec<RankedChunk>, RagError> {
+        // FTS5 lane
+        let fts_results = self.retrieve_filtered(query, top_k * 2, None)?;
+
+        // ANN lane (only if we have a query embedding and embeddings exist)
+        let ann_results = if let Some(qe) = query_embedding {
+            self.retrieve_ann(qe, top_k * 2)?
+        } else {
+            Vec::new()
+        };
+
+        if ann_results.is_empty() {
+            // No ANN results — fall back to pure FTS
+            return Ok(fts_results.into_iter().take(top_k).collect());
+        }
+
+        Ok(rrf_merge(&fts_results, &ann_results, top_k))
+    }
+
+    /// ANN search over stored embeddings using cosine distance.
+    fn retrieve_ann(
+        &self,
+        query_embedding: &[f32],
+        top_k: usize,
+    ) -> Result<Vec<RankedChunk>, RagError> {
+        let conn = self.conn.lock().unwrap();
+
+        // Check if rag_embeddings has any rows
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM rag_embeddings", [], |row| row.get(0))
+            .unwrap_or(0);
+        if count == 0 {
+            return Ok(Vec::new());
+        }
+
+        // Brute-force cosine similarity (no sqlite-vec needed for this approach).
+        // For the current corpus size (~2000 chunks), this is fast enough.
+        // sqlite-vec ANN can be added later for larger corpora.
+        let mut stmt = conn
+            .prepare(
+                "SELECT re.chunk_id, re.embedding, rc.document_id,
+                        rd.source_kind, rd.source_path, rd.git_sha,
+                        rc.ord, rc.content
+                 FROM rag_embeddings re
+                 JOIN rag_chunks rc ON rc.id = re.chunk_id
+                 JOIN rag_documents rd ON rd.id = rc.document_id",
+            )
+            .map_err(|e| RagError::Database(e.to_string()))?;
+
+        let rows: Vec<RankedChunk> = stmt
+            .query_map([], |row| {
+                let chunk_id: i64 = row.get(0)?;
+                let blob: Vec<u8> = row.get(1)?;
+                let document_id: i64 = row.get(2)?;
+                let source_kind: String = row.get(3)?;
+                let source_path: String = row.get(4)?;
+                let git_sha: String = row.get(5)?;
+                let ord: i64 = row.get(6)?;
+                let content: String = row.get(7)?;
+
+                let stored = blob_to_embedding(&blob);
+                let score = cosine_similarity(query_embedding, &stored);
+
+                Ok(RankedChunk {
+                    chunk_id,
+                    document_id,
+                    source_kind,
+                    source_path,
+                    git_sha,
+                    ord,
+                    content,
+                    score,
+                })
+            })
+            .map_err(|e| RagError::Database(e.to_string()))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        // Sort by score descending and take top_k
+        let mut sorted = rows;
+        sorted.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        sorted.truncate(top_k);
+        Ok(sorted)
     }
 
     /// Retrieve chunks filtered by optional `source_kind` values.
@@ -290,6 +492,88 @@ impl Retriever for RagStore {
     async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<RankedChunk>, RagError> {
         self.retrieve_filtered(query, top_k, None)
     }
+}
+
+// ── Embedding helpers ────────────────────────────────────────────────────
+
+fn content_hash(content: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(content.as_bytes());
+    format!("{:x}", hasher.finalize())
+}
+
+fn embedding_to_blob(vec: &[f32]) -> Vec<u8> {
+    vec.iter().flat_map(|f| f.to_le_bytes()).collect()
+}
+
+fn blob_to_embedding(blob: &[u8]) -> Vec<f32> {
+    blob.chunks_exact(4)
+        .map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]]))
+        .collect()
+}
+
+fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
+    if a.len() != b.len() || a.is_empty() {
+        return 0.0;
+    }
+    let (mut dot, mut norm_a, mut norm_b) = (0.0_f64, 0.0_f64, 0.0_f64);
+    for (x, y) in a.iter().zip(b.iter()) {
+        let (x, y) = (*x as f64, *y as f64);
+        dot += x * y;
+        norm_a += x * x;
+        norm_b += y * y;
+    }
+    let denom = norm_a.sqrt() * norm_b.sqrt();
+    if denom < 1e-10 {
+        0.0
+    } else {
+        dot / denom
+    }
+}
+
+/// Reciprocal Rank Fusion: merge two ranked lists into one.
+///
+/// RRF_score(d) = sum(1 / (k + rank_i(d))) for each lane i that contains d.
+/// k = 60 is the standard constant from the original RRF paper.
+fn rrf_merge(
+    fts_results: &[RankedChunk],
+    ann_results: &[RankedChunk],
+    top_k: usize,
+) -> Vec<RankedChunk> {
+    const K: f64 = 60.0;
+    let mut scores: HashMap<i64, (f64, RankedChunk)> = HashMap::new();
+
+    for (rank, chunk) in fts_results.iter().enumerate() {
+        let rrf = 1.0 / (K + rank as f64 + 1.0);
+        scores
+            .entry(chunk.chunk_id)
+            .and_modify(|(s, _)| *s += rrf)
+            .or_insert((rrf, chunk.clone()));
+    }
+
+    for (rank, chunk) in ann_results.iter().enumerate() {
+        let rrf = 1.0 / (K + rank as f64 + 1.0);
+        scores
+            .entry(chunk.chunk_id)
+            .and_modify(|(s, _)| *s += rrf)
+            .or_insert((rrf, chunk.clone()));
+    }
+
+    let mut merged: Vec<RankedChunk> = scores
+        .into_values()
+        .map(|(score, mut chunk)| {
+            chunk.score = score;
+            chunk
+        })
+        .collect();
+
+    merged.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    merged.truncate(top_k);
+    merged
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────
@@ -448,5 +732,208 @@ mod tests {
             .unwrap();
         let results = store.retrieve_filtered("content", 10, Some(&[])).unwrap();
         assert!(results.is_empty());
+    }
+
+    // ── Embedding tests ──────────────────────────────────────────────────
+
+    #[test]
+    fn content_hash_deterministic() {
+        let h1 = content_hash("hello world");
+        let h2 = content_hash("hello world");
+        assert_eq!(h1, h2);
+        assert_ne!(h1, content_hash("different"));
+    }
+
+    #[test]
+    fn embedding_blob_roundtrip() {
+        let original = vec![0.1_f32, -0.5, 2.78, 0.0];
+        let blob = embedding_to_blob(&original);
+        let recovered = blob_to_embedding(&blob);
+        assert_eq!(original.len(), recovered.len());
+        for (a, b) in original.iter().zip(recovered.iter()) {
+            assert!((a - b).abs() < f32::EPSILON);
+        }
+    }
+
+    #[test]
+    fn cosine_similarity_identical() {
+        let a = vec![1.0_f32, 0.0, 0.0];
+        let sim = cosine_similarity(&a, &a);
+        assert!((sim - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn cosine_similarity_orthogonal() {
+        let a = vec![1.0_f32, 0.0, 0.0];
+        let b = vec![0.0_f32, 1.0, 0.0];
+        let sim = cosine_similarity(&a, &b);
+        assert!(sim.abs() < 1e-6);
+    }
+
+    #[test]
+    fn cosine_similarity_opposite() {
+        let a = vec![1.0_f32, 0.0];
+        let b = vec![-1.0_f32, 0.0];
+        let sim = cosine_similarity(&a, &b);
+        assert!((sim - (-1.0)).abs() < 1e-6);
+    }
+
+    #[test]
+    fn rrf_merge_two_lists() {
+        let a = vec![make_ranked(1, "rust", 0.9), make_ranked(2, "plan", 0.8)];
+        let b = vec![make_ranked(2, "plan", 0.95), make_ranked(3, "hcl", 0.85)];
+        let merged = rrf_merge(&a, &b, 10);
+
+        // chunk 2 appears in both lists → highest RRF score
+        assert_eq!(merged[0].chunk_id, 2);
+        assert_eq!(merged.len(), 3);
+    }
+
+    #[test]
+    fn rrf_merge_disjoint() {
+        let a = vec![make_ranked(1, "a", 1.0)];
+        let b = vec![make_ranked(2, "b", 1.0)];
+        let merged = rrf_merge(&a, &b, 10);
+        assert_eq!(merged.len(), 2);
+        // Both should have the same RRF score (each rank-1 in their respective list)
+        assert!((merged[0].score - merged[1].score).abs() < 1e-10);
+    }
+
+    #[test]
+    fn rrf_merge_single_lane() {
+        let a = vec![make_ranked(1, "rust", 0.9), make_ranked(2, "plan", 0.8)];
+        let merged = rrf_merge(&a, &[], 10);
+        assert_eq!(merged.len(), 2);
+        assert_eq!(merged[0].chunk_id, 1);
+    }
+
+    #[test]
+    fn migration_creates_embeddings_table() {
+        let store = RagStore::in_memory().unwrap();
+        let conn = store.conn.lock().unwrap();
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM rag_embeddings", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(count, 0);
+    }
+
+    #[tokio::test]
+    async fn upsert_embeddings_stores_vectors() {
+        let store = RagStore::in_memory().unwrap();
+        store
+            .upsert_document(
+                "rust",
+                "crates/lib.rs",
+                "sha1",
+                &fixture_chunks(&["Rust code one.", "Rust code two.", "Rust code three."]),
+            )
+            .unwrap();
+
+        let embedder = StubEmbedder { dim: 4 };
+        let stats = store.upsert_embeddings(&embedder).await.unwrap();
+        assert_eq!(stats.embedded, 3);
+        assert_eq!(stats.errors, 0);
+
+        let conn = store.conn.lock().unwrap();
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM rag_embeddings", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(count, 3);
+    }
+
+    #[tokio::test]
+    async fn upsert_embeddings_content_hash_skip() {
+        let store = RagStore::in_memory().unwrap();
+        store
+            .upsert_document(
+                "rust",
+                "lib.rs",
+                "sha1",
+                &fixture_chunks(&["Same content."]),
+            )
+            .unwrap();
+
+        let embedder = StubEmbedder { dim: 4 };
+        let stats1 = store.upsert_embeddings(&embedder).await.unwrap();
+        assert_eq!(stats1.embedded, 1);
+
+        // Second call should skip (content unchanged)
+        let stats2 = store.upsert_embeddings(&embedder).await.unwrap();
+        assert_eq!(stats2.embedded, 0);
+        assert_eq!(stats2.skipped, 1);
+    }
+
+    #[tokio::test]
+    async fn retrieve_hybrid_fts_only_fallback() {
+        let store = RagStore::in_memory().unwrap();
+        store
+            .upsert_document(
+                "plan",
+                "test.md",
+                "sha1",
+                &fixture_chunks(&["SQLite is the database engine."]),
+            )
+            .unwrap();
+
+        // No embeddings, no query embedding → pure FTS
+        let results = store.retrieve_hybrid("SQLite", None, 5).await.unwrap();
+        assert!(!results.is_empty());
+        assert!(results[0].content.contains("SQLite"));
+    }
+
+    #[tokio::test]
+    async fn retrieve_hybrid_with_embeddings() {
+        let store = RagStore::in_memory().unwrap();
+        store
+            .upsert_document(
+                "plan",
+                "test.md",
+                "sha1",
+                &fixture_chunks(&[
+                    "SQLite is the database engine.",
+                    "Lambda functions run on AWS.",
+                ]),
+            )
+            .unwrap();
+
+        let embedder = StubEmbedder { dim: 4 };
+        store.upsert_embeddings(&embedder).await.unwrap();
+
+        let query_emb = vec![0.1_f32; 4];
+        let results = store
+            .retrieve_hybrid("SQLite", Some(&query_emb), 5)
+            .await
+            .unwrap();
+        assert!(!results.is_empty());
+    }
+
+    fn make_ranked(id: i64, kind: &str, score: f64) -> RankedChunk {
+        RankedChunk {
+            chunk_id: id,
+            document_id: 1,
+            source_kind: kind.to_string(),
+            source_path: format!("test/{id}"),
+            git_sha: "abc".to_string(),
+            ord: 0,
+            content: format!("content {id}"),
+            score,
+        }
+    }
+
+    struct StubEmbedder {
+        dim: usize,
+    }
+
+    #[async_trait]
+    impl rag_core::Embedder for StubEmbedder {
+        fn provider_id(&self) -> &'static str {
+            "stub"
+        }
+        fn dim(&self) -> usize {
+            self.dim
+        }
+        async fn embed(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>, RagError> {
+            Ok(texts.iter().map(|_| vec![0.1_f32; self.dim]).collect())
+        }
     }
 }

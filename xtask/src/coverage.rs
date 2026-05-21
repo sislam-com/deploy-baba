@@ -7,6 +7,8 @@
 //! - api-openapi/graphql/grpc: 80%
 //! - api-merger: 80%
 //! - infra-types: 75%
+//! - llm-core/llm-anthropic/llm-openai: 70%
+//! - rag-core/rag-sqlite: 70%
 
 use clap::Subcommand;
 use std::collections::HashMap;
@@ -117,6 +119,11 @@ async fn enforce_floors() -> anyhow::Result<()> {
     floors.insert("api-grpc", 80);
     floors.insert("api-merger", 80);
     floors.insert("infra-types", 75);
+    floors.insert("llm-core", 70);
+    floors.insert("llm-anthropic", 70);
+    floors.insert("llm-openai", 70);
+    floors.insert("rag-core", 70);
+    floors.insert("rag-sqlite", 70);
 
     let mut failed = Vec::new();
 

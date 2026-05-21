@@ -24,3 +24,14 @@ CREATE TABLE IF NOT EXISTS rag_chunks (
 -- Trigger-based sync is handled by explicit rebuild calls in RagStore.
 CREATE VIRTUAL TABLE IF NOT EXISTS rag_chunks_fts
     USING fts5(content, content=rag_chunks, content_rowid=id);
+
+-- Embedding storage for ANN retrieval (W-RAG.4.1).
+-- Content-hash enables skip-on-reindex when chunk content unchanged.
+CREATE TABLE IF NOT EXISTS rag_embeddings (
+    chunk_id      INTEGER PRIMARY KEY REFERENCES rag_chunks(id) ON DELETE CASCADE,
+    content_hash  TEXT NOT NULL,
+    embedding     BLOB NOT NULL,
+    model         TEXT NOT NULL DEFAULT 'text-embedding-3-small',
+    dim           INTEGER NOT NULL DEFAULT 1536,
+    updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
