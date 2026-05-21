@@ -231,6 +231,7 @@ injects this contract via `PromptBundle.system_prompt`.
 | W-RAG.11.4 | Add "challenge"/"challenges" keyword triggers to HybridRetriever | DONE | `crates/rag-core/src/hybrid.rs`; 12 new portfolio keywords include challenge terms |
 | W-RAG.11.5 | Extend corpus table in module plan to document challenges as 7th corpus | DONE | Added to Chunkers (per corpus) table in rag.md |
 | W-RAG.12.1 | Deterministic groundedness scoring (`eval.rs`) — `score_groundedness()` + `verify_citation_refs()` | DONE | `crates/rag-core/src/eval.rs` (109 LOC, 6 tests); wired into `ask.rs` handler; scores every `/api/ask` response |
+| W-RAG.12.2 | Eval runner (`just rag-eval`) — reads eval cases, runs HybridRetriever, scores retrieval + optional LLM, stores results in DB, prints terminal report | DONE | `xtask/src/rag.rs` (Eval variant); `just rag-eval` (retrieval-only), `just rag-eval-full` (LLM), `just rag-eval-category` (filtered) |
 
 ## W-RAG.5 Test Strategy
 

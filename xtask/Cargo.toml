@@ -29,6 +29,7 @@ llm-openai = { workspace = true }
 # RAG
 rag-core = { workspace = true }
 rag-sqlite = { workspace = true }
+async-trait = { workspace = true }
 
 # OpenAPI spec (for RAG ingest)
 api-openapi = { workspace = true }

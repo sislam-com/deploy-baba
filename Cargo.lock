@@ -4470,6 +4470,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "api-openapi",
+ "async-trait",
  "aws-config",
  "aws-sdk-dynamodb",
  "aws-sdk-ecr",

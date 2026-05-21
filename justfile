@@ -193,7 +193,7 @@ sso-login:
 # Fetches Cognito config from SSM (/deploy-baba/<ENV>/cognito-*) and JWKS from the
 # public Cognito endpoint. Consumed via `eval "$(just dev-env)"` in `just ui`.
 # Requires a valid SSO session — run `just sso-login` first.
-dev-env ENV="dev":
+dev-env ENV="prod":
     #!/usr/bin/env bash
     set -euo pipefail
     AWS="env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN AWS_PROFILE={{PROFILE}} aws"
@@ -376,6 +376,20 @@ rag-query QUERY DB="deploy-baba.db":
 # Retrieve chunks + generate a grounded answer via Claude (requires ANTHROPIC_API_KEY)
 ask QUERY DB="deploy-baba.db":
     cargo xtask rag ask --db-path {{DB}} "{{QUERY}}"
+
+# Run RAG evaluation suite (retrieval-only, no LLM key needed)
+rag-eval DB="deploy-baba.db":
+    cargo xtask rag eval --db-path {{DB}} --retrieval-only
+
+# Run full RAG evaluation with LLM (fetches Anthropic key from Secrets Manager)
+rag-eval-full DB="deploy-baba.db" PROFILE="default":
+    just aws-check {{PROFILE}} && \
+    ANTHROPIC_API_KEY=$(cargo xtask secret get anthropic-api-key --profile {{PROFILE}} | tail -1) \
+    cargo xtask rag eval --db-path {{DB}}
+
+# Run RAG eval filtered by category (portfolio, architecture, code, edge-case)
+rag-eval-category CATEGORY DB="deploy-baba.db":
+    cargo xtask rag eval --db-path {{DB}} --retrieval-only --category {{CATEGORY}}
 
 # ── crates.io ────────────────────────────────────────────────────────────────
 
