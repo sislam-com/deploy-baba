@@ -284,3 +284,137 @@ impl LlmProvider for AnthropicProvider {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use llm_core::{ChatMessage, LlmProvider, MessageRole};
+
+    #[test]
+    fn provider_id_is_anthropic() {
+        let p = AnthropicProvider::new("test-key");
+        assert_eq!(p.provider_id(), "anthropic");
+    }
+
+    #[test]
+    fn default_model_is_haiku() {
+        let p = AnthropicProvider::new("test-key");
+        assert_eq!(p.default_model(), DEFAULT_MODEL);
+        assert!(p.default_model().contains("haiku"));
+    }
+
+    #[test]
+    fn message_to_api_text() {
+        let msg = ChatMessage::text(MessageRole::User, "Hello");
+        let api = message_to_api(&msg);
+        assert_eq!(api.role, "user");
+        assert_eq!(api.content, serde_json::Value::String("Hello".into()));
+    }
+
+    #[test]
+    fn message_to_api_assistant() {
+        let msg = ChatMessage::text(MessageRole::Assistant, "Hi");
+        let api = message_to_api(&msg);
+        assert_eq!(api.role, "assistant");
+    }
+
+    #[test]
+    fn message_to_api_system_maps_to_user() {
+        let msg = ChatMessage::text(MessageRole::System, "You are helpful");
+        let api = message_to_api(&msg);
+        assert_eq!(api.role, "user");
+    }
+
+    #[test]
+    fn message_to_api_tool_result() {
+        let msg = ChatMessage::tool_result("call-1", "result text", false);
+        let api = message_to_api(&msg);
+        assert_eq!(api.role, "user");
+        let arr = api.content.as_array().unwrap();
+        assert_eq!(arr.len(), 1);
+        assert_eq!(arr[0]["type"], "tool_result");
+        assert_eq!(arr[0]["tool_use_id"], "call-1");
+        assert_eq!(arr[0]["content"], "result text");
+        assert_eq!(arr[0]["is_error"], false);
+    }
+
+    #[test]
+    fn message_to_api_error_tool_result() {
+        let msg = ChatMessage::tool_result("call-2", "error msg", true);
+        let api = message_to_api(&msg);
+        let arr = api.content.as_array().unwrap();
+        assert_eq!(arr[0]["is_error"], true);
+    }
+
+    #[test]
+    fn api_response_parse_text() {
+        let json = r#"{
+            "content": [{"type": "text", "text": "Hello world"}],
+            "stop_reason": "end_turn",
+            "model": "claude-haiku-4-5-20251001",
+            "usage": {"input_tokens": 10, "output_tokens": 5}
+        }"#;
+        let resp: ApiResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(resp.model, "claude-haiku-4-5-20251001");
+        assert_eq!(resp.usage.input_tokens, 10);
+        assert_eq!(resp.usage.output_tokens, 5);
+        assert!(matches!(resp.content[0], ContentBlock::Text { .. }));
+    }
+
+    #[test]
+    fn api_response_parse_tool_use() {
+        let json = r#"{
+            "content": [
+                {"type": "text", "text": "Let me check."},
+                {"type": "tool_use", "id": "tu_1", "name": "get_weather", "input": {"city": "NYC"}}
+            ],
+            "stop_reason": "tool_use",
+            "model": "claude-haiku-4-5-20251001",
+            "usage": {"input_tokens": 20, "output_tokens": 15}
+        }"#;
+        let resp: ApiResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(resp.content.len(), 2);
+        assert!(matches!(resp.content[1], ContentBlock::ToolUse { .. }));
+        if let ContentBlock::ToolUse { id, name, input } = &resp.content[1] {
+            assert_eq!(id, "tu_1");
+            assert_eq!(name, "get_weather");
+            assert_eq!(input["city"], "NYC");
+        }
+    }
+
+    #[test]
+    fn api_error_parse() {
+        let json = r#"{
+            "error": {"type": "invalid_request_error", "message": "Invalid API key"}
+        }"#;
+        let err: ApiError = serde_json::from_str(json).unwrap();
+        assert_eq!(err.error.kind, "invalid_request_error");
+        assert_eq!(err.error.message, "Invalid API key");
+    }
+
+    #[test]
+    fn stop_reason_mapping() {
+        assert!(matches!(
+            match Some("end_turn") {
+                Some("end_turn") => StopReason::EndTurn,
+                Some("max_tokens") => StopReason::MaxTokens,
+                Some("tool_use") => StopReason::ToolUse,
+                Some("stop_sequence") => StopReason::StopSequence,
+                Some(other) => StopReason::Other(other.to_owned()),
+                None => StopReason::EndTurn,
+            },
+            StopReason::EndTurn
+        ));
+        assert!(matches!(
+            match Some("tool_use") {
+                Some("end_turn") => StopReason::EndTurn,
+                Some("max_tokens") => StopReason::MaxTokens,
+                Some("tool_use") => StopReason::ToolUse,
+                Some("stop_sequence") => StopReason::StopSequence,
+                Some(other) => StopReason::Other(other.to_owned()),
+                None => StopReason::EndTurn,
+            },
+            StopReason::ToolUse
+        ));
+    }
+}

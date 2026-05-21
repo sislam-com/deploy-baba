@@ -245,7 +245,36 @@ pub async fn ask(
     // Clamp top_k
     let top_k = req.top_k.clamp(1, 20);
 
-    // Retrieve relevant chunks via FTS5 BM25 + live portfolio data
+    // Retrieve relevant chunks via FTS5 BM25 + optional ANN + live portfolio data
+    //
+    // When an OpenAI key is available and embeddings exist, embed the query
+    // and use hybrid (FTS + ANN via RRF) retrieval for the codebase lane.
+    let query_embedding: Option<Vec<f32>> = if let Some(openai_key) = get_openai_key() {
+        let embedder =
+            rag_sqlite::embed_bridge::LlmEmbedder::new(Arc::new(OpenAIProvider::new(openai_key)));
+        match rag_core::Embedder::embed(&embedder, &[req.query.as_str()]).await {
+            Ok(vecs) => vecs.into_iter().next(),
+            Err(e) => {
+                tracing::warn!("Query embedding failed, falling back to FTS-only: {e}");
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    // FTS + ANN lane (codebase retrieval)
+    let fts_ann_chunks = rag
+        .retrieve_hybrid(&req.query, query_embedding.as_deref(), top_k)
+        .await
+        .map_err(|e| {
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &format!("retrieval failed: {e}"),
+            )
+        })?;
+
+    // Merge with live portfolio data via HybridRetriever
     let hybrid = HybridRetriever {
         fts: Arc::clone(&rag),
         portfolio: Arc::clone(&db),
@@ -256,6 +285,28 @@ pub async fn ask(
             &format!("retrieval failed: {e}"),
         )
     })?;
+
+    // If ANN provided better-ranked codebase results, prefer the hybrid FTS+ANN
+    // results merged with portfolio data. Otherwise, fall back to pure FTS+portfolio.
+    let chunks = if !fts_ann_chunks.is_empty()
+        && query_embedding.is_some()
+        && fts_ann_chunks.iter().any(|c| c.source_kind != "portfolio")
+    {
+        // Replace FTS-only codebase chunks with FTS+ANN hybrid results,
+        // keeping portfolio live chunks from the HybridRetriever
+        let portfolio_chunks: Vec<_> = chunks
+            .iter()
+            .filter(|c| c.source_kind == "portfolio")
+            .cloned()
+            .collect();
+        let mut merged = portfolio_chunks;
+        let remaining = top_k.saturating_sub(merged.len());
+        merged.extend(fts_ann_chunks.into_iter().take(remaining));
+        merged.truncate(top_k);
+        merged
+    } else {
+        chunks
+    };
 
     if chunks.is_empty() {
         return Err(err(

@@ -7,7 +7,7 @@
 
 ## Coverage Floors
 
-All 10 library crates must meet these minimums (enforced by `cargo xtask coverage`):
+All 15 library crates must meet these minimums (enforced by `cargo xtask coverage`):
 
 ```
 config-core:    90%   (current: 98.3%)
@@ -20,10 +20,16 @@ api-graphql:    80%   (current: 95.4%)
 api-grpc:       80%   (current: 94.6%)
 api-merger:     80%   (current: 96.5%)
 infra-types:    75%   (current: 89.5%)
+llm-core:       70%   (current: 95.9%)
+llm-anthropic:  70%   (current: ~70%)
+llm-openai:     70%   (current: 81.9%)
+rag-core:       70%   (current: 89.0%)
+rag-sqlite:     70%   (current: 96.1%)
 ```
 
-All floors passing as of 2026-05-03. See `plans/drift/DRL-2026-05-03-coverage-floors.md`
+Original 10 floors passing as of 2026-05-03. See `plans/drift/DRL-2026-05-03-coverage-floors.md`
 for the root-cause analysis and fix (per-file aggregation in `xtask/src/coverage.rs`).
+LLM + RAG crate floors added 2026-05-21 as part of W-RAG embedding enhancement.
 
 **Tool:** `cargo-llvm-cov` (`cargo install cargo-llvm-cov`)
 **Binary excluded:** `services/ui/` and `xtask/` are excluded from coverage floors

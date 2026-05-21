@@ -90,4 +90,53 @@ describe('CompetencyDetail', () => {
       expect(screen.queryByText('New competency')).not.toBeInTheDocument()
     })
   })
+
+  it('shows error on save failure', async () => {
+    global.fetch = vi.fn(() => Promise.resolve(new Response('Save failed', { status: 400 })))
+    render(
+      <DashboardLayout>
+        <CompetencyDetail />
+      </DashboardLayout>,
+      { router: 'memory', route: '/dashboard/competencies/new', routes: [{ path: '/dashboard/competencies/:id' }] }
+    )
+    const user = userEvent.setup()
+
+    await user.type(screen.getByLabelText('slug'), 'test-competency')
+    await user.type(screen.getByLabelText('name'), 'Test Competency')
+
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => {
+      expect(screen.getByText('Save failed')).toBeInTheDocument()
+    })
+  })
+
+  it('shows loading state for existing competency', async () => {
+    render(
+      <DashboardLayout>
+        <CompetencyDetail />
+      </DashboardLayout>,
+      { router: 'memory', route: '/dashboard/competencies/1', routes: [{ path: '/dashboard/competencies/:id' }] }
+    )
+    expect(screen.getByText('Loading…')).toBeInTheDocument()
+  })
+
+  it('cancels delete when confirmation is rejected', async () => {
+    global.confirm = vi.fn(() => false)
+    render(
+      <DashboardLayout>
+        <CompetencyDetail />
+      </DashboardLayout>,
+      { router: 'memory', route: '/dashboard/competencies/1', routes: [{ path: '/dashboard/competencies/:id' }] }
+    )
+    const user = userEvent.setup()
+
+    await waitFor(() => {
+      expect(screen.queryByText('Loading…')).not.toBeInTheDocument()
+    })
+
+    const deleteButton = screen.getByRole('button', { name: 'Delete' })
+    await user.click(deleteButton)
+
+    expect(global.confirm).toHaveBeenCalledWith('Delete this competency?')
+  })
 })

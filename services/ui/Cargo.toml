@@ -20,7 +20,7 @@ api-openapi = { workspace = true }
 api-merger = { workspace = true }
 infra-types = { workspace = true }
 rag-core = { workspace = true }
-rag-sqlite = { workspace = true }
+rag-sqlite = { workspace = true, features = ["llm-bridge"] }
 llm-core = { workspace = true }
 llm-anthropic = { workspace = true }
 llm-openai = { workspace = true }

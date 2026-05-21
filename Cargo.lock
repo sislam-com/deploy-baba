@@ -2955,11 +2955,14 @@ name = "rag-sqlite"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "llm-core",
  "rag-core",
  "rusqlite",
  "serde_json",
+ "sha2 0.10.9",
  "thiserror",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -4470,6 +4473,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "api-openapi",
+ "async-trait",
  "aws-config",
  "aws-sdk-dynamodb",
  "aws-sdk-ecr",

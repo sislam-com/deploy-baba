@@ -1,5 +1,5 @@
 # W-LLM: llm-core + llm-anthropic + llm-openai
-**Crates:** `crates/llm-core/`, `crates/llm-anthropic/`, `crates/llm-openai/` | **Status:** WIP
+**Crates:** `crates/llm-core/`, `crates/llm-anthropic/`, `crates/llm-openai/` | **Status:** DONE
 **Coverage floor:** N/A (library crates) | **Depends on:** — | **Depended on by:** W-RST, W-UI (via W-RST)
 
 ---
@@ -226,7 +226,7 @@ is instantiated based on the runtime selector.
 | W-LLM.4.13 | Update Anthropic adapter: parse `id` from `ContentBlock::ToolUse`, serialize `MessageContent::ToolResult` as content-array | DONE | `crates/llm-anthropic/src/lib.rs`; tool_result wire format |
 | W-LLM.4.14 | Migrate all call-sites for `ChatMessage.content` breaking change | DONE | 7 files migrated: grounding.rs, testing.rs, lib.rs doc, llm-anthropic, llm-proxy, xtask/rag.rs, xtask/resume/generate.rs |
 | W-LLM.4.15 | Implement `crates/llm-openai` adapter crate (`LlmProvider`) | DONE | 347 LOC; `OpenAIProvider` implements `LlmProvider` (Chat Completions API); GPT-4o-mini default; runtime selector in llm-proxy |
-| W-LLM.4.16 | Add `EmbeddingProvider` impl to `llm-openai` (text-embedding-3-small) | TODO | Unblocks W-RAG.4.1 (embedder wiring); Anthropic has no embedding API so OpenAI is the viable path |
+| W-LLM.4.16 | Add `EmbeddingProvider` impl to `llm-openai` (text-embedding-3-small) | DONE (2026-05-21) | `OpenAIProvider` implements `EmbeddingProvider` (1536-dim, text-embedding-3-small); 10 unit tests + 3 `#[ignore]` live tests; wired to W-RAG.4.1 via `LlmEmbedder` bridge |
 
 ---
 

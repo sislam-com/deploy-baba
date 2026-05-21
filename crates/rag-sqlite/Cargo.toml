@@ -8,12 +8,19 @@ repository.workspace = true
 authors.workspace = true
 rust-version.workspace = true
 
+[features]
+default = []
+llm-bridge = ["dep:llm-core"]
+
 [dependencies]
 rag-core = { workspace = true }
 rusqlite = { workspace = true }
 thiserror = { workspace = true }
 serde_json = { workspace = true }
 async-trait = { workspace = true }
+sha2 = "0.10"
+tracing = { workspace = true }
+llm-core = { workspace = true, optional = true }
 
 [dev-dependencies]
 tokio = { workspace = true }

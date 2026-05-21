@@ -11,11 +11,12 @@
 use anyhow::Context;
 use clap::Subcommand;
 use rag_core::chunk::chunk_file;
-use rag_core::types::SourceKind;
+use rag_core::types::{RankedChunk, SourceKind};
 use rag_core::Retriever;
 use rag_sqlite::RagStore;
 use rusqlite::Connection;
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 
 #[derive(Subcommand)]
 pub enum RagAction {
@@ -60,6 +61,27 @@ pub enum RagAction {
         #[arg(long, default_value = "anthropic")]
         provider: String,
     },
+    /// Run the RAG evaluation suite against seed cases in rag_eval_cases.
+    Eval {
+        /// Path to the SQLite database.
+        #[arg(long, default_value = "deploy-baba.db")]
+        db_path: PathBuf,
+        /// LLM provider (anthropic or openai). Ignored in --retrieval-only mode.
+        #[arg(long, default_value = "anthropic")]
+        provider: String,
+        /// Max tokens for LLM responses.
+        #[arg(long, default_value = "1024")]
+        max_tokens: u32,
+        /// Number of chunks to retrieve per case.
+        #[arg(long, default_value = "10")]
+        top_k: usize,
+        /// Only test retrieval (no LLM generation). No API key needed.
+        #[arg(long)]
+        retrieval_only: bool,
+        /// Filter by category (portfolio, architecture, code, edge-case).
+        #[arg(long)]
+        category: Option<String>,
+    },
 }
 
 pub async fn execute(action: RagAction) -> anyhow::Result<()> {
@@ -68,7 +90,7 @@ pub async fn execute(action: RagAction) -> anyhow::Result<()> {
             db_path,
             repo_root,
             include_cache,
-        } => ingest(&db_path, &repo_root, include_cache),
+        } => ingest(&db_path, &repo_root, include_cache).await,
         RagAction::Query {
             db_path,
             query,
@@ -81,12 +103,30 @@ pub async fn execute(action: RagAction) -> anyhow::Result<()> {
             max_tokens,
             provider,
         } => ask_cmd(&db_path, &query, top_k, max_tokens, &provider).await,
+        RagAction::Eval {
+            db_path,
+            provider,
+            max_tokens,
+            top_k,
+            retrieval_only,
+            category,
+        } => {
+            eval_cmd(
+                &db_path,
+                &provider,
+                max_tokens,
+                top_k,
+                retrieval_only,
+                category.as_deref(),
+            )
+            .await
+        }
     }
 }
 
 // ── Ingest ────────────────────────────────────────────────────────────────
 
-fn ingest(db_path: &Path, repo_root: &Path, include_cache: bool) -> anyhow::Result<()> {
+async fn ingest(db_path: &Path, repo_root: &Path, include_cache: bool) -> anyhow::Result<()> {
     println!("Opening RAG store at {}", db_path.display());
     let conn = Connection::open(db_path)
         .with_context(|| format!("Failed to open database: {}", db_path.display()))?;
@@ -175,6 +215,28 @@ fn ingest(db_path: &Path, repo_root: &Path, include_cache: bool) -> anyhow::Resu
     }
 
     println!("Done. Total: {total_docs} documents, {total_chunks} chunks indexed.");
+
+    // ── Optional: embed chunks when OPENAI_API_KEY is set ──────────
+    if let Ok(api_key) = std::env::var("OPENAI_API_KEY") {
+        println!("  Embedding chunks (OPENAI_API_KEY detected)...");
+        let embedder = rag_sqlite::embed_bridge::LlmEmbedder::new(std::sync::Arc::new(
+            llm_openai::OpenAIProvider::new(api_key),
+        ));
+        match store.upsert_embeddings(&embedder).await {
+            Ok(stats) => {
+                println!(
+                    "    {} embedded, {} skipped, {} errors",
+                    stats.embedded, stats.skipped, stats.errors
+                );
+            }
+            Err(e) => {
+                println!("    Embedding failed (FTS-only mode): {e}");
+            }
+        }
+    } else {
+        println!("  No OPENAI_API_KEY — skipping embedding (FTS-only mode).");
+    }
+
     Ok(())
 }
 
@@ -530,6 +592,619 @@ async fn ask_cmd(
     Ok(())
 }
 
+// ── Eval ─────────────────────────────────────────────────────────────────
+
+struct EvalCase {
+    id: i64,
+    question: String,
+    expected_hit: String,
+    source_path: Option<String>,
+    category: String,
+    difficulty: String,
+}
+
+fn check_retrieval_hit(chunks: &[RankedChunk], expected: Option<&str>) -> bool {
+    match expected {
+        None => true,
+        Some(prefix) => chunks.iter().any(|c| c.source_path.starts_with(prefix)),
+    }
+}
+
+struct SqlitePortfolioProvider {
+    conn: std::sync::Mutex<Connection>,
+}
+
+#[async_trait::async_trait]
+impl rag_core::portfolio::PortfolioDataProvider for SqlitePortfolioProvider {
+    async fn get_jobs_summary(&self) -> Result<Vec<serde_json::Value>, rag_core::RagError> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn
+            .prepare(
+                "SELECT j.slug, j.company, j.title, j.location, j.start_date, j.end_date, j.summary, j.tech_stack
+                 FROM jobs j ORDER BY j.sort_order ASC",
+            )
+            .map_err(|e| rag_core::RagError::Database(e.to_string()))?;
+        let jobs: Vec<(String, serde_json::Value)> = stmt
+            .query_map([], |row| {
+                let slug = row.get::<_, String>(0)?;
+                Ok((
+                    slug.clone(),
+                    serde_json::json!({
+                        "slug": slug,
+                        "company": row.get::<_, String>(1)?,
+                        "title": row.get::<_, String>(2)?,
+                        "location": row.get::<_, Option<String>>(3)?,
+                        "start_date": row.get::<_, Option<String>>(4)?,
+                        "end_date": row.get::<_, Option<String>>(5)?,
+                        "summary": row.get::<_, Option<String>>(6)?,
+                        "tech_stack": row.get::<_, Option<String>>(7)?,
+                    }),
+                ))
+            })
+            .map_err(|e| rag_core::RagError::Database(e.to_string()))?
+            .filter_map(|r| r.ok())
+            .collect();
+        let mut result = Vec::new();
+        for (slug, mut job_val) in jobs {
+            let job_id: Option<i64> = conn
+                .query_row(
+                    "SELECT id FROM jobs WHERE slug = ?1",
+                    rusqlite::params![&slug],
+                    |row| row.get(0),
+                )
+                .ok();
+            if let Some(jid) = job_id {
+                let mut ds = conn
+                    .prepare("SELECT detail_text, category FROM job_details WHERE job_id = ?1 ORDER BY sort_order ASC")
+                    .map_err(|e| rag_core::RagError::Database(e.to_string()))?;
+                let details: Vec<serde_json::Value> = ds
+                    .query_map(rusqlite::params![jid], |row| {
+                        Ok(serde_json::json!({
+                            "text": row.get::<_, String>(0)?,
+                            "category": row.get::<_, Option<String>>(1)?,
+                        }))
+                    })
+                    .map_err(|e| rag_core::RagError::Database(e.to_string()))?
+                    .filter_map(|r| r.ok())
+                    .collect();
+                job_val["details"] = serde_json::Value::Array(details);
+            }
+            result.push(job_val);
+        }
+        Ok(result)
+    }
+
+    async fn get_job_details(
+        &self,
+        slug: &str,
+    ) -> Result<Option<serde_json::Value>, rag_core::RagError> {
+        let conn = self.conn.lock().unwrap();
+        let job = conn
+            .query_row(
+                "SELECT id, slug, company, title, summary, tech_stack FROM jobs WHERE slug = ?1",
+                rusqlite::params![slug],
+                |row| {
+                    Ok((
+                        row.get::<_, i64>(0)?,
+                        serde_json::json!({
+                            "slug": row.get::<_, String>(1)?,
+                            "company": row.get::<_, String>(2)?,
+                            "title": row.get::<_, String>(3)?,
+                            "summary": row.get::<_, Option<String>>(4)?,
+                            "tech_stack": row.get::<_, Option<String>>(5)?,
+                        }),
+                    ))
+                },
+            )
+            .ok();
+        let Some((job_id, mut val)) = job else {
+            return Ok(None);
+        };
+        let mut ds = conn
+            .prepare(
+                "SELECT detail_text FROM job_details WHERE job_id = ?1 ORDER BY sort_order ASC",
+            )
+            .map_err(|e| rag_core::RagError::Database(e.to_string()))?;
+        let details: Vec<serde_json::Value> = ds
+            .query_map(rusqlite::params![job_id], |row| {
+                Ok(serde_json::json!({ "text": row.get::<_, String>(0)? }))
+            })
+            .map_err(|e| rag_core::RagError::Database(e.to_string()))?
+            .filter_map(|r| r.ok())
+            .collect();
+        val["details"] = serde_json::Value::Array(details);
+        Ok(Some(val))
+    }
+
+    async fn get_competencies_summary(&self) -> Result<Vec<serde_json::Value>, rag_core::RagError> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn
+            .prepare(
+                "SELECT slug, name, description, icon FROM competencies ORDER BY sort_order ASC",
+            )
+            .map_err(|e| rag_core::RagError::Database(e.to_string()))?;
+        let comps: Vec<(String, serde_json::Value)> = stmt
+            .query_map([], |row| {
+                let slug = row.get::<_, String>(0)?;
+                Ok((
+                    slug.clone(),
+                    serde_json::json!({
+                        "slug": slug,
+                        "name": row.get::<_, String>(1)?,
+                        "description": row.get::<_, Option<String>>(2)?,
+                        "icon": row.get::<_, Option<String>>(3)?,
+                    }),
+                ))
+            })
+            .map_err(|e| rag_core::RagError::Database(e.to_string()))?
+            .filter_map(|r| r.ok())
+            .collect();
+        let mut result = Vec::new();
+        for (slug, mut val) in comps {
+            let cid: Option<i64> = conn
+                .query_row(
+                    "SELECT id FROM competencies WHERE slug = ?1",
+                    rusqlite::params![&slug],
+                    |row| row.get(0),
+                )
+                .ok();
+            if let Some(cid) = cid {
+                let mut es = conn
+                    .prepare("SELECT jd.detail_text, j.company FROM competency_evidence ce LEFT JOIN jobs j ON ce.job_id = j.id LEFT JOIN job_details jd ON ce.detail_id = jd.id WHERE ce.competency_id = ?1 ORDER BY ce.sort_order ASC")
+                    .map_err(|e| rag_core::RagError::Database(e.to_string()))?;
+                let evidence: Vec<serde_json::Value> = es
+                    .query_map(rusqlite::params![cid], |row| {
+                        Ok(serde_json::json!({
+                            "text": row.get::<_, Option<String>>(0)?,
+                            "company": row.get::<_, Option<String>>(1)?,
+                        }))
+                    })
+                    .map_err(|e| rag_core::RagError::Database(e.to_string()))?
+                    .filter_map(|r| r.ok())
+                    .collect();
+                val["evidence"] = serde_json::Value::Array(evidence);
+            }
+            result.push(val);
+        }
+        Ok(result)
+    }
+
+    async fn get_about_sections(&self) -> Result<Vec<serde_json::Value>, rag_core::RagError> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn
+            .prepare("SELECT slug, heading, body FROM about_sections ORDER BY sort_order ASC")
+            .map_err(|e| rag_core::RagError::Database(e.to_string()))?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(serde_json::json!({
+                    "slug": row.get::<_, String>(0)?,
+                    "heading": row.get::<_, String>(1)?,
+                    "body": row.get::<_, Option<String>>(2)?,
+                }))
+            })
+            .map_err(|e| rag_core::RagError::Database(e.to_string()))?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(rows)
+    }
+
+    async fn get_challenges_summary(&self) -> Result<Vec<serde_json::Value>, rag_core::RagError> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn
+            .prepare(
+                "SELECT slug, title, description, short_description, tech_stack, category, url, featured
+                 FROM challenges ORDER BY sort_order ASC",
+            )
+            .map_err(|e| rag_core::RagError::Database(e.to_string()))?;
+        let rows = stmt
+            .query_map([], |row| {
+                let featured: i64 = row.get(7)?;
+                Ok(serde_json::json!({
+                    "entity_type": "challenge",
+                    "slug": row.get::<_, String>(0)?,
+                    "title": row.get::<_, String>(1)?,
+                    "description": row.get::<_, String>(2)?,
+                    "short_description": row.get::<_, Option<String>>(3)?,
+                    "tech_stack": row.get::<_, Option<String>>(4)?,
+                    "category": row.get::<_, Option<String>>(5)?,
+                    "url": row.get::<_, Option<String>>(6)?,
+                    "featured": featured != 0,
+                }))
+            })
+            .map_err(|e| rag_core::RagError::Database(e.to_string()))?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(rows)
+    }
+}
+
+async fn eval_cmd(
+    db_path: &Path,
+    provider_id: &str,
+    max_tokens: u32,
+    top_k: usize,
+    retrieval_only: bool,
+    category_filter: Option<&str>,
+) -> anyhow::Result<()> {
+    use llm_anthropic::AnthropicProvider;
+    use llm_core::{ChatMessage, GenerationConfig, LlmProvider, LlmRequest, MessageRole};
+    use llm_openai::OpenAIProvider;
+    use rag_core::{DefaultPromptAssembler, PromptAssembler};
+
+    let top_k = top_k.clamp(1, 20);
+    let mode_label = if retrieval_only {
+        "retrieval-only"
+    } else {
+        "full"
+    };
+
+    // Connection 1: consumed by RagStore for retrieval
+    let conn1 = Connection::open(db_path)
+        .with_context(|| format!("Failed to open {}", db_path.display()))?;
+    let store =
+        std::sync::Arc::new(RagStore::new(conn1).context("Failed to initialise RAG schema")?);
+
+    // Connection 2: eval table reads/writes
+    let conn2 = Connection::open(db_path)
+        .with_context(|| format!("Failed to open {}", db_path.display()))?;
+    conn2.execute_batch(include_str!(
+        "../../services/ui/migrations/023_rag_eval.sql"
+    ))?;
+
+    // Connection 3: portfolio data provider for HybridRetriever
+    let conn3 = Connection::open(db_path)
+        .with_context(|| format!("Failed to open {}", db_path.display()))?;
+    let portfolio = SqlitePortfolioProvider {
+        conn: std::sync::Mutex::new(conn3),
+    };
+    let hybrid = rag_core::HybridRetriever {
+        fts: std::sync::Arc::clone(&store),
+        portfolio,
+    };
+
+    // Read eval cases
+    let sql = if category_filter.is_some() {
+        "SELECT id, question, expected_hit, source_path, category, difficulty \
+         FROM rag_eval_cases WHERE category = ?1 ORDER BY id"
+    } else {
+        "SELECT id, question, expected_hit, source_path, category, difficulty \
+         FROM rag_eval_cases ORDER BY id"
+    };
+    let mut stmt = conn2.prepare(sql)?;
+    let cases: Vec<EvalCase> = if let Some(cat) = category_filter {
+        stmt.query_map([cat], |row| {
+            Ok(EvalCase {
+                id: row.get(0)?,
+                question: row.get(1)?,
+                expected_hit: row.get(2)?,
+                source_path: row.get(3)?,
+                category: row.get(4)?,
+                difficulty: row.get(5)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?
+    } else {
+        stmt.query_map([], |row| {
+            Ok(EvalCase {
+                id: row.get(0)?,
+                question: row.get(1)?,
+                expected_hit: row.get(2)?,
+                source_path: row.get(3)?,
+                category: row.get(4)?,
+                difficulty: row.get(5)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?
+    };
+
+    if cases.is_empty() {
+        println!("No eval cases found. Run migrations first (`just rag-index`).");
+        return Ok(());
+    }
+
+    let git_sha = git_head_sha(Path::new(".")).unwrap_or_else(|_| "unknown".to_string());
+
+    // Create eval run placeholder
+    conn2.execute(
+        "INSERT INTO rag_eval_runs (git_sha, prompt_version, total_cases, pass_count) \
+         VALUES (?1, ?2, ?3, 0)",
+        rusqlite::params![git_sha, "eval-v1", cases.len()],
+    )?;
+    let run_id = conn2.last_insert_rowid();
+
+    // Build LLM provider if full mode
+    let provider: Option<Box<dyn LlmProvider>> = if retrieval_only {
+        None
+    } else {
+        let api_key = match provider_id {
+            "anthropic" => std::env::var("ANTHROPIC_API_KEY").map_err(|_| {
+                anyhow::anyhow!(
+                    "ANTHROPIC_API_KEY required for full eval (use --retrieval-only to skip LLM)"
+                )
+            })?,
+            "openai" => std::env::var("OPENAI_API_KEY").map_err(|_| {
+                anyhow::anyhow!(
+                    "OPENAI_API_KEY required for full eval (use --retrieval-only to skip LLM)"
+                )
+            })?,
+            _ => return Err(anyhow::anyhow!("Unknown provider: {provider_id}")),
+        };
+        Some(match provider_id {
+            "anthropic" => Box::new(AnthropicProvider::new(api_key)),
+            "openai" => Box::new(OpenAIProvider::new(api_key)),
+            _ => unreachable!(),
+        })
+    };
+
+    println!("══ RAG Eval ═══════════════════════════════════════════════════════");
+    println!("  Run #{run_id} | sha: {git_sha} | prompt: eval-v1 | mode: {mode_label}");
+    println!("  {} cases", cases.len());
+    println!("───────────────────────────────────────────────────────────────────");
+
+    if retrieval_only {
+        println!(
+            "  {:>3} │ {:12} │ {:10} │ {:3} │ Pass",
+            "#", "Category", "Difficulty", "Hit"
+        );
+    } else {
+        println!(
+            "  {:>3} │ {:12} │ {:10} │ {:3} │ {:>5} │ {:>4} │ {:>4} │ {:>6} │ Pass",
+            "#", "Category", "Difficulty", "Hit", "Grnd", "Corr", "Cite", "ms"
+        );
+    }
+
+    let mut pass_count = 0u32;
+    let mut sum_groundedness = 0.0f64;
+    let mut sum_correctness = 0.0f64;
+    let mut scored_count = 0u32;
+
+    for (i, case) in cases.iter().enumerate() {
+        let start = Instant::now();
+
+        let chunks = match hybrid.retrieve(&case.question, top_k).await {
+            Ok(c) => c,
+            Err(e) => {
+                let failure = format!("retrieval_error: {e}");
+                insert_eval_result(
+                    &conn2,
+                    run_id,
+                    case.id,
+                    "",
+                    None,
+                    None,
+                    false,
+                    None,
+                    None,
+                    None,
+                    0,
+                    Some(&failure),
+                )?;
+                print_eval_row(
+                    i + 1,
+                    case,
+                    false,
+                    None,
+                    None,
+                    None,
+                    0,
+                    false,
+                    retrieval_only,
+                );
+                continue;
+            }
+        };
+
+        let hit = check_retrieval_hit(&chunks, case.source_path.as_deref());
+        let latency_ms;
+        let mut groundedness: Option<f64> = None;
+        let mut correctness: Option<f64> = None;
+        let mut citation_accuracy: Option<f64> = None;
+        let mut answer = String::new();
+        let mut failure_type: Option<String> = None;
+
+        if retrieval_only || chunks.is_empty() {
+            latency_ms = start.elapsed().as_millis() as i64;
+            if chunks.is_empty() {
+                failure_type = Some("no_chunks_retrieved".to_string());
+            }
+        } else if let Some(ref prov) = provider {
+            let assembler = DefaultPromptAssembler;
+            let bundle = assembler.assemble(&case.question, &chunks);
+
+            let req = LlmRequest {
+                model: prov.default_model().to_owned(),
+                messages: vec![ChatMessage::text(MessageRole::User, &bundle.user_message)],
+                system: Some(bundle.system_prompt),
+                tools: vec![],
+                grounding: None,
+                config: GenerationConfig {
+                    max_tokens,
+                    temperature: 0.0,
+                    prompt_version: "eval-v1",
+                },
+            };
+
+            match prov.generate(req).await {
+                Ok(resp) => {
+                    answer = resp.content;
+                    let g = rag_core::eval::score_groundedness(&answer) as f64;
+                    let c = if answer
+                        .to_lowercase()
+                        .contains(&case.expected_hit.to_lowercase())
+                    {
+                        1.0
+                    } else {
+                        0.0
+                    };
+                    let (valid, invalid) =
+                        rag_core::eval::verify_citation_refs(&answer, chunks.len());
+                    let total_refs = valid + invalid.len();
+                    let ca = if total_refs == 0 {
+                        1.0
+                    } else {
+                        valid as f64 / total_refs as f64
+                    };
+
+                    groundedness = Some(g);
+                    correctness = Some(c);
+                    citation_accuracy = Some(ca);
+                    sum_groundedness += g;
+                    sum_correctness += c;
+                    scored_count += 1;
+                }
+                Err(e) => {
+                    failure_type = Some(format!("llm_error: {e}"));
+                }
+            }
+
+            latency_ms = start.elapsed().as_millis() as i64;
+        } else {
+            latency_ms = start.elapsed().as_millis() as i64;
+        }
+
+        let passed = hit
+            && failure_type.is_none()
+            && (retrieval_only || correctness.is_some_and(|c| c >= 1.0));
+
+        if passed {
+            pass_count += 1;
+        }
+
+        insert_eval_result(
+            &conn2,
+            run_id,
+            case.id,
+            &answer,
+            None,
+            None,
+            hit,
+            groundedness,
+            correctness,
+            citation_accuracy,
+            latency_ms,
+            failure_type.as_deref(),
+        )?;
+
+        print_eval_row(
+            i + 1,
+            case,
+            hit,
+            groundedness,
+            correctness,
+            citation_accuracy,
+            latency_ms,
+            passed,
+            retrieval_only,
+        );
+    }
+
+    // Update run summary
+    let avg_g = if scored_count > 0 {
+        Some(sum_groundedness / scored_count as f64)
+    } else {
+        None
+    };
+    let avg_c = if scored_count > 0 {
+        Some(sum_correctness / scored_count as f64)
+    } else {
+        None
+    };
+
+    conn2.execute(
+        "UPDATE rag_eval_runs SET pass_count = ?1, avg_groundedness = ?2, avg_correctness = ?3 \
+         WHERE id = ?4",
+        rusqlite::params![pass_count, avg_g, avg_c, run_id],
+    )?;
+
+    let total = cases.len() as f64;
+    let pct = if total > 0.0 {
+        (pass_count as f64 / total) * 100.0
+    } else {
+        0.0
+    };
+
+    println!("───────────────────────────────────────────────────────────────────");
+    if let (Some(g), Some(c)) = (avg_g, avg_c) {
+        println!(
+            "  {pass_count}/{} passed ({pct:.1}%) │ avg groundedness: {g:.2} │ avg correctness: {c:.2}",
+            cases.len()
+        );
+    } else {
+        println!("  {pass_count}/{} passed ({pct:.1}%)", cases.len());
+    }
+    println!("═══════════════════════════════════════════════════════════════════");
+
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn insert_eval_result(
+    conn: &Connection,
+    run_id: i64,
+    case_id: i64,
+    answer: &str,
+    citations_json: Option<&str>,
+    chunks_json: Option<&str>,
+    retrieval_hit: bool,
+    groundedness: Option<f64>,
+    correctness: Option<f64>,
+    citation_accuracy: Option<f64>,
+    latency_ms: i64,
+    failure_type: Option<&str>,
+) -> anyhow::Result<()> {
+    conn.execute(
+        "INSERT INTO rag_eval_results \
+         (run_id, case_id, answer, citations_json, chunks_json, retrieval_hit, \
+          groundedness, correctness, citation_accuracy, latency_ms, failure_type) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+        rusqlite::params![
+            run_id,
+            case_id,
+            answer,
+            citations_json,
+            chunks_json,
+            retrieval_hit as i32,
+            groundedness,
+            correctness,
+            citation_accuracy,
+            latency_ms,
+            failure_type,
+        ],
+    )?;
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn print_eval_row(
+    num: usize,
+    case: &EvalCase,
+    hit: bool,
+    groundedness: Option<f64>,
+    correctness: Option<f64>,
+    citation_accuracy: Option<f64>,
+    latency_ms: i64,
+    passed: bool,
+    retrieval_only: bool,
+) {
+    let hit_s = if hit { " Y " } else { " N " };
+    let pass_s = if passed { " OK " } else { "FAIL" };
+
+    if retrieval_only {
+        println!(
+            "  {:>3} │ {:12} │ {:10} │ {:3} │ {pass_s}",
+            num, case.category, case.difficulty, hit_s
+        );
+    } else {
+        let g_s = groundedness.map_or(" -  ".to_string(), |v| format!("{v:.2}"));
+        let c_s = correctness.map_or(" -  ".to_string(), |v| format!("{v:.2}"));
+        let ca_s = citation_accuracy.map_or(" -  ".to_string(), |v| format!("{v:.2}"));
+        println!(
+            "  {:>3} │ {:12} │ {:10} │ {:3} │ {:>5} │ {:>4} │ {:>4} │ {:>6} │ {pass_s}",
+            num, case.category, case.difficulty, hit_s, g_s, c_s, ca_s, latency_ms
+        );
+    }
+}
+
 /// Diagnose a deployment failure using RAG to find relevant documentation
 ///
 /// This function queries the RAG system with context about a deployment failure
@@ -582,10 +1257,28 @@ async fn query_cmd(db_path: &Path, query: &str, top_k: usize) -> anyhow::Result<
         .with_context(|| format!("Failed to open database: {}", db_path.display()))?;
     let store = RagStore::new(conn).context("Failed to initialise RAG schema")?;
 
-    let results = store
-        .retrieve(query, top_k)
-        .await
-        .map_err(|e| anyhow::anyhow!("retrieval failed: {e}"))?;
+    // Use hybrid (FTS + ANN) retrieval when OPENAI_API_KEY is set and embeddings exist
+    let results = if let Ok(api_key) = std::env::var("OPENAI_API_KEY") {
+        use rag_core::Embedder;
+        let embedder = rag_sqlite::embed_bridge::LlmEmbedder::new(std::sync::Arc::new(
+            llm_openai::OpenAIProvider::new(api_key),
+        ));
+        let query_vecs: Vec<Vec<f32>> = embedder
+            .embed(&[query])
+            .await
+            .map_err(|e| anyhow::anyhow!("query embedding failed: {e}"))?;
+        let qe = query_vecs.first().map(|v: &Vec<f32>| v.as_slice());
+        println!("  Using hybrid retrieval (FTS + ANN)");
+        store
+            .retrieve_hybrid(query, qe, top_k)
+            .await
+            .map_err(|e| anyhow::anyhow!("hybrid retrieval failed: {e}"))?
+    } else {
+        store
+            .retrieve(query, top_k)
+            .await
+            .map_err(|e| anyhow::anyhow!("retrieval failed: {e}"))?
+    };
 
     if results.is_empty() {
         println!("No results found.");
