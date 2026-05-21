@@ -248,6 +248,7 @@ mod tests {
                 "/public": {
                     "post": {
                         "tags": ["public"],
+                        "security": [{ "apiKeyAuth": [] }],
                         "requestBody": {
                             "content": {
                                 "application/json": {
