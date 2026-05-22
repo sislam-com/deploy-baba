@@ -348,8 +348,8 @@ deploy-dry PROFILE="default":
     just aws-check {{PROFILE}} && cargo xtask deploy docker
 
 # Wait for Lambda to settle after a code update (step 2 of full pipeline)
-lambda-wait PROFILE="default":
-    just aws-check {{PROFILE}} && cargo xtask deploy wait --profile {{PROFILE}}
+lambda-wait PROFILE="default" ENV="prod":
+    just aws-check {{PROFILE}} && cargo xtask deploy wait --profile {{PROFILE}} --function deploy-baba-{{ENV}}
 
 # SPA-only deploy: build → S3 sync → sync-spa invoke → /health (steps 3–6)
 # ENV selects which deploy-config secret to read (prod or dev).
@@ -361,7 +361,7 @@ spa-deploy PROFILE="default" ENV="prod":
 deploy-full PROFILE="default" ENV="prod" TAG="":
     just quality
     just lambda-deploy {{PROFILE}}
-    just lambda-wait {{PROFILE}}
+    just lambda-wait {{PROFILE}} {{ENV}}
     just spa-deploy {{PROFILE}} {{ENV}}
     {{ if TAG != "" { "just release-tag dev push" } else { "echo 'Skipping dev tag — pass TAG=1 to enable'" } }}
 
