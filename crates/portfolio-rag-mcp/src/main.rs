@@ -134,7 +134,7 @@ async fn handle_request(rag: &PortfolioRAG, request: &str) -> Result<String> {
     // Validate method name (prevent injection)
     if !method
         .chars()
-        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.')
+        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.' || c == '/')
     {
         return Err(anyhow::anyhow!(
             "{}: Invalid method name: {}",

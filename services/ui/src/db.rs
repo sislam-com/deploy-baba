@@ -122,6 +122,14 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "029_rag_embeddings",
         include_str!("../migrations/029_rag_embeddings.sql"),
     ),
+    (
+        "030_challenge_rag_shape",
+        include_str!("../migrations/030_challenge_rag_shape.sql"),
+    ),
+    (
+        "031_rag_eval_v2",
+        include_str!("../migrations/031_rag_eval_v2.sql"),
+    ),
 ];
 
 /// Re-exported from `api_openapi::models::social` — the canonical SSOT.
@@ -425,14 +433,16 @@ impl PortfolioDataProvider for Db {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn
             .prepare(
-                "SELECT slug, title, description, short_description, tech_stack, category, url, featured
+                "SELECT slug, title, description, short_description, tech_stack, category, url,
+                        problem, constraints, decisions, implementation, outcomes, metrics,
+                        related_job_slug, related_plan_module, related_adr, featured
                  FROM challenges ORDER BY sort_order ASC",
             )
             .map_err(|e| RagError::Database(e.to_string()))?;
 
         let challenges = stmt
             .query_map([], |row| {
-                let featured: i64 = row.get(7)?;
+                let featured: i64 = row.get(16)?;
                 Ok(serde_json::json!({
                     "entity_type": "challenge",
                     "slug": row.get::<_, String>(0)?,
@@ -442,6 +452,15 @@ impl PortfolioDataProvider for Db {
                     "tech_stack": row.get::<_, Option<String>>(4)?,
                     "category": row.get::<_, Option<String>>(5)?,
                     "url": row.get::<_, Option<String>>(6)?,
+                    "problem": row.get::<_, Option<String>>(7)?,
+                    "constraints": row.get::<_, Option<String>>(8)?,
+                    "decisions": row.get::<_, Option<String>>(9)?,
+                    "implementation": row.get::<_, Option<String>>(10)?,
+                    "outcomes": row.get::<_, Option<String>>(11)?,
+                    "metrics": row.get::<_, Option<String>>(12)?,
+                    "related_job_slug": row.get::<_, Option<String>>(13)?,
+                    "related_plan_module": row.get::<_, Option<String>>(14)?,
+                    "related_adr": row.get::<_, Option<String>>(15)?,
                     "featured": featured != 0,
                 }))
             })

@@ -391,6 +391,138 @@ rag-eval-full DB="deploy-baba.db" PROFILE="default":
 rag-eval-category CATEGORY DB="deploy-baba.db":
     cargo xtask rag eval --db-path {{DB}} --retrieval-only --category {{CATEGORY}}
 
+# ── Local MCP ────────────────────────────────────────────────────────────────
+
+# Build the local mcp-rs server binary
+mcp-build:
+    cargo build --release --manifest-path /Users/shantopagla/mcp-rs/Cargo.toml
+
+# Verify local mcp-rs initialize, tools/list, and resources/list over stdio
+mcp-smoke:
+    #!/usr/bin/env python3
+    import json
+    import os
+    import subprocess
+    import sys
+
+    env = os.environ.copy()
+    env["MCP_RS_CONFIG"] = "/Users/shantopagla/mcp-rs/mcp-rs.toml"
+    env.setdefault("RUST_LOG", "mcp_rs=warn")
+
+    proc = subprocess.Popen(
+        ["/Users/shantopagla/mcp-rs/target/release/mcp-rs"],
+        cwd="/Users/shantopagla/mcp-rs",
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env=env,
+    )
+
+    def read_json_response():
+        while True:
+            line = proc.stdout.readline()
+            if not line:
+                raise RuntimeError(proc.stderr.read())
+            try:
+                return json.loads(line)
+            except json.JSONDecodeError:
+                # Some local MCP servers may emit startup logs on stdout.
+                continue
+
+    def rpc(method, params=None):
+        request = {"jsonrpc": "2.0", "id": method, "method": method}
+        if params is not None:
+            request["params"] = params
+        proc.stdin.write(json.dumps(request) + "\n")
+        proc.stdin.flush()
+        response = read_json_response()
+        if "error" in response:
+            raise RuntimeError(response["error"])
+        return response["result"]
+
+    try:
+        init = rpc("initialize", {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "just-mcp-smoke", "version": "0.1.0"}})
+        tools = rpc("tools/list")
+        resources = rpc("resources/list")
+        cache = rpc("resources/read", {"uri": "project://cache"})
+        plans = rpc("resources/read", {"uri": "project://plans"})
+        print(f"initialized: {init.get('serverInfo', {}).get('name', 'mcp-rs')}")
+        print(f"tools: {len(tools.get('tools', []))}")
+        print(f"resources: {len(resources.get('resources', []))}")
+        print(f"cache_bytes: {len(cache.get('contents', [{}])[0].get('text', ''))}")
+        print(f"plans_bytes: {len(plans.get('contents', [{}])[0].get('text', ''))}")
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+
+# Verify local portfolio RAG MCP tools over stdio
+mcp-rag-smoke DB="deploy-baba.db":
+    #!/usr/bin/env python3
+    import json
+    import os
+    import subprocess
+
+    env = os.environ.copy()
+    env["DATABASE_PATH"] = os.path.abspath("{{DB}}")
+    env["RAG_CORPORA_PATH"] = "/Users/shantopagla/portfolio"
+    env.setdefault("RUST_LOG", "portfolio_rag_mcp=warn")
+
+    proc = subprocess.Popen(
+        ["cargo", "run", "-q", "-p", "portfolio-rag-mcp"],
+        cwd="/Users/shantopagla/portfolio",
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env=env,
+    )
+
+    def read_json_response():
+        while True:
+            line = proc.stdout.readline()
+            if not line:
+                raise RuntimeError(proc.stderr.read())
+            try:
+                return json.loads(line)
+            except json.JSONDecodeError:
+                # Skip startup logs emitted on stdout before JSON-RPC responses.
+                continue
+
+    def rpc(method, params=None):
+        request = {"jsonrpc": "2.0", "id": method, "method": method}
+        if params is not None:
+            request["params"] = params
+        proc.stdin.write(json.dumps(request) + "\n")
+        proc.stdin.flush()
+        response = read_json_response()
+        if "error" in response:
+            raise RuntimeError(response["error"])
+        return response["result"]
+
+    try:
+        init = rpc("initialize", {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "just-mcp-rag-smoke", "version": "0.1.0"}})
+        tools = rpc("tools/list")
+        corpora = rpc("tools/call", {"name": "list_corpora", "arguments": {}})
+        results = rpc("tools/call", {"name": "query_rag", "arguments": {"query": "architecture", "corpus": "plan"}})
+        print(f"initialized: {init.get('serverInfo', {}).get('name', 'portfolio-rag')}")
+        print(f"tools: {len(tools.get('tools', []))}")
+        print(f"corpora: {corpora.get('corpus_count', 0)}")
+        print(f"rag_results: {results.get('result_count', 0)}")
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+
+# Inspect recent local mcp-rs audit entries
+mcp-audit-tail LINES="25":
+    tail -n {{LINES}} /tmp/mcp-rs-audit.jsonl
+
 # ── crates.io ────────────────────────────────────────────────────────────────
 
 # Dry-run publish for all library crates

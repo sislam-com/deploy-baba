@@ -1,7 +1,7 @@
-# CLAUDE.md — Portfolio Project Instructions
+# AGENTS.md — Portfolio Project Instructions
 
-This file provides guidance to Claude Code when working in this repository.
-It includes global instructions (inlined from `~/CLAUDE.md`) plus project-specific context.
+This file provides guidance to Codex when working in this repository.
+It includes global instructions (inlined from `~/AGENTS.md`) plus project-specific context.
 
 ---
 
@@ -98,7 +98,7 @@ Update `git.sha`, `last_updated`, and the relevant component's `git_sha_at_scan`
 
 ## About Me
 
-- **Name:** shantopagla
+- **Name:** Sharful Islam
 - **Email:** it@shantopagla.com
 - **GitHub:** sislam-com
 - **Primary Language:** Rust (also uses TypeScript/Node.js, Python)
@@ -227,4 +227,4 @@ Current status: ~93% complete. Remaining work listed in P0.1–P3 sections of `p
 
 ### Cross-Session Memory
 
-Claude's auto-memory for this project: `~/.claude/projects/-Users-shantopagla-portfolio/memory/`
+Codex's auto-memory for this project: `~/.Codex/projects/-Users-shantopagla-portfolio/memory/`

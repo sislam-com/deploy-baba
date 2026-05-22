@@ -353,6 +353,11 @@ fn index_portfolio_data(
             "portfolio/social.json",
             Box::new(query_social_links),
         ),
+        (
+            "challenges",
+            "portfolio/challenges.json",
+            Box::new(query_challenges),
+        ),
     ];
 
     for (label, virtual_path, query_fn) in &tables {
@@ -493,6 +498,59 @@ fn query_social_links(conn: &Connection) -> anyhow::Result<Vec<serde_json::Value
     Ok(rows)
 }
 
+fn query_challenges(conn: &Connection) -> anyhow::Result<Vec<serde_json::Value>> {
+    let structured = has_column(conn, "challenges", "problem");
+    let sql = if structured {
+        "SELECT slug, title, description, short_description, tech_stack, category, url,
+                problem, constraints, decisions, implementation, outcomes, metrics,
+                related_job_slug, related_plan_module, related_adr, featured
+         FROM challenges ORDER BY sort_order ASC"
+    } else {
+        "SELECT slug, title, description, short_description, tech_stack, category, url,
+                NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, featured
+         FROM challenges ORDER BY sort_order ASC"
+    };
+    let mut stmt = conn.prepare(sql)?;
+    let rows: Vec<serde_json::Value> = stmt
+        .query_map([], |row| {
+            let featured: i64 = row.get(16)?;
+            Ok(serde_json::json!({
+                "entity_type": "challenge",
+                "slug": row.get::<_, String>(0)?,
+                "title": row.get::<_, String>(1)?,
+                "description": row.get::<_, String>(2)?,
+                "short_description": row.get::<_, Option<String>>(3)?,
+                "tech_stack": row.get::<_, Option<String>>(4)?,
+                "category": row.get::<_, Option<String>>(5)?,
+                "url": row.get::<_, Option<String>>(6)?,
+                "problem": row.get::<_, Option<String>>(7)?,
+                "constraints": row.get::<_, Option<String>>(8)?,
+                "decisions": row.get::<_, Option<String>>(9)?,
+                "implementation": row.get::<_, Option<String>>(10)?,
+                "outcomes": row.get::<_, Option<String>>(11)?,
+                "metrics": row.get::<_, Option<String>>(12)?,
+                "related_job_slug": row.get::<_, Option<String>>(13)?,
+                "related_plan_module": row.get::<_, Option<String>>(14)?,
+                "related_adr": row.get::<_, Option<String>>(15)?,
+                "featured": featured != 0,
+            }))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
+fn has_column(conn: &Connection, table: &str, column: &str) -> bool {
+    let pragma = format!("PRAGMA table_info({table})");
+    let Ok(mut stmt) = conn.prepare(&pragma) else {
+        return false;
+    };
+    let Ok(rows) = stmt.query_map([], |row| row.get::<_, String>(1)) else {
+        return false;
+    };
+    let cols: Vec<String> = rows.filter_map(|r| r.ok()).collect();
+    cols.iter().any(|c| c == column)
+}
+
 // ── Ask ───────────────────────────────────────────────────────────────────
 
 async fn ask_cmd(
@@ -599,15 +657,132 @@ struct EvalCase {
     question: String,
     expected_hit: String,
     source_path: Option<String>,
+    expected_source_kind: Option<String>,
+    expected_entity_type: Option<String>,
     category: String,
     difficulty: String,
 }
 
-fn check_retrieval_hit(chunks: &[RankedChunk], expected: Option<&str>) -> bool {
-    match expected {
+fn check_retrieval_hit(case: &EvalCase, chunks: &[RankedChunk]) -> bool {
+    let path_hit = match case.source_path.as_deref() {
         None => true,
         Some(prefix) => chunks.iter().any(|c| c.source_path.starts_with(prefix)),
+    };
+    let kind_hit = match case.expected_source_kind.as_deref() {
+        None => true,
+        Some(kind) => chunks.iter().any(|c| c.source_kind == kind),
+    };
+    let entity_hit = match case.expected_entity_type.as_deref() {
+        None => true,
+        Some(entity_type) => chunks.iter().any(|c| {
+            c.source_path
+                .starts_with(&format!("portfolio://{entity_type}"))
+        }),
+    };
+    path_hit && kind_hit && entity_hit
+}
+
+fn ensure_eval_v2_schema(conn: &Connection) -> anyhow::Result<()> {
+    if !has_column(conn, "rag_eval_cases", "expected_source_kind") {
+        conn.execute(
+            "ALTER TABLE rag_eval_cases ADD COLUMN expected_source_kind TEXT",
+            [],
+        )?;
     }
+    if !has_column(conn, "rag_eval_cases", "expected_entity_type") {
+        conn.execute(
+            "ALTER TABLE rag_eval_cases ADD COLUMN expected_entity_type TEXT",
+            [],
+        )?;
+    }
+    if !has_column(conn, "rag_eval_results", "top_k_hit") {
+        conn.execute(
+            "ALTER TABLE rag_eval_results ADD COLUMN top_k_hit INTEGER",
+            [],
+        )?;
+    }
+
+    conn.execute_batch(
+        "UPDATE rag_eval_results
+         SET top_k_hit = retrieval_hit
+         WHERE top_k_hit IS NULL;",
+    )?;
+
+    conn.execute_batch(
+        "UPDATE rag_eval_cases
+         SET expected_source_kind = COALESCE(expected_source_kind, 'portfolio'),
+             expected_entity_type = COALESCE(expected_entity_type, 'competency')
+         WHERE question IN (
+           'What are your primary skills and technical expertise?',
+           'Tell me about your experience with AI/LLM systems and RAG pipelines',
+           'What is your experience with cloud infrastructure and AWS?',
+           'How many competencies does the portfolio list?'
+         );
+
+         UPDATE rag_eval_cases
+         SET expected_source_kind = COALESCE(expected_source_kind, 'portfolio'),
+             expected_entity_type = COALESCE(expected_entity_type, 'job')
+         WHERE question IN (
+           'Describe your technical leadership and team management experience',
+           'What platforms and products have you built end-to-end?',
+           'Compare the jobs at Scala Computing and the personal projects'
+         );
+
+         UPDATE rag_eval_cases
+         SET expected_source_kind = COALESCE(expected_source_kind, 'portfolio'),
+             expected_entity_type = COALESCE(expected_entity_type, 'challenge')
+         WHERE question IN (
+           'How does the RAG pipeline in this portfolio project work?',
+           'Tell me about the 27-step deployment challenge'
+         );
+
+         UPDATE rag_eval_cases
+         SET expected_source_kind = COALESCE(expected_source_kind, 'portfolio'),
+             expected_entity_type = COALESCE(expected_entity_type, 'about')
+         WHERE question IN (
+           'What are the key architecture decisions in this portfolio?'
+         );
+
+         INSERT INTO rag_eval_cases (
+           question, expected_hit, source_path, category, difficulty, expected_source_kind, expected_entity_type
+         )
+         VALUES
+           (
+             'Which challenge explains key constraints and tradeoffs?',
+             'constraint',
+             'portfolio://challenge',
+             'challenge',
+             'medium',
+             'portfolio',
+             'challenge'
+           ),
+           (
+             'Which challenge documents measurable outcomes and metrics?',
+             'metric',
+             'portfolio://challenge',
+             'challenge',
+             'medium',
+             'portfolio',
+             'challenge'
+           ),
+           (
+             'Which challenge references ADR or module alignment?',
+             'ADR',
+             'portfolio://challenge',
+             'challenge',
+             'hard',
+             'portfolio',
+             'challenge'
+           )
+         ON CONFLICT(question) DO UPDATE SET
+           expected_hit = EXCLUDED.expected_hit,
+           source_path = EXCLUDED.source_path,
+           category = EXCLUDED.category,
+           difficulty = EXCLUDED.difficulty,
+           expected_source_kind = EXCLUDED.expected_source_kind,
+           expected_entity_type = EXCLUDED.expected_entity_type;",
+    )?;
+    Ok(())
 }
 
 struct SqlitePortfolioProvider {
@@ -790,15 +965,23 @@ impl rag_core::portfolio::PortfolioDataProvider for SqlitePortfolioProvider {
 
     async fn get_challenges_summary(&self) -> Result<Vec<serde_json::Value>, rag_core::RagError> {
         let conn = self.conn.lock().unwrap();
+        let structured = has_column(&conn, "challenges", "problem");
+        let sql = if structured {
+            "SELECT slug, title, description, short_description, tech_stack, category, url,
+                    problem, constraints, decisions, implementation, outcomes, metrics,
+                    related_job_slug, related_plan_module, related_adr, featured
+             FROM challenges ORDER BY sort_order ASC"
+        } else {
+            "SELECT slug, title, description, short_description, tech_stack, category, url,
+                    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, featured
+             FROM challenges ORDER BY sort_order ASC"
+        };
         let mut stmt = conn
-            .prepare(
-                "SELECT slug, title, description, short_description, tech_stack, category, url, featured
-                 FROM challenges ORDER BY sort_order ASC",
-            )
+            .prepare(sql)
             .map_err(|e| rag_core::RagError::Database(e.to_string()))?;
         let rows = stmt
             .query_map([], |row| {
-                let featured: i64 = row.get(7)?;
+                let featured: i64 = row.get(16)?;
                 Ok(serde_json::json!({
                     "entity_type": "challenge",
                     "slug": row.get::<_, String>(0)?,
@@ -808,6 +991,15 @@ impl rag_core::portfolio::PortfolioDataProvider for SqlitePortfolioProvider {
                     "tech_stack": row.get::<_, Option<String>>(4)?,
                     "category": row.get::<_, Option<String>>(5)?,
                     "url": row.get::<_, Option<String>>(6)?,
+                    "problem": row.get::<_, Option<String>>(7)?,
+                    "constraints": row.get::<_, Option<String>>(8)?,
+                    "decisions": row.get::<_, Option<String>>(9)?,
+                    "implementation": row.get::<_, Option<String>>(10)?,
+                    "outcomes": row.get::<_, Option<String>>(11)?,
+                    "metrics": row.get::<_, Option<String>>(12)?,
+                    "related_job_slug": row.get::<_, Option<String>>(13)?,
+                    "related_plan_module": row.get::<_, Option<String>>(14)?,
+                    "related_adr": row.get::<_, Option<String>>(15)?,
                     "featured": featured != 0,
                 }))
             })
@@ -850,6 +1042,7 @@ async fn eval_cmd(
     conn2.execute_batch(include_str!(
         "../../services/ui/migrations/023_rag_eval.sql"
     ))?;
+    ensure_eval_v2_schema(&conn2)?;
 
     // Connection 3: portfolio data provider for HybridRetriever
     let conn3 = Connection::open(db_path)
@@ -864,10 +1057,10 @@ async fn eval_cmd(
 
     // Read eval cases
     let sql = if category_filter.is_some() {
-        "SELECT id, question, expected_hit, source_path, category, difficulty \
+        "SELECT id, question, expected_hit, source_path, expected_source_kind, expected_entity_type, category, difficulty \
          FROM rag_eval_cases WHERE category = ?1 ORDER BY id"
     } else {
-        "SELECT id, question, expected_hit, source_path, category, difficulty \
+        "SELECT id, question, expected_hit, source_path, expected_source_kind, expected_entity_type, category, difficulty \
          FROM rag_eval_cases ORDER BY id"
     };
     let mut stmt = conn2.prepare(sql)?;
@@ -878,8 +1071,10 @@ async fn eval_cmd(
                 question: row.get(1)?,
                 expected_hit: row.get(2)?,
                 source_path: row.get(3)?,
-                category: row.get(4)?,
-                difficulty: row.get(5)?,
+                expected_source_kind: row.get(4)?,
+                expected_entity_type: row.get(5)?,
+                category: row.get(6)?,
+                difficulty: row.get(7)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?
@@ -890,8 +1085,10 @@ async fn eval_cmd(
                 question: row.get(1)?,
                 expected_hit: row.get(2)?,
                 source_path: row.get(3)?,
-                category: row.get(4)?,
-                difficulty: row.get(5)?,
+                expected_source_kind: row.get(4)?,
+                expected_entity_type: row.get(5)?,
+                category: row.get(6)?,
+                difficulty: row.get(7)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?
@@ -954,6 +1151,8 @@ async fn eval_cmd(
     }
 
     let mut pass_count = 0u32;
+    let mut category_totals: std::collections::BTreeMap<String, (u32, u32)> =
+        std::collections::BTreeMap::new();
     let mut sum_groundedness = 0.0f64;
     let mut sum_correctness = 0.0f64;
     let mut scored_count = 0u32;
@@ -994,7 +1193,7 @@ async fn eval_cmd(
             }
         };
 
-        let hit = check_retrieval_hit(&chunks, case.source_path.as_deref());
+        let hit = check_retrieval_hit(case, &chunks);
         let latency_ms;
         let mut groundedness: Option<f64> = None;
         let mut correctness: Option<f64> = None;
@@ -1069,6 +1268,13 @@ async fn eval_cmd(
         if passed {
             pass_count += 1;
         }
+        let entry = category_totals
+            .entry(case.category.clone())
+            .or_insert((0, 0));
+        entry.0 += 1;
+        if passed {
+            entry.1 += 1;
+        }
 
         insert_eval_result(
             &conn2,
@@ -1132,6 +1338,15 @@ async fn eval_cmd(
     } else {
         println!("  {pass_count}/{} passed ({pct:.1}%)", cases.len());
     }
+    println!("  Category scorecard:");
+    for (category, (total_cases, passed_cases)) in category_totals {
+        let cat_pct = if total_cases > 0 {
+            (passed_cases as f64 / total_cases as f64) * 100.0
+        } else {
+            0.0
+        };
+        println!("    - {category}: {passed_cases}/{total_cases} ({cat_pct:.1}%)");
+    }
     println!("═══════════════════════════════════════════════════════════════════");
 
     Ok(())
@@ -1155,14 +1370,15 @@ fn insert_eval_result(
     conn.execute(
         "INSERT INTO rag_eval_results \
          (run_id, case_id, answer, citations_json, chunks_json, retrieval_hit, \
-          groundedness, correctness, citation_accuracy, latency_ms, failure_type) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+          top_k_hit, groundedness, correctness, citation_accuracy, latency_ms, failure_type) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
         rusqlite::params![
             run_id,
             case_id,
             answer,
             citations_json,
             chunks_json,
+            retrieval_hit as i32,
             retrieval_hit as i32,
             groundedness,
             correctness,

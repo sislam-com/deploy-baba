@@ -3,6 +3,7 @@ use crate::portfolio::PortfolioDataProvider;
 use crate::types::RankedChunk;
 use crate::{RagError, Retriever};
 use async_trait::async_trait;
+use std::collections::VecDeque;
 
 const PORTFOLIO_KEYWORDS: &[&str] = &[
     "experience",
@@ -44,41 +45,65 @@ pub struct HybridRetriever<R, P> {
     pub portfolio: P,
 }
 
+#[derive(Clone, Copy)]
+struct QueryIntent {
+    skills: bool,
+    challenges: bool,
+    architecture: bool,
+}
+
 impl<R: Retriever, P: PortfolioDataProvider> HybridRetriever<R, P> {
     fn query_matches_portfolio(query: &str) -> bool {
         let lower = query.to_lowercase();
         PORTFOLIO_KEYWORDS.iter().any(|kw| lower.contains(kw))
     }
 
+    fn classify_entity(val: &serde_json::Value) -> (String, String) {
+        if let Some(entity_type) = val.get("entity_type").and_then(|v| v.as_str()) {
+            let slug = val
+                .get("slug")
+                .and_then(|s| s.as_str())
+                .unwrap_or("")
+                .to_string();
+            return (entity_type.to_string(), slug);
+        }
+        if val.get("company").is_some() && val.get("title").is_some() {
+            return (
+                "job".to_string(),
+                val.get("slug")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("")
+                    .to_string(),
+            );
+        }
+        if val.get("name").is_some() && val.get("icon").is_some() {
+            return (
+                "competency".to_string(),
+                val.get("slug")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("")
+                    .to_string(),
+            );
+        }
+        if val.get("heading").is_some() && val.get("body").is_some() {
+            return (
+                "about".to_string(),
+                val.get("slug")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("")
+                    .to_string(),
+            );
+        }
+        ("unknown".to_string(), String::new())
+    }
+
     fn value_to_chunk(val: &serde_json::Value, ord: usize) -> RankedChunk {
-        // Convert portfolio entity to readable prose instead of raw JSON
         let content = entity_to_prose(val);
-
-        // Extract entity type and slug for proper URL generation
-        let (entity_type, slug) = if val.get("company").is_some() && val.get("title").is_some() {
-            (
-                "job",
-                val.get("slug").and_then(|s| s.as_str()).unwrap_or(""),
-            )
-        } else if val.get("name").is_some() && val.get("icon").is_some() {
-            (
-                "competency",
-                val.get("slug").and_then(|s| s.as_str()).unwrap_or(""),
-            )
-        } else if val.get("heading").is_some() && val.get("body").is_some() {
-            (
-                "about",
-                val.get("slug").and_then(|s| s.as_str()).unwrap_or(""),
-            )
-        } else {
-            ("unknown", "")
-        };
-
-        // Store metadata in source_path for URL generation
+        let (entity_type, slug) = Self::classify_entity(val);
         let source_path = if slug.is_empty() {
             format!("portfolio://{}", entity_type)
         } else {
-            format!("portfolio://{}/{}", entity_type, slug)
+            format!("portfolio://{}/{}", entity_type, slug.as_str())
         };
 
         RankedChunk {
@@ -92,6 +117,105 @@ impl<R: Retriever, P: PortfolioDataProvider> HybridRetriever<R, P> {
             score: 0.0,
         }
     }
+
+    fn parse_intent(query: &str) -> QueryIntent {
+        let lower = query.to_lowercase();
+        QueryIntent {
+            skills: ["skill", "skills", "competency", "competencies", "expertise"]
+                .iter()
+                .any(|kw| lower.contains(kw)),
+            challenges: [
+                "challenge",
+                "challenges",
+                "project",
+                "projects",
+                "tradeoff",
+                "outcome",
+            ]
+            .iter()
+            .any(|kw| lower.contains(kw)),
+            architecture: [
+                "architecture",
+                "adr",
+                "design",
+                "infrastructure",
+                "auth",
+                "cognito",
+            ]
+            .iter()
+            .any(|kw| lower.contains(kw)),
+        }
+    }
+
+    fn live_mix_from_intent(intent: QueryIntent, portfolio_budget: usize) -> [usize; 4] {
+        if portfolio_budget == 0 {
+            return [0, 0, 0, 0];
+        }
+        let mut mix = if intent.skills {
+            [1, 2, 1, 1]
+        } else if intent.challenges {
+            [1, 1, 1, 2]
+        } else if intent.architecture {
+            [1, 1, 2, 1]
+        } else {
+            [2, 1, 1, 1]
+        };
+        let mut total: usize = mix.iter().sum();
+        while total > portfolio_budget {
+            for item in &mut mix {
+                if *item > 0 && total > portfolio_budget {
+                    *item -= 1;
+                    total -= 1;
+                }
+            }
+        }
+        while total < portfolio_budget {
+            for item in &mut mix {
+                if total < portfolio_budget {
+                    *item += 1;
+                    total += 1;
+                }
+            }
+        }
+        mix
+    }
+
+    fn pop_take(queue: &mut VecDeque<RankedChunk>, count: usize, out: &mut Vec<RankedChunk>) {
+        for _ in 0..count {
+            if let Some(chunk) = queue.pop_front() {
+                out.push(chunk);
+            } else {
+                return;
+            }
+        }
+    }
+
+    fn gather_live_chunks(
+        jobs: &[serde_json::Value],
+        competencies: &[serde_json::Value],
+        about: &[serde_json::Value],
+        challenges: &[serde_json::Value],
+    ) -> Vec<RankedChunk> {
+        let mut all = Vec::new();
+        let mut ord = 0usize;
+        for entity in jobs {
+            all.push(Self::value_to_chunk(entity, ord));
+            ord += 1;
+        }
+        for entity in competencies {
+            all.push(Self::value_to_chunk(entity, ord));
+            ord += 1;
+        }
+        for entity in about {
+            all.push(Self::value_to_chunk(entity, ord));
+            ord += 1;
+        }
+        for entity in challenges {
+            all.push(Self::value_to_chunk(entity, ord));
+            ord += 1;
+        }
+        all
+    }
 }
 
 #[async_trait]
@@ -104,9 +228,9 @@ impl<R: Retriever, P: PortfolioDataProvider> Retriever for HybridRetriever<R, P>
             return self.fts.retrieve(query, top_k).await;
         }
 
-        // Portfolio-related query: inject capped live data, guarantee FTS budget
         let portfolio_budget = top_k.min(5);
         let fts_budget = top_k.saturating_sub(portfolio_budget);
+        let intent = Self::parse_intent(query);
 
         let fts_results = if fts_budget > 0 {
             self.fts.retrieve(query, fts_budget).await?
@@ -114,34 +238,59 @@ impl<R: Retriever, P: PortfolioDataProvider> Retriever for HybridRetriever<R, P>
             Vec::new()
         };
 
-        let mut live_chunks = Vec::new();
-        let mut ord = 0usize;
-
         let jobs = self.portfolio.get_jobs_summary().await?;
-        for val in &jobs {
-            live_chunks.push(Self::value_to_chunk(val, ord));
-            ord += 1;
-        }
-
         let competencies = self.portfolio.get_competencies_summary().await?;
-        for val in &competencies {
-            live_chunks.push(Self::value_to_chunk(val, ord));
-            ord += 1;
-        }
-
         let about = self.portfolio.get_about_sections().await?;
-        for val in &about {
-            live_chunks.push(Self::value_to_chunk(val, ord));
-            ord += 1;
-        }
-
         let challenges = self.portfolio.get_challenges_summary().await?;
-        for val in &challenges {
-            live_chunks.push(Self::value_to_chunk(val, ord));
-            ord += 1;
-        }
 
-        live_chunks.truncate(portfolio_budget);
+        let mut job_q: VecDeque<_> = jobs
+            .iter()
+            .enumerate()
+            .map(|(i, v)| Self::value_to_chunk(v, i))
+            .collect();
+        let mut comp_q: VecDeque<_> = competencies
+            .iter()
+            .enumerate()
+            .map(|(i, v)| Self::value_to_chunk(v, i + 100))
+            .collect();
+        let mut about_q: VecDeque<_> = about
+            .iter()
+            .enumerate()
+            .map(|(i, v)| Self::value_to_chunk(v, i + 200))
+            .collect();
+        let mut challenge_q: VecDeque<_> = challenges
+            .iter()
+            .enumerate()
+            .map(|(i, v)| Self::value_to_chunk(v, i + 300))
+            .collect();
+
+        let mix = Self::live_mix_from_intent(intent, portfolio_budget);
+        let mut live_chunks = Vec::new();
+        Self::pop_take(&mut job_q, mix[0], &mut live_chunks);
+        Self::pop_take(&mut comp_q, mix[1], &mut live_chunks);
+        Self::pop_take(&mut about_q, mix[2], &mut live_chunks);
+        Self::pop_take(&mut challenge_q, mix[3], &mut live_chunks);
+
+        if live_chunks.len() < portfolio_budget {
+            let mut overflow = VecDeque::from(Self::gather_live_chunks(
+                &jobs,
+                &competencies,
+                &about,
+                &challenges,
+            ));
+            while live_chunks.len() < portfolio_budget {
+                if let Some(next) = overflow.pop_front() {
+                    if !live_chunks
+                        .iter()
+                        .any(|c| c.source_path == next.source_path)
+                    {
+                        live_chunks.push(next);
+                    }
+                } else {
+                    break;
+                }
+            }
+        }
 
         let mut merged = live_chunks;
         merged.extend(fts_results);
@@ -191,6 +340,7 @@ mod tests {
             Ok(vec![serde_json::json!({
                 "name": "Cloud Infra",
                 "description": "AWS, Lambda, EFS",
+                "icon": "cloud",
             })])
         }
         async fn get_about_sections(&self) -> Result<Vec<serde_json::Value>, RagError> {
@@ -325,6 +475,43 @@ mod tests {
         assert!(
             results.iter().any(|c| c.git_sha != "live"),
             "auth query should also include FTS code chunks"
+        );
+    }
+
+    #[tokio::test]
+    async fn challenge_entity_has_stable_source_path() {
+        let chunk = HybridRetriever::<StubRetriever, StubPortfolio>::value_to_chunk(
+            &serde_json::json!({
+                "entity_type": "challenge",
+                "slug": "rag-grounding-citation",
+                "title": "RAG Grounding",
+                "description": "Grounded retrieval and citations"
+            }),
+            0,
+        );
+        assert_eq!(
+            chunk.source_path,
+            "portfolio://challenge/rag-grounding-citation"
+        );
+    }
+
+    #[tokio::test]
+    async fn challenge_query_reserves_challenge_slots() {
+        let hybrid = HybridRetriever {
+            fts: StubRetriever {
+                chunks: vec![make_fts_chunk("plan", "adr and architecture chunk")],
+            },
+            portfolio: StubPortfolio,
+        };
+        let results = hybrid
+            .retrieve("tell me about your challenge project outcomes", 6)
+            .await
+            .unwrap();
+        assert!(
+            results
+                .iter()
+                .any(|c| c.source_path.starts_with("portfolio://challenge/")),
+            "challenge intent should include challenge live chunks"
         );
     }
 }

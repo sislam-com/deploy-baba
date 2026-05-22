@@ -835,7 +835,9 @@ pub async fn delete_social_link(
 // ── Challenge handlers ───────────────────────────────────────────────────────
 
 const CHALLENGE_SELECT: &str =
-    "id, slug, title, job_id, description, short_description, tech_stack, category, url, image_url, featured, sort_order";
+    "id, slug, title, job_id, description, short_description, tech_stack, category, url, image_url, \
+     problem, constraints, decisions, implementation, outcomes, metrics, related_job_slug, related_plan_module, \
+     related_adr, featured, sort_order";
 
 /// Create a new challenge.
 #[utoipa::path(
@@ -856,8 +858,10 @@ pub async fn create_challenge(
 ) -> ApiResult<(StatusCode, Json<Challenge>)> {
     let conn = db.conn.lock().unwrap();
     conn.execute(
-        "INSERT INTO challenges (slug, title, job_id, description, short_description, tech_stack, category, url, image_url, featured, sort_order)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+        "INSERT INTO challenges (slug, title, job_id, description, short_description, tech_stack, category, url, image_url,
+         problem, constraints, decisions, implementation, outcomes, metrics, related_job_slug, related_plan_module, related_adr,
+         featured, sort_order)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)",
         rusqlite::params![
             input.slug,
             input.title,
@@ -868,8 +872,17 @@ pub async fn create_challenge(
             input.category,
             input.url,
             input.image_url,
+            input.problem,
+            input.constraints,
+            input.decisions,
+            input.implementation,
+            input.outcomes,
+            input.metrics,
+            input.related_job_slug,
+            input.related_plan_module,
+            input.related_adr,
             input.featured as i64,
-            input.sort_order,
+            input.sort_order
         ],
     )
     .map_err(db_err)?;
@@ -906,8 +919,10 @@ pub async fn update_challenge(
     let rows = conn
         .execute(
             "UPDATE challenges SET slug=?1, title=?2, job_id=?3, description=?4,
-             short_description=?5, tech_stack=?6, category=?7, url=?8,
-             image_url=?9, featured=?10, sort_order=?11 WHERE id=?12",
+             short_description=?5, tech_stack=?6, category=?7, url=?8, image_url=?9,
+             problem=?10, constraints=?11, decisions=?12, implementation=?13, outcomes=?14, metrics=?15,
+             related_job_slug=?16, related_plan_module=?17, related_adr=?18,
+             featured=?19, sort_order=?20 WHERE id=?21",
             rusqlite::params![
                 input.slug,
                 input.title,
@@ -918,6 +933,15 @@ pub async fn update_challenge(
                 input.category,
                 input.url,
                 input.image_url,
+                input.problem,
+                input.constraints,
+                input.decisions,
+                input.implementation,
+                input.outcomes,
+                input.metrics,
+                input.related_job_slug,
+                input.related_plan_module,
+                input.related_adr,
                 input.featured as i64,
                 input.sort_order,
                 id,

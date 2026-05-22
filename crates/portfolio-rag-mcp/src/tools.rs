@@ -27,7 +27,7 @@ pub fn list_tools() -> Vec<Tool> {
                     },
                     "corpus": {
                         "type": "string",
-                        "description": "Optional corpus filter (openapi_spec, portfolio_data, source_code, documentation, architecture_decisions, plans)"
+                        "description": "Optional source_kind filter (openapi, portfolio, rust, hcl, plan, cache)"
                     }
                 },
                 "required": ["query"]

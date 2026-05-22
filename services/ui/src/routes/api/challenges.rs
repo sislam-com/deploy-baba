@@ -12,7 +12,7 @@ pub use api_openapi::models::Challenge;
 
 pub fn row_to_challenge(row: &rusqlite::Row<'_>) -> rusqlite::Result<Challenge> {
     let tech_raw: Option<String> = row.get(6)?;
-    let featured_int: i64 = row.get(10)?;
+    let featured_int: i64 = row.get(19)?;
     Ok(Challenge {
         id: row.get(0)?,
         slug: row.get(1)?,
@@ -24,13 +24,24 @@ pub fn row_to_challenge(row: &rusqlite::Row<'_>) -> rusqlite::Result<Challenge> 
         category: row.get(7)?,
         url: row.get(8)?,
         image_url: row.get(9)?,
+        problem: row.get(10)?,
+        constraints: row.get(11)?,
+        decisions: row.get(12)?,
+        implementation: row.get(13)?,
+        outcomes: row.get(14)?,
+        metrics: row.get(15)?,
+        related_job_slug: row.get(16)?,
+        related_plan_module: row.get(17)?,
+        related_adr: row.get(18)?,
         featured: featured_int != 0,
-        sort_order: row.get(11)?,
+        sort_order: row.get(20)?,
     })
 }
 
 const SELECT_COLS: &str =
-    "id, slug, title, job_id, description, short_description, tech_stack, category, url, image_url, featured, sort_order";
+    "id, slug, title, job_id, description, short_description, tech_stack, category, url, image_url, \
+     problem, constraints, decisions, implementation, outcomes, metrics, related_job_slug, related_plan_module, \
+     related_adr, featured, sort_order";
 
 #[utoipa::path(
     get,

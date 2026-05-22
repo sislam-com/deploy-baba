@@ -45,6 +45,10 @@ pub fn chunk(path: &str, content: &str) -> Vec<Chunk> {
     let mut ord = 0usize;
 
     for entity in &entities {
+        if entity.get("entity_type").and_then(|v| v.as_str()) == Some("challenge") {
+            emit_challenge_chunks(path, entity, &mut ord, &mut chunks);
+            continue;
+        }
         let (text, meta) = entity_to_prose_with_meta(entity);
         if text.is_empty() {
             continue;
@@ -142,23 +146,99 @@ pub fn about_to_prose(about: &Value) -> (String, Value) {
 pub fn challenge_to_prose(challenge: &Value) -> (String, Value) {
     let title = challenge["title"].as_str().unwrap_or("");
     let description = challenge["description"].as_str().unwrap_or("");
+    let short_description = challenge["short_description"].as_str().unwrap_or("");
     let tech = challenge["tech_stack"].as_str().unwrap_or("");
     let category = challenge["category"].as_str().unwrap_or("");
     let slug = challenge["slug"].as_str().unwrap_or("");
+    let problem = challenge["problem"].as_str().unwrap_or("");
+    let constraints = challenge["constraints"].as_str().unwrap_or("");
+    let decisions = challenge["decisions"].as_str().unwrap_or("");
+    let implementation = challenge["implementation"].as_str().unwrap_or("");
+    let outcomes = challenge["outcomes"].as_str().unwrap_or("");
+    let metrics = challenge["metrics"].as_str().unwrap_or("");
+    let related_job_slug = challenge["related_job_slug"].as_str().unwrap_or("");
+    let related_plan_module = challenge["related_plan_module"].as_str().unwrap_or("");
+    let related_adr = challenge["related_adr"].as_str().unwrap_or("");
 
     let mut text = format!("Project: {title}");
     if !category.is_empty() {
         text.push_str(&format!(" [{category}]"));
     }
+    if !short_description.is_empty() {
+        text.push_str(&format!("\nSummary: {short_description}"));
+    }
     if !tech.is_empty() {
         text.push_str(&format!("\nTech: {tech}"));
     }
     if !description.is_empty() {
-        text.push_str(&format!("\n{description}"));
+        text.push_str(&format!("\nDescription: {description}"));
+    }
+    if !problem.is_empty() {
+        text.push_str(&format!("\nProblem: {problem}"));
+    }
+    if !constraints.is_empty() {
+        text.push_str(&format!("\nConstraints: {constraints}"));
+    }
+    if !decisions.is_empty() {
+        text.push_str(&format!("\nDecisions: {decisions}"));
+    }
+    if !implementation.is_empty() {
+        text.push_str(&format!("\nImplementation: {implementation}"));
+    }
+    if !outcomes.is_empty() {
+        text.push_str(&format!("\nOutcomes: {outcomes}"));
+    }
+    if !metrics.is_empty() {
+        text.push_str(&format!("\nMetrics: {metrics}"));
+    }
+    if !related_job_slug.is_empty() {
+        text.push_str(&format!("\nRelated job: {related_job_slug}"));
+    }
+    if !related_plan_module.is_empty() {
+        text.push_str(&format!("\nPlan module: {related_plan_module}"));
+    }
+    if !related_adr.is_empty() {
+        text.push_str(&format!("\nADR: {related_adr}"));
     }
 
     let meta = serde_json::json!({ "entity_type": "challenge", "slug": slug });
     (text, meta)
+}
+
+fn emit_challenge_chunks(path: &str, challenge: &Value, ord: &mut usize, chunks: &mut Vec<Chunk>) {
+    let (narrative, mut narrative_meta) = challenge_to_prose(challenge);
+    if !narrative.is_empty() {
+        narrative_meta["chunk_role"] = serde_json::json!("narrative");
+        emit_chunks(path, &narrative, narrative_meta, ord, chunks);
+    }
+
+    let slug = challenge["slug"].as_str().unwrap_or("");
+    let mut evidence_lines = Vec::new();
+    for (label, field) in [
+        ("Problem", "problem"),
+        ("Constraints", "constraints"),
+        ("Decisions", "decisions"),
+        ("Implementation", "implementation"),
+        ("Outcomes", "outcomes"),
+        ("Metrics", "metrics"),
+        ("Related job", "related_job_slug"),
+        ("Related plan module", "related_plan_module"),
+        ("Related ADR", "related_adr"),
+    ] {
+        let value = challenge[field].as_str().unwrap_or("");
+        if !value.is_empty() {
+            evidence_lines.push(format!("{label}: {value}"));
+        }
+    }
+    if !evidence_lines.is_empty() {
+        let evidence_text = format!("Challenge evidence ({slug})\n{}", evidence_lines.join("\n"));
+        let evidence_meta = serde_json::json!({
+            "entity_type": "challenge",
+            "slug": slug,
+            "chunk_role": "evidence"
+        });
+        emit_chunks(path, &evidence_text, evidence_meta, ord, chunks);
+    }
 }
 
 pub fn social_to_prose(social: &Value) -> (String, Value) {

@@ -41,14 +41,14 @@ impl PortfolioRAG {
     }
 
     fn load_corpora(&mut self, _base_path: &str) -> Result<()> {
-        // Define the 6 corpora from ADR-016
+        // Match the source_kind values stored by rag-sqlite.
         self.corpora = vec![
-            "openapi_spec".to_string(),
-            "portfolio_data".to_string(),
-            "source_code".to_string(),
-            "documentation".to_string(),
-            "architecture_decisions".to_string(),
-            "plans".to_string(),
+            "openapi".to_string(),
+            "portfolio".to_string(),
+            "rust".to_string(),
+            "hcl".to_string(),
+            "plan".to_string(),
+            "cache".to_string(),
         ];
 
         // RagStore handles schema migration automatically
