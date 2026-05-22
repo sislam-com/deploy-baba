@@ -44,7 +44,7 @@ pub struct Output {
 
 impl Tool for FindFiles {
     const NAME: &'static str = "find_files";
-    const DESCRIPTION: &'static str = "Find files by name pattern using glob matching";
+    const DESCRIPTION: &'static str = "Find files by name pattern using glob matching. Prefer native Bash find for general lookups; use this for MCP workspace-scoped file discovery.";
 
     type Input = Input;
     type Output = Output;

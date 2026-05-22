@@ -3,17 +3,12 @@
 
 set dotenv-load := false
 
+# Set the shell to bash to support 'eval' and string manipulation
+set shell := ["bash", "-c"]
+
 # Default AWS profile — pinned to stack.toml `aws.profile`.
 # Recipes with a `PROFILE` parameter shadow this; argless recipes (sso-login, ui, dev-stack) use it directly.
-# Override ENV or PROFILE on any invocation: just ENV=dev deploy-full
 PROFILE := "deploy-baba"
-
-# Target environment: "prod" or "dev". Controls function names, SSM paths, deploy-config secrets.
-# Override with: just ENV=dev <recipe>
-ENV := "prod"
-
-# Derived function name prefix: deploy-baba-prod or deploy-baba-dev
-FN_PREFIX := "deploy-baba-" + ENV
 
 # ── Meta ──────────────────────────────────────────────────────────────────────
 
@@ -55,7 +50,8 @@ coverage:
 
 # fmt + lint + test (the standard inner loop)
 dev:
-    just web-types-offline && just fmt && just lint && just test && just web-typecheck && just web-test
+    @just dev-doctor
+    @just dev-stack
 
 # Full quality gate (fmt + lint + test + coverage floors + audit + HCL fmt check)
 quality:
@@ -99,7 +95,7 @@ email-build:
 # Build email Lambda zip + update the deployed function
 email-deploy PROFILE="default":
     just aws-check {{PROFILE}} && just email-build && aws lambda update-function-code \
-        --function-name {{FN_PREFIX}}-email \
+        --function-name deploy-baba-email \
         --zip-file fileb://infra/build/email-lambda.zip \
         --profile {{PROFILE}}
 
@@ -112,7 +108,7 @@ llm-proxy-build:
 # Build LLM-proxy Lambda zip + update the deployed function
 llm-proxy-deploy PROFILE="default":
     just aws-check {{PROFILE}} && just llm-proxy-build && aws lambda update-function-code \
-        --function-name {{FN_PREFIX}}-llm-proxy \
+        --function-name deploy-baba-llm-proxy \
         --zip-file fileb://infra/build/llm-proxy-lambda.zip \
         --profile {{PROFILE}}
 
@@ -127,22 +123,27 @@ mcp-context-build:
     cp services/ui/migrations/*.sql build/mcp-context/services/ui/migrations/
     cp justfile build/mcp-context/justfile
     cp stack.example.toml build/mcp-context/stack.example.toml
-    python3 -c 'from pathlib import Path; text = Path(".mcp-rs.toml").read_text(); text = text.replace("workspace_root = \".\"", "workspace_root = \"/var/task/mcp-context\""); text = text.replace("log_path = \"mcp-audit.jsonl\"", "log_path = \"/tmp/mcp-gateway-audit.jsonl\""); Path("build/mcp-gateway/mcp-rs.toml").write_text(text)'
+    python3 - <<'PY'
+    from pathlib import Path
+    text = Path(".mcp-rs.toml").read_text()
+    text = text.replace('workspace_root = "."', 'workspace_root = "/var/task/mcp-context"')
+    text = text.replace('log_path = "mcp-audit.jsonl"', 'log_path = "/tmp/mcp-gateway-audit.jsonl"')
+    Path("build/mcp-gateway/mcp-rs.toml").write_text(text)
+    PY
 
 # Build the private Cognito-protected MCP gateway Lambda zip
 mcp-cloud-build: mcp-context-build
     PATH="$HOME/.cargo/bin:$PATH" cargo lambda build --release --package mcp-gateway --target aarch64-unknown-linux-gnu
     cp target/lambda/mcp-gateway/bootstrap build/mcp-gateway/bootstrap
     chmod +x build/mcp-gateway/bootstrap
-    cp -r build/mcp-context build/mcp-gateway/mcp-context
     mkdir -p infra/build
     rm -f infra/build/mcp-gateway-lambda.zip
-    cd build/mcp-gateway && zip -qr ../../infra/build/mcp-gateway-lambda.zip bootstrap mcp-rs.toml mcp-context
+    cd build/mcp-gateway && zip -qr ../../infra/build/mcp-gateway-lambda.zip bootstrap mcp-rs.toml ../mcp-context
 
 # Build + upload the private MCP gateway Lambda
 mcp-cloud-deploy PROFILE="default":
     just aws-check {{PROFILE}} && just mcp-cloud-build && aws lambda update-function-code \
-        --function-name {{FN_PREFIX}}-mcp-gateway \
+        --function-name deploy-baba-mcp-gateway \
         --zip-file fileb://infra/build/mcp-gateway-lambda.zip \
         --profile {{PROFILE}}
 
@@ -167,16 +168,16 @@ infra-verify DOMAIN="sislam.com":
 # Run the portfolio site locally on :3000, serving the pre-built SPA from web/dist/.
 # Run `just web-build` first if web/dist/ is missing or stale.
 # For hot-reloading frontend dev, use `just dev-stack` instead (Vite on :3000 + API on :3001).
-ui:
+ui ENV="dev":
     #!/usr/bin/env bash
     set -euo pipefail
     if [ ! -f web/dist/index.html ]; then
         echo "web/dist/ missing — building SPA first..."
         just web-build
     fi
-    eval "$(just dev-env)"
+    eval "$(just dev-env {{ENV}})"
     env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN \
-        cargo watch -x 'run --package deploy-baba-ui'
+        AWS_PROFILE={{PROFILE}} cargo watch -x 'run --package deploy-baba-ui'
 
 # Run the portfolio site once (no hot reload)
 ui-run:
@@ -186,7 +187,7 @@ ui-run:
         just web-build
     fi
     eval "$(just dev-env)"
-    env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN \
+    env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN AWS_PROFILE={{PROFILE}} \
         cargo run --package deploy-baba-ui
 
 # Build the UI binary only (fast check)
@@ -195,7 +196,7 @@ ui-build:
 
 # Tail CloudWatch logs for the deployed Lambda
 ui-logs PROFILE="default":
-    just aws-check {{PROFILE}} && cargo xtask aws logs --function {{FN_PREFIX}} --profile {{PROFILE}}
+    just aws-check {{PROFILE}} && cargo xtask aws logs --function deploy-baba-ui --profile {{PROFILE}}
 
 # Open the live portfolio URL (reads from OpenTofu outputs)
 ui-open:
@@ -239,7 +240,7 @@ sso-login:
 # Fetches Cognito config from SSM (/deploy-baba/<ENV>/cognito-*) and JWKS from the
 # public Cognito endpoint. Consumed via `eval "$(just dev-env)"` in `just ui`.
 # Requires a valid SSO session — run `just sso-login` first.
-dev-env:
+dev-env ENV="prod":
     #!/usr/bin/env bash
     set -euo pipefail
     AWS="env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN AWS_PROFILE={{PROFILE}} aws"
@@ -305,7 +306,7 @@ dev-stack:
     #!/usr/bin/env bash
     set -euo pipefail
     trap 'kill 0' SIGINT SIGTERM EXIT
-    just ui &
+    env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN AWS_PROFILE={{PROFILE}} just ui &
     just web &
     wait
 
@@ -357,12 +358,12 @@ deploy-dry PROFILE="default":
 
 # Wait for Lambda to settle after a code update (step 2 of full pipeline)
 lambda-wait PROFILE="default":
-    just aws-check {{PROFILE}} && cargo xtask deploy wait --profile {{PROFILE}} --function {{FN_PREFIX}}
+    just aws-check {{PROFILE}} && cargo xtask deploy wait --profile {{PROFILE}} --function deploy-baba-prod
 
 # SPA-only deploy: build → S3 sync → sync-spa invoke → /health (steps 3–6)
-# ENV (top-level) selects which deploy-config secret to read (prod or dev).
+# Requires: SPA_BUCKET, UI_FN_NAME, FN_URL env vars (or set via infra outputs)
 spa-deploy PROFILE="default":
-    just aws-check {{PROFILE}} && cargo xtask deploy spa --profile {{PROFILE}} --env {{ENV}} --sha "$(git rev-parse HEAD)"
+    just aws-check {{PROFILE}} && cargo xtask deploy spa --profile {{PROFILE}} --sha "$(git rev-parse HEAD)"
 
 # Full pipeline: quality → Lambda → wait → SPA build → S3 sync → sync-spa → /health
 # Pass TAG=1 to also create a dev-vX.Y.Z git tag (mirrors deploy-dev.yml)
@@ -553,9 +554,11 @@ mcp-rag-smoke DB="deploy-baba.db":
         init = rpc("initialize", {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "just-mcp-rag-smoke", "version": "0.1.0"}})
         tools = rpc("tools/list")
         corpora = rpc("tools/call", {"name": "list_corpora", "arguments": {}})
-        results = rpc("tools/call", {"name": "query_rag", "arguments": {"query": "architecture", "corpus": "plan"}})
+        results = rpc("tools/call", {"name": "query_rag", "arguments": {"query": "architecture", "corpus": "plan", "top_k": 3, "max_content_length": 200}})
         print(f"initialized: {init.get('serverInfo', {}).get('name', 'portfolio-rag')}")
-        print(f"tools: {len(tools.get('tools', []))}")
+        tool_count = len(tools.get('tools', []))
+        print(f"tools: {tool_count}")
+        assert tool_count == 5, f"expected 5 tools, got {tool_count}"
         print(f"corpora: {corpora.get('corpus_count', 0)}")
         print(f"rag_results: {results.get('result_count', 0)}")
     finally:

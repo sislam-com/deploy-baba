@@ -35,7 +35,7 @@ pub struct Output {
 impl Tool for ListDirectory {
     const NAME: &'static str = "list_directory";
     const DESCRIPTION: &'static str =
-        "List directory contents with optional recursion and pattern filtering";
+        "List directory contents with optional recursion and pattern filtering. Prefer native Bash ls for general listings; use this for MCP workspace-scoped directory browsing.";
 
     type Input = Input;
     type Output = Output;

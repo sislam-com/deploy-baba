@@ -54,7 +54,7 @@ pub struct Output {
 
 impl Tool for GrepProject {
     const NAME: &'static str = "grep_project";
-    const DESCRIPTION: &'static str = "Search for a pattern across multiple files in a directory";
+    const DESCRIPTION: &'static str = "Search for a pattern across multiple files in a directory. Prefer native Bash grep for general searches; use this for MCP-scoped project-wide pattern matching.";
 
     type Input = Input;
     type Output = Output;

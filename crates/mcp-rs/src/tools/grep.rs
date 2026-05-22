@@ -37,7 +37,7 @@ pub struct Output {
 
 impl Tool for GrepFile {
     const NAME: &'static str = "grep_file";
-    const DESCRIPTION: &'static str = "Search within a single file for a pattern";
+    const DESCRIPTION: &'static str = "Search within a single file for a pattern. Prefer native Grep/Bash for general searches; use this for MCP-scoped file searching.";
 
     type Input = Input;
     type Output = Output;

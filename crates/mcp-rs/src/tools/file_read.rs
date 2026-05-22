@@ -29,7 +29,7 @@ pub struct Output {
 
 impl Tool for ReadFile {
     const NAME: &'static str = "read_file";
-    const DESCRIPTION: &'static str = "Read file contents with optional line range";
+    const DESCRIPTION: &'static str = "Read file contents with optional line range. Prefer native Read tool for general file access; use this when reading within MCP workspace scope.";
 
     type Input = Input;
     type Output = Output;

@@ -45,7 +45,9 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | observability | W-OBS | `services/ui/src/telemetry.rs`, `services/ui/migrations/` | DONE | `metrics_middleware` (fire-and-forget SQLite writes); `GET /api/v1/metrics` (p50/p95/p99 + error rate); admin-gated |
 | resilience | W-RES | `services/ui/src/middleware/` | DONE | `rate_limit_middleware` (100 req/60s per IP+endpoint); `CircuitBreaker` around LLM calls (5 failures → 60s open); `validate_request_middleware` (1 MB body guard); `RetryPolicy` available for handler retry |
 | module-decomposition | W-MOD | `services/ui/src/modules/` | TODO | Logical module separation (portfolio, rag, admin, auth); independent testing per module; module-specific metrics |
+| mcp-cloud | W-MCP | `crates/mcp-rs/`, `services/mcp-gateway/` | WIP | Private MCP gateway; local mcp-rs + cloud Cognito-authenticated Lambda gateway (ADR-028) |
 | env-promote | W-PROM | `xtask/src/deploy/promote.rs`, `infra/*.tf`, `.github/workflows/` | TODO | Dev/prod separation via OT workspaces; `just promote` artifact promotion; xtask workspace refactoring (ADR-029) |
+| saas-onboard | W-SAAS | `xtask/src/onboard.rs`, `crates/portfolio-rag-mcp/`, `services/ui/src/routes/api/eval.rs` | WIP | Project onboarding for external repos; eval dashboard; project_health MCP tool (ADR-030) |
 
 ---
 
@@ -103,6 +105,12 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 18. **W-CHL.4.10–4.13** — Challenges remaining features — TODO (admin edit/delete forms, public portfolio pages, evaluation metrics, search/filter)
 19. **W-LLM.4.1–4.4** — LLM provider abstraction + Claude reference adapter (see `plans/modules/llm-core.md`) — TODO
 18. **W-RST.4.1–4.10** — AI Resume Tailor pipeline on W-LLM (see `plans/modules/resume-tailor.md`) — TODO; BLOCKED-on-deploy for items 4.3/4.4/4.5 until W-SEC deployed + `anthropic-api-key` in SM
+
+### P2.7 — SaaS AI-DLC (ADR-030)
+26. **W-SAAS.4.3** — `project_health` MCP tool — **DONE** (combines plan coverage + drift + cache age + eval score)
+27. **W-SAAS.4.4–4.6** — Eval dashboard: `rag_eval_results` table exists (migration 023); `just rag-eval` persistence + `GET /api/v1/eval/dashboard` endpoint — TODO
+28. **W-SAAS.4.7–4.9** — `xtask onboard <repo-url>` external repo onboarding: language detection, artifact generation, RAG indexing — TODO
+29. **W-SAAS.4.10–4.11** — `onboard_project` MCP tool + justfile recipes — TODO
 
 ### P3 — Polish & Publish
 9. **W-GDR.4.1–4.4** — Google Drive MCP setup + `plan-export`/`plan-import` justfile recipes + `Stop` hook quality gate (see `plans/modules/gdrive-planning.md`)
@@ -167,6 +175,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | ADR-027 | Module-Based Service Decomposition — Logical separation within single Lambda (portfolio, rag, admin, auth modules); independent testing per module; future extraction path to separate Lambdas if needed | W-MOD, W-UI, W-RAG, W-AUTH |
 | ADR-028 | Private Cloud MCP Gateway — Cognito-authenticated MCP server on Lambda; API Gateway routing for POST /mcp + GET /mcp/health | W-MCP, W-CI, W-OTF |
 | ADR-029 | Dev/Prod Environment Separation with Artifact Promotion — OT workspaces for dev/prod; `just promote` copies artifacts instead of rebuilding; singleton resource sharing (VPC endpoints, OIDC, ACM) | W-PROM, W-CI, W-OTF, W-XT |
+| ADR-030 | SaaS AI-DLC Pattern — Six-pillar replicable AI-DLC (onboarding, session lifecycle, anti-rot, RAG, agentic tools, health dashboard); external repo onboarding; eval-driven accuracy loop | W-SAAS, W-RAG, W-MCP, W-AIL, W-LLM |
 
 ---
 
