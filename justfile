@@ -5,7 +5,15 @@ set dotenv-load := false
 
 # Default AWS profile — pinned to stack.toml `aws.profile`.
 # Recipes with a `PROFILE` parameter shadow this; argless recipes (sso-login, ui, dev-stack) use it directly.
+# Override ENV or PROFILE on any invocation: just ENV=dev deploy-full
 PROFILE := "deploy-baba"
+
+# Target environment: "prod" or "dev". Controls function names, SSM paths, deploy-config secrets.
+# Override with: just ENV=dev <recipe>
+ENV := "prod"
+
+# Derived function name prefix: deploy-baba-prod or deploy-baba-dev
+FN_PREFIX := "deploy-baba-" + ENV
 
 # ── Meta ──────────────────────────────────────────────────────────────────────
 
@@ -91,7 +99,7 @@ email-build:
 # Build email Lambda zip + update the deployed function
 email-deploy PROFILE="default":
     just aws-check {{PROFILE}} && just email-build && aws lambda update-function-code \
-        --function-name deploy-baba-email \
+        --function-name {{FN_PREFIX}}-email \
         --zip-file fileb://infra/build/email-lambda.zip \
         --profile {{PROFILE}}
 
@@ -104,7 +112,7 @@ llm-proxy-build:
 # Build LLM-proxy Lambda zip + update the deployed function
 llm-proxy-deploy PROFILE="default":
     just aws-check {{PROFILE}} && just llm-proxy-build && aws lambda update-function-code \
-        --function-name deploy-baba-llm-proxy \
+        --function-name {{FN_PREFIX}}-llm-proxy \
         --zip-file fileb://infra/build/llm-proxy-lambda.zip \
         --profile {{PROFILE}}
 
@@ -134,7 +142,7 @@ mcp-cloud-build: mcp-context-build
 # Build + upload the private MCP gateway Lambda
 mcp-cloud-deploy PROFILE="default":
     just aws-check {{PROFILE}} && just mcp-cloud-build && aws lambda update-function-code \
-        --function-name deploy-baba-mcp-gateway \
+        --function-name {{FN_PREFIX}}-mcp-gateway \
         --zip-file fileb://infra/build/mcp-gateway-lambda.zip \
         --profile {{PROFILE}}
 
@@ -159,25 +167,25 @@ infra-verify DOMAIN="sislam.com":
 # Run the portfolio site locally on :3000, serving the pre-built SPA from web/dist/.
 # Run `just web-build` first if web/dist/ is missing or stale.
 # For hot-reloading frontend dev, use `just dev-stack` instead (Vite on :3000 + API on :3001).
-ui ENV="dev":
+ui:
     #!/usr/bin/env bash
     set -euo pipefail
     if [ ! -f web/dist/index.html ]; then
         echo "web/dist/ missing — building SPA first..."
         just web-build
     fi
-    eval "$(just dev-env {{ENV}})"
+    eval "$(just dev-env)"
     env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN \
         cargo watch -x 'run --package deploy-baba-ui'
 
 # Run the portfolio site once (no hot reload)
-ui-run ENV="dev":
+ui-run:
     #!/usr/bin/env bash
     if [ ! -f web/dist/index.html ]; then
         echo "web/dist/ missing — building SPA first..."
         just web-build
     fi
-    eval "$(just dev-env {{ENV}})"
+    eval "$(just dev-env)"
     env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN \
         cargo run --package deploy-baba-ui
 
@@ -187,7 +195,7 @@ ui-build:
 
 # Tail CloudWatch logs for the deployed Lambda
 ui-logs PROFILE="default":
-    just aws-check {{PROFILE}} && cargo xtask aws logs --function deploy-baba-ui --profile {{PROFILE}}
+    just aws-check {{PROFILE}} && cargo xtask aws logs --function {{FN_PREFIX}} --profile {{PROFILE}}
 
 # Open the live portfolio URL (reads from OpenTofu outputs)
 ui-open:
@@ -231,7 +239,7 @@ sso-login:
 # Fetches Cognito config from SSM (/deploy-baba/<ENV>/cognito-*) and JWKS from the
 # public Cognito endpoint. Consumed via `eval "$(just dev-env)"` in `just ui`.
 # Requires a valid SSO session — run `just sso-login` first.
-dev-env ENV="dev":
+dev-env:
     #!/usr/bin/env bash
     set -euo pipefail
     AWS="env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN AWS_PROFILE={{PROFILE}} aws"
@@ -293,11 +301,11 @@ web-types-offline: api-spec
     pnpm --dir web exec openapi-typescript openapi.json -o src/api/types.gen.ts
 
 # Start both the Rust API server (:3001) and Vite dev server (:3000) in parallel
-dev-stack ENV="dev":
+dev-stack:
     #!/usr/bin/env bash
     set -euo pipefail
     trap 'kill 0' SIGINT SIGTERM EXIT
-    just ui {{ENV}} &
+    just ui &
     just web &
     wait
 
@@ -348,21 +356,21 @@ deploy-dry PROFILE="default":
     just aws-check {{PROFILE}} && cargo xtask deploy docker
 
 # Wait for Lambda to settle after a code update (step 2 of full pipeline)
-lambda-wait PROFILE="default" ENV="prod":
-    just aws-check {{PROFILE}} && cargo xtask deploy wait --profile {{PROFILE}} --function deploy-baba-{{ENV}}
+lambda-wait PROFILE="default":
+    just aws-check {{PROFILE}} && cargo xtask deploy wait --profile {{PROFILE}} --function {{FN_PREFIX}}
 
 # SPA-only deploy: build → S3 sync → sync-spa invoke → /health (steps 3–6)
-# ENV selects which deploy-config secret to read (prod or dev).
-spa-deploy PROFILE="default" ENV="prod":
+# ENV (top-level) selects which deploy-config secret to read (prod or dev).
+spa-deploy PROFILE="default":
     just aws-check {{PROFILE}} && cargo xtask deploy spa --profile {{PROFILE}} --env {{ENV}} --sha "$(git rev-parse HEAD)"
 
 # Full pipeline: quality → Lambda → wait → SPA build → S3 sync → sync-spa → /health
 # Pass TAG=1 to also create a dev-vX.Y.Z git tag (mirrors deploy-dev.yml)
-deploy-full PROFILE="default" ENV="prod" TAG="":
+deploy-full PROFILE="default" TAG="":
     just quality
     just lambda-deploy {{PROFILE}}
-    just lambda-wait {{PROFILE}} {{ENV}}
-    just spa-deploy {{PROFILE}} {{ENV}}
+    just lambda-wait {{PROFILE}}
+    just spa-deploy {{PROFILE}}
     {{ if TAG != "" { "just release-tag dev push" } else { "echo 'Skipping dev tag — pass TAG=1 to enable'" } }}
 
 # ── Database (SQLite + S3) ───────────────────────────────────────────────────
