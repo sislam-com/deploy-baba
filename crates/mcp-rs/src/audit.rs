@@ -429,7 +429,7 @@ pub struct AuditSummary {
 mod tests {
     use super::*;
     use serde_json::json;
-    use tempfile::{NamedTempFile, TempDir};
+    use tempfile::TempDir;
 
     fn create_test_config() -> AuditConfig {
         let temp_dir = TempDir::new().unwrap();

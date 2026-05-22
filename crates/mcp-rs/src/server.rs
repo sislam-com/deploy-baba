@@ -507,6 +507,34 @@ impl Server {
     }
 }
 
+fn find_header_end(buffer: &[u8]) -> Option<usize> {
+    buffer.windows(4).position(|window| window == b"\r\n\r\n")
+}
+
+fn write_http_response(
+    stream: &mut TcpStream,
+    status: u16,
+    content_type: &str,
+    body: &[u8],
+) -> io::Result<()> {
+    let reason = match status {
+        200 => "OK",
+        400 => "Bad Request",
+        404 => "Not Found",
+        413 => "Payload Too Large",
+        _ => "Internal Server Error",
+    };
+    write!(
+        stream,
+        "HTTP/1.1 {} {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        status,
+        reason,
+        content_type,
+        body.len()
+    )?;
+    stream.write_all(body)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -543,8 +571,10 @@ mod tests {
 
     #[test]
     fn test_tools_list_hides_disabled_tools() {
-        let mut policy = Policy::default();
-        policy.enabled_tools = vec!["health".to_string()];
+        let policy = Policy {
+            enabled_tools: vec!["health".to_string()],
+            ..Policy::default()
+        };
         let server = test_server(policy);
 
         let response = server.handle_request(
@@ -556,32 +586,4 @@ mod tests {
         assert_eq!(tools.len(), 1);
         assert_eq!(tools[0]["name"], "health");
     }
-}
-
-fn find_header_end(buffer: &[u8]) -> Option<usize> {
-    buffer.windows(4).position(|window| window == b"\r\n\r\n")
-}
-
-fn write_http_response(
-    stream: &mut TcpStream,
-    status: u16,
-    content_type: &str,
-    body: &[u8],
-) -> io::Result<()> {
-    let reason = match status {
-        200 => "OK",
-        400 => "Bad Request",
-        404 => "Not Found",
-        413 => "Payload Too Large",
-        _ => "Internal Server Error",
-    };
-    write!(
-        stream,
-        "HTTP/1.1 {} {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-        status,
-        reason,
-        content_type,
-        body.len()
-    )?;
-    stream.write_all(body)
 }

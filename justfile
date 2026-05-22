@@ -352,17 +352,17 @@ lambda-wait PROFILE="default":
     just aws-check {{PROFILE}} && cargo xtask deploy wait --profile {{PROFILE}}
 
 # SPA-only deploy: build → S3 sync → sync-spa invoke → /health (steps 3–6)
-# Requires: SPA_BUCKET, UI_FN_NAME, FN_URL env vars (or set via infra outputs)
-spa-deploy PROFILE="default":
-    just aws-check {{PROFILE}} && cargo xtask deploy spa --profile {{PROFILE}} --sha "$(git rev-parse HEAD)"
+# ENV selects which deploy-config secret to read (prod or dev).
+spa-deploy PROFILE="default" ENV="prod":
+    just aws-check {{PROFILE}} && cargo xtask deploy spa --profile {{PROFILE}} --env {{ENV}} --sha "$(git rev-parse HEAD)"
 
 # Full pipeline: quality → Lambda → wait → SPA build → S3 sync → sync-spa → /health
 # Pass TAG=1 to also create a dev-vX.Y.Z git tag (mirrors deploy-dev.yml)
-deploy-full PROFILE="default" TAG="":
+deploy-full PROFILE="default" ENV="prod" TAG="":
     just quality
     just lambda-deploy {{PROFILE}}
     just lambda-wait {{PROFILE}}
-    just spa-deploy {{PROFILE}}
+    just spa-deploy {{PROFILE}} {{ENV}}
     {{ if TAG != "" { "just release-tag dev push" } else { "echo 'Skipping dev tag — pass TAG=1 to enable'" } }}
 
 # ── Database (SQLite + S3) ───────────────────────────────────────────────────

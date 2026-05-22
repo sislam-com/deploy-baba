@@ -318,7 +318,7 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(10));
 
         let uptime = Health::get_uptime_seconds();
-        assert!(uptime >= 0); // Should be at least 0 seconds
+        let _ = uptime;
 
         let tools_count = Health::get_tools_count();
         assert_eq!(tools_count, 1);
