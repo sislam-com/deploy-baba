@@ -1,6 +1,9 @@
 //! Infrastructure management module
 //!
-//! Wraps OpenTofu operations and bootstrap procedures
+//! Wraps OpenTofu operations and bootstrap procedures.
+//!
+//! `--workspace` selects the OpenTofu workspace (default → prod, dev → dev).
+//! `--aws-profile` sets AWS credentials (independent of workspace).
 
 use clap::Subcommand;
 
@@ -9,66 +12,69 @@ pub mod tofu;
 
 #[derive(Subcommand)]
 pub enum InfraAction {
-    /// Initialize Terraform
+    /// Initialize OpenTofu
     Init {
-        /// Working directory (defaults to "infra")
         #[arg(long)]
         dir: Option<String>,
-        /// AWS profile
+        /// AWS profile for credentials
         #[arg(long)]
-        profile: Option<String>,
+        aws_profile: Option<String>,
     },
-    /// Plan Terraform changes
+    /// Plan infrastructure changes
     Plan {
-        /// Working directory (defaults to "infra")
         #[arg(long)]
         dir: Option<String>,
-        /// AWS profile
+        /// Target workspace (default → prod, dev → dev-named resources)
         #[arg(long)]
-        profile: Option<String>,
+        workspace: Option<String>,
+        /// AWS profile for credentials
+        #[arg(long)]
+        aws_profile: Option<String>,
     },
-    /// Apply Terraform changes
+    /// Apply infrastructure changes
     Apply {
-        /// Working directory (defaults to "infra")
         #[arg(long)]
         dir: Option<String>,
-        /// Auto-approve changes
         #[arg(long)]
         auto_approve: bool,
-        /// AWS profile
+        /// Target workspace (default → prod, dev → dev-named resources)
         #[arg(long)]
-        profile: Option<String>,
+        workspace: Option<String>,
+        /// AWS profile for credentials
+        #[arg(long)]
+        aws_profile: Option<String>,
     },
     /// Destroy infrastructure
     Destroy {
-        /// Working directory (defaults to "infra")
         #[arg(long)]
         dir: Option<String>,
-        /// Auto-approve destruction
         #[arg(long)]
         auto_approve: bool,
-        /// AWS profile
+        /// Target workspace (default → prod, dev → dev-named resources)
         #[arg(long)]
-        profile: Option<String>,
+        workspace: Option<String>,
+        /// AWS profile for credentials
+        #[arg(long)]
+        aws_profile: Option<String>,
     },
-    /// Get Terraform output values
+    /// Get OpenTofu output values
     Output {
-        /// Output name
         #[arg(long)]
         name: Option<String>,
-        /// Working directory (defaults to "infra")
         #[arg(long)]
         dir: Option<String>,
-        /// AWS profile
+        /// Target workspace (default → prod, dev → dev-named resources)
         #[arg(long)]
-        profile: Option<String>,
+        workspace: Option<String>,
+        /// AWS profile for credentials
+        #[arg(long)]
+        aws_profile: Option<String>,
     },
-    /// Bootstrap AWS account (create state bucket + DynamoDB lock table, run terraform init)
+    /// Bootstrap AWS account (create state bucket + DynamoDB lock table, run tofu init)
     Bootstrap {
-        /// AWS profile
+        /// AWS profile for credentials
         #[arg(long)]
         profile: Option<String>,
-        /// AWS region (default: us-east-1)
         #[arg(long)]
         region: Option<String>,
     },
@@ -76,21 +82,30 @@ pub enum InfraAction {
 
 pub async fn execute(action: InfraAction) -> anyhow::Result<()> {
     match action {
-        InfraAction::Init { dir, profile } => tofu::run_tofu_init(dir, profile).await,
-        InfraAction::Plan { dir, profile } => tofu::run_tofu_plan(dir, profile).await,
+        InfraAction::Init { dir, aws_profile } => tofu::run_tofu_init(dir, aws_profile).await,
+        InfraAction::Plan {
+            dir,
+            workspace,
+            aws_profile,
+        } => tofu::run_tofu_plan(dir, workspace, aws_profile).await,
         InfraAction::Apply {
             dir,
             auto_approve,
-            profile,
-        } => tofu::run_tofu_apply(dir, auto_approve, profile).await,
+            workspace,
+            aws_profile,
+        } => tofu::run_tofu_apply(dir, auto_approve, workspace, aws_profile).await,
         InfraAction::Destroy {
             dir,
             auto_approve,
-            profile,
-        } => tofu::run_tofu_destroy(dir, auto_approve, profile).await,
-        InfraAction::Output { name, dir, profile } => {
-            tofu::run_tofu_output(name, dir, profile).await
-        }
+            workspace,
+            aws_profile,
+        } => tofu::run_tofu_destroy(dir, auto_approve, workspace, aws_profile).await,
+        InfraAction::Output {
+            name,
+            dir,
+            workspace,
+            aws_profile,
+        } => tofu::run_tofu_output(name, dir, workspace, aws_profile).await,
         InfraAction::Bootstrap { profile, region } => {
             bootstrap::bootstrap_account(profile, region).await
         }

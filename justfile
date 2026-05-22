@@ -108,6 +108,44 @@ llm-proxy-deploy PROFILE="default":
         --zip-file fileb://infra/build/llm-proxy-lambda.zip \
         --profile {{PROFILE}}
 
+# Build the read-only context bundle consumed by the private cloud MCP gateway
+mcp-context-build:
+    rm -rf build/mcp-context build/mcp-gateway
+    mkdir -p build/mcp-context/.agent-cache build/mcp-context/plans/modules build/mcp-context/plans/adr build/mcp-context/services/ui/migrations build/mcp-gateway
+    cp .agent-cache/index.json build/mcp-context/.agent-cache/index.json
+    cp plans/INDEX.md build/mcp-context/plans/INDEX.md
+    cp plans/modules/*.md build/mcp-context/plans/modules/
+    cp plans/adr/*.md build/mcp-context/plans/adr/
+    cp services/ui/migrations/*.sql build/mcp-context/services/ui/migrations/
+    cp justfile build/mcp-context/justfile
+    cp stack.example.toml build/mcp-context/stack.example.toml
+    python3 -c 'from pathlib import Path; text = Path(".mcp-rs.toml").read_text(); text = text.replace("workspace_root = \".\"", "workspace_root = \"/var/task/mcp-context\""); text = text.replace("log_path = \"mcp-audit.jsonl\"", "log_path = \"/tmp/mcp-gateway-audit.jsonl\""); Path("build/mcp-gateway/mcp-rs.toml").write_text(text)'
+
+# Build the private Cognito-protected MCP gateway Lambda zip
+mcp-cloud-build: mcp-context-build
+    PATH="$HOME/.cargo/bin:$PATH" cargo lambda build --release --package mcp-gateway --target aarch64-unknown-linux-gnu
+    cp target/lambda/mcp-gateway/bootstrap build/mcp-gateway/bootstrap
+    chmod +x build/mcp-gateway/bootstrap
+    cp -r build/mcp-context build/mcp-gateway/mcp-context
+    mkdir -p infra/build
+    rm -f infra/build/mcp-gateway-lambda.zip
+    cd build/mcp-gateway && zip -qr ../../infra/build/mcp-gateway-lambda.zip bootstrap mcp-rs.toml mcp-context
+
+# Build + upload the private MCP gateway Lambda
+mcp-cloud-deploy PROFILE="default":
+    just aws-check {{PROFILE}} && just mcp-cloud-build && aws lambda update-function-code \
+        --function-name deploy-baba-mcp-gateway \
+        --zip-file fileb://infra/build/mcp-gateway-lambda.zip \
+        --profile {{PROFILE}}
+
+# Smoke the deployed private MCP gateway. Requires MCP_BEARER_TOKEN with a valid Cognito ID token.
+mcp-cloud-smoke PROFILE="default" BASE_URL="https://sislam.com":
+    @status=$(curl -s -o /tmp/mcp-unauth.out -w "%{http_code}" -X POST {{BASE_URL}}/mcp -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'); test "$status" = "401"
+    @test -n "$MCP_BEARER_TOKEN" || (echo "Set MCP_BEARER_TOKEN to a valid Cognito ID token" >&2; exit 1)
+    @curl -fsS -H "Authorization: Bearer $MCP_BEARER_TOKEN" -H "Content-Type: application/json" -X POST {{BASE_URL}}/mcp -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' | jq .
+    @curl -fsS -H "Authorization: Bearer $MCP_BEARER_TOKEN" -H "Content-Type: application/json" -X POST {{BASE_URL}}/mcp -d '{"jsonrpc":"2.0","id":2,"method":"resources/list","params":{}}' | jq .
+    @curl -fsS -H "Authorization: Bearer $MCP_BEARER_TOKEN" -H "Content-Type: application/json" -X POST {{BASE_URL}}/mcp -d '{"jsonrpc":"2.0","id":3,"method":"resources/read","params":{"uri":"project://plans"}}' | jq .
+
 # Verify the live deployment (curl apex + www health checks)
 infra-verify DOMAIN="sislam.com":
     @echo "=== Verifying {{DOMAIN}} ==="
@@ -133,13 +171,13 @@ ui ENV="dev":
         cargo watch -x 'run --package deploy-baba-ui'
 
 # Run the portfolio site once (no hot reload)
-ui-run:
+ui-run ENV="dev":
     #!/usr/bin/env bash
     if [ ! -f web/dist/index.html ]; then
         echo "web/dist/ missing — building SPA first..."
         just web-build
     fi
-    eval "$(just dev-env)"
+    eval "$(just dev-env {{ENV}})"
     env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN \
         cargo run --package deploy-baba-ui
 
@@ -152,8 +190,8 @@ ui-logs PROFILE="default":
     just aws-check {{PROFILE}} && cargo xtask aws logs --function deploy-baba-ui --profile {{PROFILE}}
 
 # Open the live portfolio URL (reads from OpenTofu outputs)
-ui-open PROFILE="default":
-    cargo xtask infra output --key function_url --profile {{PROFILE}} | xargs open
+ui-open:
+    cargo xtask infra output --name function_url --aws-profile {{PROFILE}} | xargs open
 
 # ── Utilities ────────────────────────────────────────────────────────────────
 
@@ -193,7 +231,7 @@ sso-login:
 # Fetches Cognito config from SSM (/deploy-baba/<ENV>/cognito-*) and JWKS from the
 # public Cognito endpoint. Consumed via `eval "$(just dev-env)"` in `just ui`.
 # Requires a valid SSO session — run `just sso-login` first.
-dev-env ENV="prod":
+dev-env ENV="dev":
     #!/usr/bin/env bash
     set -euo pipefail
     AWS="env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN AWS_PROFILE={{PROFILE}} aws"
@@ -255,11 +293,11 @@ web-types-offline: api-spec
     pnpm --dir web exec openapi-typescript openapi.json -o src/api/types.gen.ts
 
 # Start both the Rust API server (:3001) and Vite dev server (:3000) in parallel
-dev-stack:
+dev-stack ENV="dev":
     #!/usr/bin/env bash
     set -euo pipefail
     trap 'kill 0' SIGINT SIGTERM EXIT
-    env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN just ui-run &
+    just ui {{ENV}} &
     just web &
     wait
 
@@ -269,21 +307,21 @@ dev-stack:
 infra-bootstrap PROFILE="default" REGION="us-east-1":
     bash scripts/bootstrap-tfstate.sh
 
-# Preview infrastructure changes
-infra-plan PROFILE="default":
-    just aws-check {{PROFILE}} && cargo xtask infra plan --profile {{PROFILE}}
+# Preview infrastructure changes (WORKSPACE: default=prod, dev=dev-named resources)
+infra-plan WORKSPACE="default":
+    just aws-check {{PROFILE}} && cargo xtask infra plan --workspace {{WORKSPACE}} --aws-profile {{PROFILE}}
 
-# Apply infrastructure changes
-infra-apply PROFILE="default":
-    just aws-check {{PROFILE}} && cargo xtask infra apply --profile {{PROFILE}}
+# Apply infrastructure changes (WORKSPACE: default=prod, dev=dev-named resources)
+infra-apply WORKSPACE="default":
+    just aws-check {{PROFILE}} && cargo xtask infra apply --workspace {{WORKSPACE}} --aws-profile {{PROFILE}}
 
 # Destroy all infrastructure (prompt confirmation)
-infra-destroy PROFILE="default":
-    just aws-check {{PROFILE}} && cargo xtask infra destroy --profile {{PROFILE}}
+infra-destroy WORKSPACE="default":
+    just aws-check {{PROFILE}} && cargo xtask infra destroy --workspace {{WORKSPACE}} --aws-profile {{PROFILE}}
 
 # Show OpenTofu outputs (API endpoint URL, etc.)
-infra-output PROFILE="default":
-    cargo xtask infra output --profile {{PROFILE}}
+infra-output WORKSPACE="default":
+    cargo xtask infra output --workspace {{WORKSPACE}} --aws-profile {{PROFILE}}
 
 # ── Deployment ───────────────────────────────────────────────────────────────
 
@@ -395,7 +433,7 @@ rag-eval-category CATEGORY DB="deploy-baba.db":
 
 # Build the local mcp-rs server binary
 mcp-build:
-    cargo build --release --manifest-path /Users/shantopagla/mcp-rs/Cargo.toml
+    cargo build --release --package mcp-rs
 
 # Verify local mcp-rs initialize, tools/list, and resources/list over stdio
 mcp-smoke:
@@ -406,12 +444,12 @@ mcp-smoke:
     import sys
 
     env = os.environ.copy()
-    env["MCP_RS_CONFIG"] = "/Users/shantopagla/mcp-rs/mcp-rs.toml"
+    env["MCP_RS_CONFIG"] = ".mcp-rs.toml"
     env.setdefault("RUST_LOG", "mcp_rs=warn")
 
     proc = subprocess.Popen(
-        ["/Users/shantopagla/mcp-rs/target/release/mcp-rs"],
-        cwd="/Users/shantopagla/mcp-rs",
+        ["target/release/mcp-rs"],
+        cwd=os.getcwd(),
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -521,7 +559,7 @@ mcp-rag-smoke DB="deploy-baba.db":
 
 # Inspect recent local mcp-rs audit entries
 mcp-audit-tail LINES="25":
-    tail -n {{LINES}} /tmp/mcp-rs-audit.jsonl
+    tail -n {{LINES}} mcp-audit.jsonl
 
 # ── crates.io ────────────────────────────────────────────────────────────────
 

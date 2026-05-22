@@ -10,17 +10,17 @@
 # email Lambda (email-lambda.tf).
 
 resource "aws_cloudwatch_log_group" "llm_proxy" {
-  name              = "/aws/lambda/${var.project_name}-llm-proxy"
+  name              = "/aws/lambda/${local.lambda_function_name}-llm-proxy"
   retention_in_days = var.logs_retention_days
 
   tags = {
-    Name = "${var.project_name}-llm-proxy-logs"
+    Name = "${local.lambda_function_name}-llm-proxy-logs"
   }
 }
 
 resource "aws_lambda_function" "llm_proxy" {
   filename      = var.llm_proxy_lambda_code_path
-  function_name = "${var.project_name}-llm-proxy"
+  function_name = "${local.lambda_function_name}-llm-proxy"
   role          = aws_iam_role.llm_proxy_execution.arn
   handler       = "bootstrap"
   runtime       = "provided.al2023"
@@ -52,14 +52,14 @@ resource "aws_lambda_function" "llm_proxy" {
   ]
 
   tags = {
-    Name = "${var.project_name}-llm-proxy"
+    Name = "${local.lambda_function_name}-llm-proxy"
   }
 }
 
 # ─── IAM Role ─────────────────────────────────────────────────────────────────
 
 resource "aws_iam_role" "llm_proxy_execution" {
-  name = "${var.project_name}-llm-proxy-execution-role"
+  name = "${local.lambda_function_name}-llm-proxy-execution-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -71,7 +71,7 @@ resource "aws_iam_role" "llm_proxy_execution" {
   })
 
   tags = {
-    Name = "${var.project_name}-llm-proxy-execution-role"
+    Name = "${local.lambda_function_name}-llm-proxy-execution-role"
   }
 }
 
@@ -81,7 +81,7 @@ resource "aws_iam_role_policy_attachment" "llm_proxy_logs" {
 }
 
 resource "aws_iam_role_policy" "llm_proxy_secretsmanager" {
-  name = "${var.project_name}-llm-proxy-secretsmanager-policy"
+  name = "${local.lambda_function_name}-llm-proxy-secretsmanager-policy"
   role = aws_iam_role.llm_proxy_execution.id
 
   policy = jsonencode({
@@ -100,7 +100,7 @@ resource "aws_iam_role_policy" "llm_proxy_secretsmanager" {
 # ─── CloudWatch Alarm: High Invocations ───────────────────────────────────────
 
 resource "aws_cloudwatch_metric_alarm" "llm_proxy_high_invocations" {
-  alarm_name          = "${var.project_name}-llm-proxy-high-invocations"
+  alarm_name          = "${local.lambda_function_name}-llm-proxy-high-invocations"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 1
   metric_name         = "Invocations"

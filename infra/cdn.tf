@@ -5,10 +5,14 @@ variable "domain_name" {
   default     = "sislam.com"
 }
 
+locals {
+  is_prod_cdn = var.environment == "prod"
+}
 
 # ─── Data sources ──────────────────────────────────────────────────────────────
 
 data "aws_route53_zone" "main" {
+  count        = local.is_prod_cdn ? 1 : 0
   name         = var.domain_name
   private_zone = false
 }
@@ -34,7 +38,8 @@ data "aws_cloudfront_origin_request_policy" "all_viewer_except_host" {
 # Cookies forwarded separately via cookies_config (session auth works).
 # x-forwarded-for always added by CloudFront regardless of this policy.
 resource "aws_cloudfront_origin_request_policy" "lambda_oac" {
-  name = "deploy-baba-lambda-oac-policy"
+  count = local.is_prod_cdn ? 1 : 0
+  name  = "deploy-baba-lambda-oac-policy"
 
   headers_config {
     header_behavior = "none"
@@ -59,6 +64,7 @@ locals {
 # ─── CloudFront OAC for Lambda ─────────────────────────────────────────────────
 
 resource "aws_cloudfront_origin_access_control" "lambda" {
+  count                             = local.is_prod_cdn ? 1 : 0
   name                              = "deploy-baba-lambda-oac"
   origin_access_control_origin_type = "lambda"
   signing_behavior                  = "always"
@@ -68,6 +74,7 @@ resource "aws_cloudfront_origin_access_control" "lambda" {
 # ─── CloudFront OAC for S3 assets ──────────────────────────────────────────────
 
 resource "aws_cloudfront_origin_access_control" "assets" {
+  count                             = local.is_prod_cdn ? 1 : 0
   name                              = "deploy-baba-assets-oac"
   origin_access_control_origin_type = "s3"
   signing_behavior                  = "always"
@@ -77,6 +84,7 @@ resource "aws_cloudfront_origin_access_control" "assets" {
 # ─── CloudFront OAC for S3 SPA bucket ─────────────────────────────────────────
 
 resource "aws_cloudfront_origin_access_control" "spa" {
+  count                             = local.is_prod_cdn ? 1 : 0
   name                              = "deploy-baba-spa-oac"
   origin_access_control_origin_type = "s3"
   signing_behavior                  = "always"
@@ -86,6 +94,7 @@ resource "aws_cloudfront_origin_access_control" "spa" {
 # ─── CloudFront Distribution ───────────────────────────────────────────────────
 
 resource "aws_cloudfront_distribution" "main" {
+  count           = local.is_prod_cdn ? 1 : 0
   enabled         = true
   is_ipv6_enabled = true
   price_class     = "PriceClass_100"
@@ -95,7 +104,7 @@ resource "aws_cloudfront_distribution" "main" {
   origin {
     domain_name              = local.lambda_origin_domain
     origin_id                = "lambda-function-url"
-    origin_access_control_id = aws_cloudfront_origin_access_control.lambda.id
+    origin_access_control_id = aws_cloudfront_origin_access_control.lambda[0].id
 
     custom_origin_config {
       http_port              = 80
@@ -108,13 +117,13 @@ resource "aws_cloudfront_distribution" "main" {
   origin {
     domain_name              = aws_s3_bucket.assets.bucket_regional_domain_name
     origin_id                = "s3-assets"
-    origin_access_control_id = aws_cloudfront_origin_access_control.assets.id
+    origin_access_control_id = aws_cloudfront_origin_access_control.assets[0].id
   }
 
   origin {
     domain_name              = aws_s3_bucket.spa.bucket_regional_domain_name
     origin_id                = "s3-spa"
-    origin_access_control_id = aws_cloudfront_origin_access_control.spa.id
+    origin_access_control_id = aws_cloudfront_origin_access_control.spa[0].id
   }
 
   # API Gateway origin for POST /api/contact (no OAC — body hash works correctly)
@@ -169,6 +178,18 @@ resource "aws_cloudfront_distribution" "main" {
     origin_request_policy_id = data.aws_cloudfront_origin_request_policy.all_viewer_except_host.id
   }
 
+  ordered_cache_behavior {
+    path_pattern           = "/mcp*"
+    target_origin_id       = "apigw-contact"
+    viewer_protocol_policy = "redirect-to-https"
+
+    allowed_methods = ["GET", "HEAD", "OPTIONS", "PUT", "PATCH", "POST", "DELETE"]
+    cached_methods  = ["GET", "HEAD"]
+
+    cache_policy_id          = data.aws_cloudfront_cache_policy.caching_disabled.id
+    origin_request_policy_id = data.aws_cloudfront_origin_request_policy.all_viewer_except_host.id
+  }
+
   # Cache behaviors for Lambda-served paths — API, auth, docs, health
   ordered_cache_behavior {
     path_pattern           = "/api/*"
@@ -179,7 +200,7 @@ resource "aws_cloudfront_distribution" "main" {
     cached_methods  = ["GET", "HEAD"]
 
     cache_policy_id          = data.aws_cloudfront_cache_policy.caching_disabled.id
-    origin_request_policy_id = aws_cloudfront_origin_request_policy.lambda_oac.id
+    origin_request_policy_id = aws_cloudfront_origin_request_policy.lambda_oac[0].id
   }
 
   ordered_cache_behavior {
@@ -191,7 +212,7 @@ resource "aws_cloudfront_distribution" "main" {
     cached_methods  = ["GET", "HEAD"]
 
     cache_policy_id          = data.aws_cloudfront_cache_policy.caching_disabled.id
-    origin_request_policy_id = aws_cloudfront_origin_request_policy.lambda_oac.id
+    origin_request_policy_id = aws_cloudfront_origin_request_policy.lambda_oac[0].id
   }
 
   ordered_cache_behavior {
@@ -203,7 +224,7 @@ resource "aws_cloudfront_distribution" "main" {
     cached_methods  = ["GET", "HEAD"]
 
     cache_policy_id          = data.aws_cloudfront_cache_policy.caching_disabled.id
-    origin_request_policy_id = aws_cloudfront_origin_request_policy.lambda_oac.id
+    origin_request_policy_id = aws_cloudfront_origin_request_policy.lambda_oac[0].id
   }
 
   ordered_cache_behavior {
@@ -215,7 +236,7 @@ resource "aws_cloudfront_distribution" "main" {
     cached_methods  = ["GET", "HEAD"]
 
     cache_policy_id          = data.aws_cloudfront_cache_policy.caching_disabled.id
-    origin_request_policy_id = aws_cloudfront_origin_request_policy.lambda_oac.id
+    origin_request_policy_id = aws_cloudfront_origin_request_policy.lambda_oac[0].id
   }
 
   # SPA hashed assets — long-lived cache keyed by content hash in filename
@@ -266,7 +287,7 @@ resource "aws_cloudfront_distribution" "main" {
   }
 
   viewer_certificate {
-    acm_certificate_arn      = aws_acm_certificate_validation.wildcard.certificate_arn
+    acm_certificate_arn      = aws_acm_certificate_validation.wildcard[0].certificate_arn
     ssl_support_method       = "sni-only"
     minimum_protocol_version = "TLSv1.2_2021"
   }
@@ -276,82 +297,88 @@ resource "aws_cloudfront_distribution" "main" {
   }
 }
 
-# ─── Route53 Records ───────────────────────────────────────────────────────────
+# ─── Route53 Records (prod-only) ──────────────────────────────────────────────
 
 resource "aws_route53_record" "apex_a" {
-  zone_id         = data.aws_route53_zone.main.zone_id
+  count           = local.is_prod_cdn ? 1 : 0
+  zone_id         = data.aws_route53_zone.main[0].zone_id
   name            = var.domain_name
   type            = "A"
   allow_overwrite = true
 
   alias {
-    name                   = aws_cloudfront_distribution.main.domain_name
-    zone_id                = aws_cloudfront_distribution.main.hosted_zone_id
+    name                   = aws_cloudfront_distribution.main[0].domain_name
+    zone_id                = aws_cloudfront_distribution.main[0].hosted_zone_id
     evaluate_target_health = false
   }
 }
 
 resource "aws_route53_record" "apex_aaaa" {
-  zone_id         = data.aws_route53_zone.main.zone_id
+  count           = local.is_prod_cdn ? 1 : 0
+  zone_id         = data.aws_route53_zone.main[0].zone_id
   name            = var.domain_name
   type            = "AAAA"
   allow_overwrite = true
 
   alias {
-    name                   = aws_cloudfront_distribution.main.domain_name
-    zone_id                = aws_cloudfront_distribution.main.hosted_zone_id
+    name                   = aws_cloudfront_distribution.main[0].domain_name
+    zone_id                = aws_cloudfront_distribution.main[0].hosted_zone_id
     evaluate_target_health = false
   }
 }
 
 resource "aws_route53_record" "www_a" {
-  zone_id         = data.aws_route53_zone.main.zone_id
+  count           = local.is_prod_cdn ? 1 : 0
+  zone_id         = data.aws_route53_zone.main[0].zone_id
   name            = "www.${var.domain_name}"
   type            = "A"
   allow_overwrite = true
 
   alias {
-    name                   = aws_cloudfront_distribution.main.domain_name
-    zone_id                = aws_cloudfront_distribution.main.hosted_zone_id
+    name                   = aws_cloudfront_distribution.main[0].domain_name
+    zone_id                = aws_cloudfront_distribution.main[0].hosted_zone_id
     evaluate_target_health = false
   }
 }
 
 resource "aws_route53_record" "www_aaaa" {
-  zone_id         = data.aws_route53_zone.main.zone_id
+  count           = local.is_prod_cdn ? 1 : 0
+  zone_id         = data.aws_route53_zone.main[0].zone_id
   name            = "www.${var.domain_name}"
   type            = "AAAA"
   allow_overwrite = true
 
   alias {
-    name                   = aws_cloudfront_distribution.main.domain_name
-    zone_id                = aws_cloudfront_distribution.main.hosted_zone_id
+    name                   = aws_cloudfront_distribution.main[0].domain_name
+    zone_id                = aws_cloudfront_distribution.main[0].hosted_zone_id
     evaluate_target_health = false
   }
 }
 
 resource "aws_route53_record" "dev_a" {
-  zone_id         = data.aws_route53_zone.main.zone_id
+  count           = local.is_prod_cdn ? 1 : 0
+  zone_id         = data.aws_route53_zone.main[0].zone_id
   name            = "dev.${var.domain_name}"
   type            = "A"
   allow_overwrite = true
 
   alias {
-    name                   = aws_cloudfront_distribution.main.domain_name
-    zone_id                = aws_cloudfront_distribution.main.hosted_zone_id
+    name                   = aws_cloudfront_distribution.main[0].domain_name
+    zone_id                = aws_cloudfront_distribution.main[0].hosted_zone_id
     evaluate_target_health = false
   }
 }
 
 resource "aws_route53_record" "dev_aaaa" {
-  zone_id         = data.aws_route53_zone.main.zone_id
+  count           = local.is_prod_cdn ? 1 : 0
+  zone_id         = data.aws_route53_zone.main[0].zone_id
   name            = "dev.${var.domain_name}"
   type            = "AAAA"
   allow_overwrite = true
 
   alias {
-    name                   = aws_cloudfront_distribution.main.domain_name
-    zone_id                = aws_cloudfront_distribution.main.hosted_zone_id
+    name                   = aws_cloudfront_distribution.main[0].domain_name
+    zone_id                = aws_cloudfront_distribution.main[0].hosted_zone_id
     evaluate_target_health = false
   }
 }

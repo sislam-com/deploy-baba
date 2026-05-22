@@ -105,6 +105,36 @@ Use these as your starting checklist. Add more as you discover additional claims
 - `scripts/dev-doctor.sh` exists and is executable.
 - `.devcontainer/devcontainer.json` exists.
 
+**ADR-029** (Dev/Prod Environment Separation + Artifact Promotion) — once W-PROM work items land
+- `xtask/src/infra/tofu.rs` has separate `workspace` and `aws_profile` parameters (not a single `profile`).
+- `xtask/src/infra/mod.rs` enum variants use `workspace` + `aws_profile`, not `profile`.
+- `justfile` infra recipes accept `WORKSPACE` parameter, not `PROFILE`.
+- `justfile` infra recipes pass `--workspace` and `--aws-profile` to xtask (not `--profile`).
+- Helper Lambda names in HCL include `var.environment`: grep `email-lambda.tf`, `llm-proxy-lambda.tf`, `mcp-gateway-lambda.tf` for `${var.project_name}-${var.environment}` pattern.
+- `infra/s3-assets.tf` bucket name includes `${var.environment}`.
+- `infra/apigateway.tf` API Gateway name includes `${var.environment}`.
+- `infra/ci-oidc.tf` dev deploy role policy targets `${var.project_name}-dev` Lambda (not `-prod`).
+- `.github/workflows/deploy-dev.yml` reads `deploy-baba/dev/deploy-config` (not `deploy-baba/prod/deploy-config`).
+
+## Infrastructure drift checks
+
+In addition to ADR claims, check for these infra-specific drift patterns:
+
+**Workspace consistency:**
+- `infra/.terraform/environment` contains `default` (or does not exist). If it contains any other value, flag as drift: "Workspace pointer set to '<value>' instead of 'default'."
+
+**Environment parameterization:**
+- All Lambda `function_name` attributes in `infra/*.tf` should use `var.environment` or `local.lambda_function_name`. Grep for `function_name = "${var.project_name}-` patterns that lack `${var.environment}`.
+- All S3 bucket names should include `var.environment`. Grep `s3*.tf` for `bucket =` lines missing `var.environment`.
+- All IAM role names in `infra/*.tf` should include `var.environment` or `local.lambda_function_name`. Grep for `name = "${var.project_name}-` in IAM role resources that lack environment.
+
+**CI/CD alignment:**
+- `deploy-dev.yml` secret path should reference `deploy-baba/dev/` not `deploy-baba/prod/`.
+- `ci-oidc.tf` dev role Lambda ARN should target `-dev` function, not `-prod`.
+
+**Singleton resource guards:**
+- Resources that must NOT be duplicated across workspaces (VPC endpoints, OIDC provider, ACM cert, CloudFront) should have `count = var.environment == "prod" ? 1 : 0` or equivalent lifecycle guard.
+
 ## Output format
 
 Keep output concise to minimize parent context cost.

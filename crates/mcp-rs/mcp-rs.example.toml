@@ -1,0 +1,71 @@
+# mcp-rs configuration
+# Copy to mcp-rs.toml and adjust paths for your machine.
+
+[server]
+name = "mcp-rs"
+version = "0.1.0"
+enable_health_checks = true
+# Relative paths are resolved from this root. Leave unset to use process cwd.
+workspace_root = "."
+# Local default is stdio. Use http for a private gateway wrapper.
+transport = "stdio"
+http_addr = "127.0.0.1:8080"
+
+[policy]
+mode = "default"
+allowed_paths = [".", "/tmp", "/var/tmp"]
+denied_paths = ["/etc", "/System", "/usr/bin", "/usr/sbin", "/sbin", "/bin", "/boot", "/root"]
+max_file_size_mb = 10
+allowed_commands = ["cargo", "rustc", "git", "node", "npm", "yarn", "python", "python3"]
+allow_env_access = true
+allow_cargo_operations = true
+# Cloud-safe profile: set read_only=true and expose only safe tools/resources.
+read_only = false
+enabled_tools = []
+disabled_tools = []
+
+[audit]
+enabled = true
+log_path = "mcp-audit.jsonl"
+log_successes = true
+log_policy_denials = true
+log_errors = true
+max_file_size_mb = 100
+pretty_print = false
+
+[logging]
+level = "info"
+format = "compact"
+include_timestamps = true
+include_source = false
+
+# --- MCP Resources ---
+# Expose project context to AI agents via resources/list and resources/read.
+# Three resource types:
+#   file    — static file content (requires: path)
+#   glob    — file listing matching a pattern (requires: pattern or path)
+#   command — output of a shell command (requires: command)
+
+# Example: expose a project's agent cache
+# [[resources]]
+# uri = "project://cache"
+# name = "Agent Cache"
+# description = "Full project knowledge snapshot"
+# type = "file"
+# path = "/path/to/project/.agent-cache/index.json"
+# mime_type = "application/json"
+
+# Example: list all plan modules
+# [[resources]]
+# uri = "project://plans"
+# name = "Plan Modules"
+# type = "glob"
+# pattern = "/path/to/project/plans/modules/*.md"
+
+# Example: workspace metadata
+# [[resources]]
+# uri = "project://workspace"
+# name = "Cargo Workspace"
+# type = "command"
+# command = "cargo metadata --format-version=1 --no-deps"
+# mime_type = "application/json"

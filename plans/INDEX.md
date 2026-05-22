@@ -45,6 +45,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | observability | W-OBS | `services/ui/src/telemetry.rs`, `services/ui/migrations/` | DONE | `metrics_middleware` (fire-and-forget SQLite writes); `GET /api/v1/metrics` (p50/p95/p99 + error rate); admin-gated |
 | resilience | W-RES | `services/ui/src/middleware/` | DONE | `rate_limit_middleware` (100 req/60s per IP+endpoint); `CircuitBreaker` around LLM calls (5 failures → 60s open); `validate_request_middleware` (1 MB body guard); `RetryPolicy` available for handler retry |
 | module-decomposition | W-MOD | `services/ui/src/modules/` | TODO | Logical module separation (portfolio, rag, admin, auth); independent testing per module; module-specific metrics |
+| env-promote | W-PROM | `xtask/src/deploy/promote.rs`, `infra/*.tf`, `.github/workflows/` | TODO | Dev/prod separation via OT workspaces; `just promote` artifact promotion; xtask workspace refactoring (ADR-029) |
 
 ---
 
@@ -164,6 +165,8 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | ADR-025 | SQLite-Based Metrics Collection — Zero-cost observability via SQLite metrics tables; structured logging with tracing; p50/p95/p99 latency calculation; no CloudWatch Metrics cost | W-OBS, W-UI, W-RAG |
 | ADR-026 | Code-Level Resilience Patterns — In-memory rate limiting; retry with exponential backoff; circuit breaker for LLM calls; request validation middleware; zero infra cost | W-RES, W-UI, W-LLM |
 | ADR-027 | Module-Based Service Decomposition — Logical separation within single Lambda (portfolio, rag, admin, auth modules); independent testing per module; future extraction path to separate Lambdas if needed | W-MOD, W-UI, W-RAG, W-AUTH |
+| ADR-028 | Private Cloud MCP Gateway — Cognito-authenticated MCP server on Lambda; API Gateway routing for POST /mcp + GET /mcp/health | W-MCP, W-CI, W-OTF |
+| ADR-029 | Dev/Prod Environment Separation with Artifact Promotion — OT workspaces for dev/prod; `just promote` copies artifacts instead of rebuilding; singleton resource sharing (VPC endpoints, OIDC, ACM) | W-PROM, W-CI, W-OTF, W-XT |
 
 ---
 

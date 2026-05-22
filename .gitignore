@@ -29,11 +29,14 @@ coverage/
 
 # Lambda build artifacts
 target/lambda/
+build/
+infra/build/
 
 # SQLite database
 deploy-baba.db
 deploy-baba.db-wal
 deploy-baba.db-shm
+mcp-audit.jsonl
 
 # Agent cache — index.json is committed (project knowledge), tmp files are not
 .agent-cache/*.tmp

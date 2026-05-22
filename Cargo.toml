@@ -6,6 +6,7 @@ members = [
     "crates/llm-openai",
     "crates/rag-core",
     "crates/rag-sqlite",
+    "crates/mcp-rs",
     "crates/config-core",
     "crates/config-toml",
     "crates/config-yaml",
@@ -20,6 +21,7 @@ members = [
     "services/ui",
     "services/email",
     "services/llm-proxy",
+    "services/mcp-gateway",
     "xtask",
     "examples/01_multi_format_config",
     "examples/02_api_spec_generation",
@@ -119,6 +121,7 @@ llm-anthropic = { path = "crates/llm-anthropic" }
 llm-openai = { path = "crates/llm-openai" }
 rag-core = { path = "crates/rag-core" }
 rag-sqlite = { path = "crates/rag-sqlite" }
+mcp-rs = { path = "crates/mcp-rs" }
 
 [profile.release]
 lto = true

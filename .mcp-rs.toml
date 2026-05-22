@@ -1,0 +1,116 @@
+# Portfolio-local MCP-RS configuration.
+# This file is safe to track: it uses repo-relative paths and exposes read-only context.
+
+[server]
+name = "deploy-baba-mcp"
+version = "0.1.0"
+enable_health_checks = true
+workspace_root = "."
+transport = "stdio"
+
+[policy]
+mode = "default"
+allowed_paths = ["."]
+denied_paths = ["/etc", "/System", "/usr/bin", "/usr/sbin", "/sbin", "/bin", "/boot", "/root"]
+max_file_size_mb = 10
+allowed_commands = []
+allow_env_access = false
+allow_cargo_operations = false
+read_only = true
+enabled_tools = [
+  "health",
+  "read_file",
+  "list_directory",
+  "grep_file",
+  "file_stats",
+  "grep_project",
+  "find_files",
+  "read_toml",
+  "json_query",
+  "markdown_query",
+  "migration_list",
+]
+disabled_tools = [
+  "read_env",
+  "check_command",
+  "cargo_check",
+  "cargo_test",
+  "cargo_build",
+  "just_run",
+  "sqlite_query",
+  "sqlite_schema",
+  "workspace_info",
+  "system_info",
+]
+
+[audit]
+enabled = true
+log_path = "mcp-audit.jsonl"
+log_successes = true
+log_policy_denials = true
+log_errors = true
+max_file_size_mb = 100
+pretty_print = false
+
+[logging]
+level = "warn"
+format = "compact"
+include_timestamps = true
+include_source = false
+
+[[resources]]
+uri = "project://cache"
+name = "Agent Cache"
+description = "Full project knowledge snapshot"
+type = "file"
+path = ".agent-cache/index.json"
+mime_type = "application/json"
+
+[[resources]]
+uri = "project://plans"
+name = "Plan Index"
+description = "Master plan index"
+type = "file"
+path = "plans/INDEX.md"
+mime_type = "text/markdown"
+
+[[resources]]
+uri = "project://plan-modules"
+name = "Plan Module Files"
+type = "glob"
+pattern = "plans/modules/*.md"
+
+[[resources]]
+uri = "project://adrs"
+name = "Architecture Decision Records"
+type = "glob"
+pattern = "plans/adr/*.md"
+
+[[resources]]
+uri = "project://migrations"
+name = "SQL Migrations"
+type = "glob"
+pattern = "services/ui/migrations/*.sql"
+
+[[resources]]
+uri = "project://workspace"
+name = "Cargo Workspace Metadata"
+description = "Workspace members, dependencies, and features"
+type = "command"
+command = "cargo metadata --format-version=1 --no-deps --manifest-path Cargo.toml"
+mime_type = "application/json"
+
+[[resources]]
+uri = "project://justfile"
+name = "Justfile"
+description = "Task runner commands"
+type = "file"
+path = "justfile"
+mime_type = "text/plain"
+
+[[resources]]
+uri = "project://stack-example"
+name = "Stack Example Config"
+type = "file"
+path = "stack.example.toml"
+mime_type = "application/toml"

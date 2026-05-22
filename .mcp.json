@@ -1,10 +1,10 @@
 {
   "mcpServers": {
     "mcp-rs": {
-      "command": "/Users/shantopagla/mcp-rs/target/release/mcp-rs",
-      "cwd": "/Users/shantopagla/mcp-rs",
+      "command": "/Users/shantopagla/portfolio/target/release/mcp-rs",
+      "cwd": "/Users/shantopagla/portfolio",
       "env": {
-        "MCP_RS_CONFIG": "/Users/shantopagla/mcp-rs/mcp-rs.toml",
+        "MCP_RS_CONFIG": ".mcp-rs.toml",
         "RUST_LOG": "mcp_rs=warn"
       }
     },

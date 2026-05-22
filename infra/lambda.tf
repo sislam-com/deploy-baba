@@ -29,7 +29,7 @@ resource "aws_lambda_function" "baba" {
       COGNITO_CLIENT_ID      = aws_cognito_user_pool_client.baba_web.id
       COGNITO_DOMAIN         = "${aws_cognito_user_pool_domain.baba.domain}.auth.${var.region}.amazoncognito.com"
       COGNITO_REGION         = var.region
-      APP_DOMAIN             = "https://${var.domain_name}"
+      APP_DOMAIN             = "https://${local.effective_domain}"
       EMAIL_LAMBDA_NAME      = aws_lambda_function.email.function_name
       COGNITO_JWKS           = data.http.cognito_jwks.response_body
       POW_SECRET_ARN         = aws_secretsmanager_secret.pow_secret.arn
@@ -38,7 +38,7 @@ resource "aws_lambda_function" "baba" {
       RAG_PUBLIC_ENABLED     = "1"
       ASK_RATE_LIMIT         = "10"
       S3_BACKUP_BUCKET       = aws_s3_bucket.backups.id
-      PORTFOLIO_API_BASE_URL = "https://${var.domain_name}"
+      PORTFOLIO_API_BASE_URL = "https://${local.effective_domain}"
     }
   }
 
@@ -80,20 +80,22 @@ resource "aws_lambda_function_url" "baba" {
   depends_on = [aws_lambda_function.baba]
 }
 
-# Lambda permission — CloudFront OAC only
+# Lambda permission — CloudFront OAC only (prod-only, dev has no CloudFront)
 resource "aws_lambda_permission" "cloudfront" {
+  count         = var.environment == "prod" ? 1 : 0
   statement_id  = "AllowCloudFrontInvoke"
   action        = "lambda:InvokeFunctionUrl"
   function_name = aws_lambda_function.baba.function_name
   principal     = "cloudfront.amazonaws.com"
-  source_arn    = aws_cloudfront_distribution.main.arn
+  source_arn    = aws_cloudfront_distribution.main[0].arn
 }
 
 resource "aws_lambda_permission" "cloudfront_invoke" {
+  count         = var.environment == "prod" ? 1 : 0
   statement_id  = "AllowCloudFrontInvokeFunction"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.baba.function_name
   principal     = "cloudfront.amazonaws.com"
-  source_arn    = aws_cloudfront_distribution.main.arn
+  source_arn    = aws_cloudfront_distribution.main[0].arn
 }
 

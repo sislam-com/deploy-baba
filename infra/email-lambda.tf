@@ -7,7 +7,7 @@
 
 resource "aws_lambda_function" "email" {
   filename      = var.email_lambda_code_path
-  function_name = "${var.project_name}-email"
+  function_name = "${local.lambda_function_name}-email"
   role          = aws_iam_role.email_lambda_execution.arn
   handler       = "bootstrap"
   runtime       = "provided.al2023"
@@ -26,7 +26,7 @@ resource "aws_lambda_function" "email" {
       SES_ACK_FROM_EMAIL = "it@sislam.com"
       CONTACT_TO_EMAIL   = var.contact_email
       AWS_SES_REGION     = var.region
-      ALLOWED_ORIGIN     = "https://${var.domain_name}"
+      ALLOWED_ORIGIN     = "https://${local.effective_domain}"
     }
   }
 
@@ -39,7 +39,7 @@ resource "aws_lambda_function" "email" {
 # ─── IAM Role ─────────────────────────────────────────────────────────────────
 
 resource "aws_iam_role" "email_lambda_execution" {
-  name = "${var.project_name}-email-execution-role"
+  name = "${local.lambda_function_name}-email-execution-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -57,7 +57,7 @@ resource "aws_iam_role_policy_attachment" "email_lambda_logs" {
 }
 
 resource "aws_iam_role_policy" "email_lambda_ses" {
-  name = "${var.project_name}-email-ses-policy"
+  name = "${local.lambda_function_name}-email-ses-policy"
   role = aws_iam_role.email_lambda_execution.id
 
   policy = jsonencode({
@@ -85,7 +85,7 @@ resource "aws_iam_role_policy" "email_lambda_ses" {
 # Add an SNS topic ARN to alarm_actions to get notified.
 
 resource "aws_cloudwatch_metric_alarm" "email_lambda_high_invocations" {
-  alarm_name          = "${var.project_name}-email-high-invocations"
+  alarm_name          = "${local.lambda_function_name}-email-high-invocations"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 1
   metric_name         = "Invocations"

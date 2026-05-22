@@ -101,3 +101,8 @@ variable "llm_proxy_lambda_code_path" {
   default     = "./build/llm-proxy-lambda.zip"
 }
 
+variable "mcp_gateway_lambda_code_path" {
+  description = "Path to the private MCP gateway Lambda zip file (built by just mcp-cloud-build)"
+  type        = string
+  default     = "./build/mcp-gateway-lambda.zip"
+}

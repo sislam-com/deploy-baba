@@ -5,23 +5,23 @@
 # This API Gateway HTTP API sits as a second CloudFront origin that receives POST
 # requests WITHOUT OAC signing, forwarding them to the UI Lambda as a proxy.
 #
-# Routes served here: POST /api/contact, POST /api/ask.
+# Routes served here: POST /api/contact, POST /api/ask, POST /mcp, GET /mcp/health.
 # All other paths use the Lambda Function URL origin with OAC as usual.
 
 # HTTP API (V2) — simpler + cheaper than REST API, supports Lambda proxy
 resource "aws_apigatewayv2_api" "contact" {
-  name          = "${var.project_name}-contact-api"
+  name          = "${local.lambda_function_name}-contact-api"
   protocol_type = "HTTP"
 
   cors_configuration {
-    allow_origins = ["https://${var.domain_name}", "https://www.${var.domain_name}"]
-    allow_methods = ["POST", "OPTIONS"]
-    allow_headers = ["Content-Type"]
+    allow_origins = ["https://${var.domain_name}", "https://www.${var.domain_name}", "https://dev.${var.domain_name}"]
+    allow_methods = ["GET", "POST", "OPTIONS"]
+    allow_headers = ["Authorization", "Content-Type"]
     max_age       = 300
   }
 
   tags = {
-    Name = "${var.project_name}-contact-api"
+    Name = "${local.lambda_function_name}-contact-api"
   }
 }
 
@@ -45,6 +45,28 @@ resource "aws_apigatewayv2_route" "ask_post" {
   api_id    = aws_apigatewayv2_api.contact.id
   route_key = "POST /api/ask"
   target    = "integrations/${aws_apigatewayv2_integration.contact.id}"
+}
+
+# Lambda proxy integration -> private MCP gateway Lambda
+resource "aws_apigatewayv2_integration" "mcp_gateway" {
+  api_id                 = aws_apigatewayv2_api.contact.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = aws_lambda_function.mcp_gateway.invoke_arn
+  payload_format_version = "2.0"
+}
+
+# Route: POST /mcp
+resource "aws_apigatewayv2_route" "mcp_post" {
+  api_id    = aws_apigatewayv2_api.contact.id
+  route_key = "POST /mcp"
+  target    = "integrations/${aws_apigatewayv2_integration.mcp_gateway.id}"
+}
+
+# Route: GET /mcp/health
+resource "aws_apigatewayv2_route" "mcp_health_get" {
+  api_id    = aws_apigatewayv2_api.contact.id
+  route_key = "GET /mcp/health"
+  target    = "integrations/${aws_apigatewayv2_integration.mcp_gateway.id}"
 }
 
 # $default stage with auto-deploy
@@ -80,6 +102,15 @@ resource "aws_lambda_permission" "apigw_contact" {
   function_name = aws_lambda_function.baba.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.contact.execution_arn}/*/*/api/*"
+}
+
+# Allow API Gateway to invoke the private MCP gateway Lambda
+resource "aws_lambda_permission" "apigw_mcp_gateway" {
+  statement_id  = "AllowAPIGatewayMcpInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.mcp_gateway.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.contact.execution_arn}/*/*/mcp*"
 }
 
 # ─── Locals ────────────────────────────────────────────────────────────────────

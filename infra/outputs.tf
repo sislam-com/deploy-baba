@@ -45,17 +45,17 @@ output "backup_schedule" {
 
 output "cloudfront_distribution_id" {
   description = "CloudFront distribution ID"
-  value       = aws_cloudfront_distribution.main.id
+  value       = local.is_prod_cdn ? aws_cloudfront_distribution.main[0].id : ""
 }
 
 output "cloudfront_domain_name" {
   description = "CloudFront distribution domain name"
-  value       = aws_cloudfront_distribution.main.domain_name
+  value       = local.is_prod_cdn ? aws_cloudfront_distribution.main[0].domain_name : ""
 }
 
 output "site_url" {
   description = "Public URL of the portfolio site"
-  value       = "https://${var.domain_name}"
+  value       = "https://${local.effective_domain}"
 }
 
 output "cognito_user_pool_id" {
@@ -71,4 +71,14 @@ output "cognito_client_id" {
 output "cognito_domain" {
   description = "Cognito hosted UI domain (FQDN)"
   value       = "${aws_cognito_user_pool_domain.baba.domain}.auth.${var.region}.amazoncognito.com"
+}
+
+output "mcp_gateway_function_name" {
+  description = "Name of the MCP gateway Lambda function"
+  value       = aws_lambda_function.mcp_gateway.function_name
+}
+
+output "mcp_gateway_endpoint" {
+  description = "MCP gateway endpoint (via CloudFront)"
+  value       = "https://${local.effective_domain}/mcp"
 }

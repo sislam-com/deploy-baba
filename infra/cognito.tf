@@ -69,6 +69,15 @@ resource "aws_cognito_user_pool_client" "baba_web" {
 }
 
 # Bootstrap admin user — password reset required on first login
+resource "random_password" "cognito_admin_temporary" {
+  length           = 20
+  special          = true
+  upper            = true
+  lower            = true
+  numeric          = true
+  override_special = "!#%*-_=+"
+}
+
 resource "aws_cognito_user" "baba_admin" {
   user_pool_id = aws_cognito_user_pool.baba.id
   username     = "baba-admin"
@@ -78,7 +87,7 @@ resource "aws_cognito_user" "baba_admin" {
     email_verified = "true"
   }
 
-  temporary_password = aws_secretsmanager_secret_version.cognito_temp_password_initial.secret_string
+  temporary_password = random_password.cognito_admin_temporary.result
 
   lifecycle {
     ignore_changes = [temporary_password]
