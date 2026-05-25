@@ -64,6 +64,28 @@ else
     fail "pnpm not found — run: npm install -g pnpm"
 fi
 
+# ── Python / uv (for services/agent) ─────────────────────────────────────────
+
+if command -v python3 &>/dev/null; then
+    PY_VER=$(python3 --version 2>/dev/null | awk '{print $2}')
+    PY_MAJOR=$(echo "${PY_VER}" | cut -d. -f1)
+    PY_MINOR=$(echo "${PY_VER}" | cut -d. -f2)
+    if [[ "${PY_MAJOR}" -ge 3 && "${PY_MINOR}" -ge 13 ]]; then
+        ok "python3 ${PY_VER} (≥3.13 required for agent service)"
+    else
+        warn "python3 ${PY_VER} — need ≥3.13 for services/agent (pyenv install 3.13)"
+    fi
+else
+    warn "python3 not found — needed for services/agent (install via pyenv)"
+fi
+
+if command -v uv &>/dev/null; then
+    UV_VER=$(uv --version 2>/dev/null | awk '{print $2}')
+    ok "uv ${UV_VER}"
+else
+    fail "uv not found — run: curl -LsSf https://astral.sh/uv/install.sh | sh"
+fi
+
 # ── OpenTofu ─────────────────────────────────────────────────────────────────
 
 if command -v tofu &>/dev/null; then

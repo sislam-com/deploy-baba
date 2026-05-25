@@ -19,6 +19,11 @@ pub enum RefusalPolicy {
     /// Log the potential violation but return the response anyway.
     /// Post-generation verification is the caller's responsibility.
     WarnAndLog,
+    /// Reject the response outright — the caller should return a structured
+    /// "insufficient context" message instead.
+    Reject,
+    /// Retry with a more capable model and stricter prompting before giving up.
+    RetryWithUpgrade,
 }
 
 /// A whitelist of source strings the generator is allowed to draw from.

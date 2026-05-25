@@ -115,7 +115,10 @@ pub async fn context_brief(rag: &PortfolioRAG, args: Value) -> Result<Value> {
             let briefs: Vec<Value> = results
                 .iter()
                 .map(|r| {
-                    let corpus = r.get("corpus").and_then(|v| v.as_str()).unwrap_or("unknown");
+                    let corpus = r
+                        .get("corpus")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown");
                     if !relevant_corpora.contains(&corpus) {
                         relevant_corpora.push(corpus);
                     }

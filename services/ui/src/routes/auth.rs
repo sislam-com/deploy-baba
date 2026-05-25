@@ -11,7 +11,7 @@ use std::sync::Arc;
 use crate::auth::AuthConfig;
 use crate::state::AppState;
 
-/// GET /auth/login — redirect to Cognito hosted UI (or create dev session).
+/// GET /auth/login — dev bypass, or redirect to SPA root (React Router renders login page).
 pub async fn login_handler(State(auth): State<Arc<AuthConfig>>) -> Response {
     if auth.dev_mode {
         // Skip Cognito; issue a fake cookie so the dashboard is reachable locally.
@@ -22,19 +22,9 @@ pub async fn login_handler(State(auth): State<Arc<AuthConfig>>) -> Response {
         return (StatusCode::FOUND, headers).into_response();
     }
 
-    // Implicit grant: response_type=token with openid scope returns both access_token and
-    // id_token in the fragment (#access_token=...&id_token=...) — no server exchange needed.
-    let url = format!(
-        "https://{}/oauth2/authorize?client_id={}&response_type=token\
-         &scope=openid+email+profile&redirect_uri={}/auth/callback",
-        auth.cognito_domain, auth.client_id, auth.app_domain
-    );
-
+    // Redirect to SPA root — client-side routing will show the login page.
     let mut headers = HeaderMap::new();
-    headers.insert(
-        header::LOCATION,
-        HeaderValue::from_str(&url).unwrap_or_else(|_| HeaderValue::from_static("/")),
-    );
+    headers.insert(header::LOCATION, HeaderValue::from_static("/"));
     (StatusCode::FOUND, headers).into_response()
 }
 
@@ -134,25 +124,12 @@ pub async fn set_session_handler(
     }
 }
 
-/// GET /auth/logout — clear cookie and redirect to Cognito logout (or home in dev).
-pub async fn logout_handler(State(auth): State<Arc<AuthConfig>>) -> Response {
+/// GET /auth/logout — clear cookie and redirect to home.
+pub async fn logout_handler() -> Response {
     let clear = "auth_token=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0";
     let mut headers = HeaderMap::new();
     headers.insert(header::SET_COOKIE, HeaderValue::from_static(clear));
-
-    let location = if auth.dev_mode {
-        "/".to_string()
-    } else {
-        format!(
-            "https://{}/logout?client_id={}&logout_uri={}",
-            auth.cognito_domain, auth.client_id, auth.app_domain
-        )
-    };
-
-    headers.insert(
-        header::LOCATION,
-        HeaderValue::from_str(&location).unwrap_or_else(|_| HeaderValue::from_static("/")),
-    );
+    headers.insert(header::LOCATION, HeaderValue::from_static("/"));
     (StatusCode::FOUND, headers).into_response()
 }
 

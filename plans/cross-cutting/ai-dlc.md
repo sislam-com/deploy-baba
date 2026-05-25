@@ -40,12 +40,16 @@ Non-trivial = any change spanning more than one component, or touching infra/CI.
 
 ```
 1. EnterPlanMode
-2. Explore agent(s) — read relevant source + plan files
-3. Plan agent — design approach, identify files, note risks
-4. Review: read critical files, ask AskUserQuestion if approach is unclear
-5. Write plan file to ~/.claude/plans/<slug>.md
-6. ExitPlanMode → user approves
+2. Read `.agent-cache/index.json` — structural knowledge already cached
+3. Query local MCP (`mcp-rs` resources, `portfolio-rag` tools) for context
+4. Fall back to direct Read/Bash/grep only if MCP is unavailable
+5. Design approach inline — identify files, note risks
+6. Ask AskUserQuestion if approach is unclear
+7. Write plan file to ~/.claude/plans/<slug>.md
+8. ExitPlanMode → user approves
 ```
+
+**Token budget:** 20k tokens max per request. Never spawn Explore or Plan subagents — they burn 80–110k tokens each. Use the local MCP pipeline first, then direct reads.
 
 Trivial tasks (single-file typo, dependency bump, doc touch) may skip plan mode.
 

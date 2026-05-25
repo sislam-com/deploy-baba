@@ -4,10 +4,12 @@
 set dotenv-load := false
 
 # Set the shell to bash to support 'eval' and string manipulation
+
 set shell := ["bash", "-c"]
 
 # Default AWS profile — pinned to stack.toml `aws.profile`.
 # Recipes with a `PROFILE` parameter shadow this; argless recipes (sso-login, ui, dev-stack) use it directly.
+
 PROFILE := "deploy-baba"
 
 # ── Meta ──────────────────────────────────────────────────────────────────────
@@ -42,7 +44,7 @@ test-all:
 
 # Run tests for a single crate
 test-crate CRATE:
-    cargo xtask test crate {{CRATE}}
+    cargo xtask test crate {{ CRATE }}
 
 # Generate coverage report (opens in browser)
 coverage:
@@ -53,9 +55,9 @@ dev:
     @just dev-doctor
     @just dev-stack
 
-# Full quality gate (fmt + lint + test + coverage floors + audit + HCL fmt check)
+# Full quality gate (fmt + lint + test + coverage floors + audit + HCL fmt check + agent)
 quality:
-    just web-types-offline && cargo xtask quality all && just web-coverage && tofu fmt -check -recursive infra/
+    just web-types-offline && cargo xtask quality all && just web-coverage && just agent-lint && just agent-test && tofu fmt -check -recursive infra/
 
 # Build all crates (release)
 build:
@@ -75,7 +77,7 @@ doc-check:
 
 # Run an example: just example 01_multi_format_config
 example NAME:
-    cargo run -p example_{{NAME}}
+    cargo run -p example_{{ NAME }}
 
 # Build the Lambda zip for aarch64 (requires cargo-lambda + aarch64 toolchain)
 lambda-build:
@@ -83,9 +85,10 @@ lambda-build:
 
 # Build Lambda zip + upload to the deployed function
 lambda-deploy PROFILE="default":
-    just aws-check {{PROFILE}} && just lambda-build && cargo xtask deploy lambda --profile {{PROFILE}}
+    just aws-check {{ PROFILE }} && just lambda-build && cargo xtask deploy lambda --profile {{ PROFILE }}
 
 # Build the email Lambda zip for aarch64 (separate non-VPC Lambda, handles SES sends)
+
 # Output goes to infra/build/ so `tofu apply` (which runs with -chdir=infra) can find it
 email-build:
     PATH="$HOME/.cargo/bin:$PATH" cargo lambda build --release --package email-lambda --target aarch64-unknown-linux-gnu
@@ -94,10 +97,10 @@ email-build:
 
 # Build email Lambda zip + update the deployed function
 email-deploy PROFILE="default":
-    just aws-check {{PROFILE}} && just email-build && aws lambda update-function-code \
+    just aws-check {{ PROFILE }} && just email-build && aws lambda update-function-code \
         --function-name deploy-baba-email \
         --zip-file fileb://infra/build/email-lambda.zip \
-        --profile {{PROFILE}}
+        --profile {{ PROFILE }}
 
 # Build the LLM-proxy Lambda zip for aarch64 (non-VPC Lambda, reaches api.anthropic.com)
 llm-proxy-build:
@@ -107,10 +110,23 @@ llm-proxy-build:
 
 # Build LLM-proxy Lambda zip + update the deployed function
 llm-proxy-deploy PROFILE="default":
-    just aws-check {{PROFILE}} && just llm-proxy-build && aws lambda update-function-code \
+    just aws-check {{ PROFILE }} && just llm-proxy-build && aws lambda update-function-code \
         --function-name deploy-baba-llm-proxy \
         --zip-file fileb://infra/build/llm-proxy-lambda.zip \
-        --profile {{PROFILE}}
+        --profile {{ PROFILE }}
+
+# Build the auth Lambda zip for aarch64 (non-VPC Lambda, reaches Cognito IDP)
+auth-build:
+    PATH="$HOME/.cargo/bin:$PATH" cargo lambda build --release --package auth-lambda --target aarch64-unknown-linux-gnu
+    mkdir -p infra/build
+    zip -j infra/build/auth-lambda.zip target/lambda/auth-lambda/bootstrap
+
+# Build auth Lambda zip + update the deployed function
+auth-deploy PROFILE="default":
+    just aws-check {{ PROFILE }} && just auth-build && aws lambda update-function-code \
+        --function-name deploy-baba-auth \
+        --zip-file fileb://infra/build/auth-lambda.zip \
+        --profile {{ PROFILE }}
 
 # Build the read-only context bundle consumed by the private cloud MCP gateway
 mcp-context-build:
@@ -142,52 +158,83 @@ mcp-cloud-build: mcp-context-build
 
 # Build + upload the private MCP gateway Lambda
 mcp-cloud-deploy PROFILE="default":
-    just aws-check {{PROFILE}} && just mcp-cloud-build && aws lambda update-function-code \
+    just aws-check {{ PROFILE }} && just mcp-cloud-build && aws lambda update-function-code \
         --function-name deploy-baba-mcp-gateway \
         --zip-file fileb://infra/build/mcp-gateway-lambda.zip \
-        --profile {{PROFILE}}
+        --profile {{ PROFILE }}
 
 # Smoke the deployed private MCP gateway. Requires MCP_BEARER_TOKEN with a valid Cognito ID token.
 mcp-cloud-smoke PROFILE="default" BASE_URL="https://sislam.com":
-    @status=$(curl -s -o /tmp/mcp-unauth.out -w "%{http_code}" -X POST {{BASE_URL}}/mcp -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'); test "$status" = "401"
+    @status=$(curl -s -o /tmp/mcp-unauth.out -w "%{http_code}" -X POST {{ BASE_URL }}/mcp -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'); test "$status" = "401"
     @test -n "$MCP_BEARER_TOKEN" || (echo "Set MCP_BEARER_TOKEN to a valid Cognito ID token" >&2; exit 1)
-    @curl -fsS -H "Authorization: Bearer $MCP_BEARER_TOKEN" -H "Content-Type: application/json" -X POST {{BASE_URL}}/mcp -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' | jq .
-    @curl -fsS -H "Authorization: Bearer $MCP_BEARER_TOKEN" -H "Content-Type: application/json" -X POST {{BASE_URL}}/mcp -d '{"jsonrpc":"2.0","id":2,"method":"resources/list","params":{}}' | jq .
-    @curl -fsS -H "Authorization: Bearer $MCP_BEARER_TOKEN" -H "Content-Type: application/json" -X POST {{BASE_URL}}/mcp -d '{"jsonrpc":"2.0","id":3,"method":"resources/read","params":{"uri":"project://plans"}}' | jq .
+    @curl -fsS -H "Authorization: Bearer $MCP_BEARER_TOKEN" -H "Content-Type: application/json" -X POST {{ BASE_URL }}/mcp -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' | jq .
+    @curl -fsS -H "Authorization: Bearer $MCP_BEARER_TOKEN" -H "Content-Type: application/json" -X POST {{ BASE_URL }}/mcp -d '{"jsonrpc":"2.0","id":2,"method":"resources/list","params":{}}' | jq .
+    @curl -fsS -H "Authorization: Bearer $MCP_BEARER_TOKEN" -H "Content-Type: application/json" -X POST {{ BASE_URL }}/mcp -d '{"jsonrpc":"2.0","id":3,"method":"resources/read","params":{"uri":"project://plans"}}' | jq .
+
+# ── Agent (Python/LangGraph) ──────────────────────────────────────────────────
+
+# Run the agent service locally on :3003 with auto-reload
+agent-dev:
+    cd services/agent && PYTHONPATH=src uv run uvicorn handler:app --host 0.0.0.0 --port 3003 --reload
+
+# Run agent tests
+agent-test:
+    cd services/agent && PYTHONPATH=src uv run pytest tests/ -v
+
+# Lint + typecheck the agent service
+agent-lint:
+    cd services/agent && uv run ruff check src/ tests/ && uv run ruff format --check src/ tests/ && PYTHONPATH=src uv run mypy src/
+
+# Format the agent service
+agent-fmt:
+    cd services/agent && uv run ruff format src/ tests/
+
+# Build the agent Lambda deployment package
+agent-build:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    rm -rf build/agent-lambda
+    mkdir -p build/agent-lambda infra/build
+    cd services/agent
+    uv export --frozen --no-dev > /tmp/agent-requirements.txt
+    pip install --target ../../build/agent-lambda -r /tmp/agent-requirements.txt --quiet
+    cp -r src/* ../../build/agent-lambda/
+    cd ../../build/agent-lambda
+    zip -qr ../../infra/build/agent-lambda.zip .
+
+# Build agent Lambda zip + update the deployed function
+agent-deploy PROFILE="default":
+    just aws-check {{ PROFILE }} && just agent-build && aws lambda update-function-code \
+        --function-name deploy-baba-agent \
+        --zip-file fileb://infra/build/agent-lambda.zip \
+        --profile {{ PROFILE }}
 
 # Verify the live deployment (curl apex + www health checks)
 infra-verify DOMAIN="sislam.com":
-    @echo "=== Verifying {{DOMAIN}} ==="
-    curl -sI https://{{DOMAIN}} | head -1
-    curl -sI https://www.{{DOMAIN}} | head -1
-    curl -s https://{{DOMAIN}}/health
+    @echo "=== Verifying {{ DOMAIN }} ==="
+    curl -sI https://{{ DOMAIN }} | head -1
+    curl -sI https://www.{{ DOMAIN }} | head -1
+    curl -s https://{{ DOMAIN }}/health
     @echo ""
 
 # ── UI / Portfolio Site ──────────────────────────────────────────────────────
+# Run the Rust API server locally on :3001 with cargo watch for auto-reload.
+# The API handles /api/*, /auth/*, /health, /docs — not the SPA.
 
-# Run the portfolio site locally on :3000, serving the pre-built SPA from web/dist/.
-# Run `just web-build` first if web/dist/ is missing or stale.
-# For hot-reloading frontend dev, use `just dev-stack` instead (Vite on :3000 + API on :3001).
+# For full-stack dev with the Vite dev server, use `just dev-stack` instead.
 ui ENV="dev":
     #!/usr/bin/env bash
     set -euo pipefail
-    if [ ! -f web/dist/index.html ]; then
-        echo "web/dist/ missing — building SPA first..."
-        just web-build
-    fi
-    eval "$(just dev-env {{ENV}})"
+    eval "$(just dev-env {{ ENV }})"
     env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN \
-        AWS_PROFILE={{PROFILE}} cargo watch -x 'run --package deploy-baba-ui'
+        AWS_PROFILE={{ PROFILE }} cargo watch -x 'run --package deploy-baba-ui'
 
-# Run the portfolio site once (no hot reload)
+# Run the Rust API server once (no hot reload) on :3001.
 ui-run:
     #!/usr/bin/env bash
-    if [ ! -f web/dist/index.html ]; then
-        echo "web/dist/ missing — building SPA first..."
-        just web-build
-    fi
+    set -euo pipefail
     eval "$(just dev-env)"
-    env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN AWS_PROFILE={{PROFILE}} \
+    env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN AWS_PROFILE={{ PROFILE }} \
         cargo run --package deploy-baba-ui
 
 # Build the UI binary only (fast check)
@@ -196,11 +243,11 @@ ui-build:
 
 # Tail CloudWatch logs for the deployed Lambda
 ui-logs PROFILE="default":
-    just aws-check {{PROFILE}} && cargo xtask aws logs --function deploy-baba-ui --profile {{PROFILE}}
+    just aws-check {{ PROFILE }} && cargo xtask aws logs --function deploy-baba-ui --profile {{ PROFILE }}
 
 # Open the live portfolio URL (reads from OpenTofu outputs)
 ui-open:
-    cargo xtask infra output --name function_url --aws-profile {{PROFILE}} | xargs open
+    open $(tofu -chdir=infra output -raw function_url)
 
 # ── Utilities ────────────────────────────────────────────────────────────────
 
@@ -220,7 +267,7 @@ audit:
 
 # Validate AWS profile is configured and has required permissions
 aws-check PROFILE="default":
-    cargo xtask aws validate --profile {{PROFILE}}
+    cargo xtask aws validate --profile {{ PROFILE }}
 
 # Print AWS setup instructions
 aws-setup:
@@ -228,27 +275,28 @@ aws-setup:
 
 # Print current caller identity
 aws-whoami PROFILE="default":
-    aws sts get-caller-identity --profile {{PROFILE}}
+    aws sts get-caller-identity --profile {{ PROFILE }}
 
 # Log in to AWS SSO. Populates ~/.aws/sso/cache — run once per workday before dev-stack/infra-plan/lambda-deploy.
 sso-login:
-    aws sso login --profile {{PROFILE}}
+    @V=$(aws --version 2>&1); if ! echo "$V" | grep -q "aws-cli/2"; then echo "ERROR: AWS CLI v2 required for 'aws sso login'. Found: $V" >&2; echo "Install: brew install awscli" >&2; exit 1; fi
+    aws sso login --profile {{ PROFILE }}
 
 # ── Developer Environment ─────────────────────────────────────────────────────
-
 # Print `export X=Y` lines for all env vars the local Rust binary needs.
 # Fetches Cognito config from SSM (/deploy-baba/<ENV>/cognito-*) and JWKS from the
 # public Cognito endpoint. Consumed via `eval "$(just dev-env)"` in `just ui`.
+
 # Requires a valid SSO session — run `just sso-login` first.
 dev-env ENV="prod":
     #!/usr/bin/env bash
     set -euo pipefail
-    AWS="env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN AWS_PROFILE={{PROFILE}} aws"
-    pool_id=$($AWS ssm get-parameter --name /deploy-baba/{{ENV}}/cognito-pool-id    --query Parameter.Value --output text)
-    client_id=$($AWS ssm get-parameter --name /deploy-baba/{{ENV}}/cognito-client-id --query Parameter.Value --output text)
-    domain=$($AWS    ssm get-parameter --name /deploy-baba/{{ENV}}/cognito-domain    --query Parameter.Value --output text)
+    AWS="env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN AWS_PROFILE={{ PROFILE }} aws"
+    pool_id=$($AWS ssm get-parameter --name /deploy-baba/{{ ENV }}/cognito-pool-id    --query Parameter.Value --output text)
+    client_id=$($AWS ssm get-parameter --name /deploy-baba/{{ ENV }}/cognito-client-id --query Parameter.Value --output text)
+    domain=$($AWS    ssm get-parameter --name /deploy-baba/{{ ENV }}/cognito-domain    --query Parameter.Value --output text)
     jwks=$(curl -fsSL "https://cognito-idp.us-east-1.amazonaws.com/${pool_id}/.well-known/jwks.json")
-    echo "export AWS_PROFILE={{PROFILE}}"
+    echo "export AWS_PROFILE={{ PROFILE }}"
     echo "export ANTHROPIC_API_KEY_ARN=root-anthropic-access-key"
     echo "export RAG_PUBLIC_ENABLED=1"
     echo "export COGNITO_POOL_ID=${pool_id}"
@@ -289,6 +337,7 @@ web-lint:
     pnpm --dir web run lint
 
 # Regenerate src/api/types.gen.ts from the running local server (requires just ui on :3001).
+
 # Prefer web-types-offline for CI and offline use.
 web-types:
     pnpm --dir web run types
@@ -301,13 +350,98 @@ api-spec:
 web-types-offline: api-spec
     pnpm --dir web exec openapi-typescript openapi.json -o src/api/types.gen.ts
 
-# Start both the Rust API server (:3001) and Vite dev server (:3000) in parallel
+# Download latest SQLite backup from S3 to deploy-baba.db (skips if fresh within 1 hour)
+db-sync:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    DB="deploy-baba.db"
+    if [ -f "$DB" ]; then
+        age=$(( $(date +%s) - $(stat -f %m "$DB") ))
+        if [ "$age" -lt 3600 ]; then
+            echo "⏩ $DB is ${age}s old (< 1h) — skipping S3 sync"
+            exit 0
+        fi
+    fi
+    echo "⬇️  Syncing latest S3 backup → $DB"
+    just db-restore {{ PROFILE }}
+
+# Start the Rust API server (:3001), Vite dev server (:3000), and agent service (:3003) in parallel.
+# Port assignments: 3000=Vite SPA, 3001=Rust API, 3002=Auth Lambda, 3003=Python Agent
+
+# Pre-cleans stale processes on all ports and guarantees cleanup on exit.
 dev-stack:
     #!/usr/bin/env bash
     set -euo pipefail
-    trap 'kill 0' SIGINT SIGTERM EXIT
-    env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN AWS_PROFILE={{PROFILE}} just ui &
-    just web &
+
+    # Pre-empt any stale processes on our ports
+    for port in 3000 3001 3003; do
+        pid=$(lsof -ti tcp:$port 2>/dev/null || true)
+        if [ -n "$pid" ]; then
+            echo "Port $port occupied by PID $pid — stopping..."
+            kill "$pid" 2>/dev/null || true
+            sleep 0.5
+            kill -9 "$pid" 2>/dev/null || true
+        fi
+    done
+
+    just db-sync
+    eval "$(just dev-env)"
+
+    # Start API server directly (use just ui for cargo watch + auto-reload)
+    echo "Starting API server on :3001..."
+    env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN \
+        AWS_PROFILE={{ PROFILE }} cargo run --package deploy-baba-ui &
+    API_PID=$!
+
+    # Wait for API to be ready before starting Vite (avoids proxy errors)
+    for i in $(seq 1 60); do
+        if curl -sf http://localhost:3001/health >/dev/null 2>&1; then
+            echo "API ready on :3001"
+            break
+        fi
+        if ! kill -0 $API_PID 2>/dev/null; then
+            echo "API server exited unexpectedly" >&2
+            exit 1
+        fi
+        sleep 1
+    done
+
+    # Start agent service (Python/LangGraph) if uv is available
+    AGENT_PID=""
+    if command -v uv &>/dev/null; then
+        echo "Starting agent service on :3003..."
+        (cd services/agent && PYTHONPATH=src uv run uvicorn handler:app --host 0.0.0.0 --port 3003 --reload) &
+        AGENT_PID=$!
+    else
+        echo "⚠️  uv not found — skipping agent service on :3003 (install: curl -LsSf https://astral.sh/uv/install.sh | sh)"
+    fi
+
+    # Start Vite dev server
+    echo "Starting Vite dev server on :3000..."
+    pnpm --dir web dev &
+    WEB_PID=$!
+
+    CLEANED_UP=0
+    cleanup() {
+        if [ "$CLEANED_UP" -eq 1 ]; then return; fi
+        CLEANED_UP=1
+        echo ""
+        echo "Shutting down dev servers..."
+        kill $WEB_PID 2>/dev/null || true
+        kill $API_PID 2>/dev/null || true
+        [ -n "$AGENT_PID" ] && kill $AGENT_PID 2>/dev/null || true
+        sleep 1
+        kill -9 $WEB_PID 2>/dev/null || true
+        kill -9 $API_PID 2>/dev/null || true
+        [ -n "$AGENT_PID" ] && kill -9 $AGENT_PID 2>/dev/null || true
+        for port in 3000 3001 3003; do
+            pid=$(lsof -ti tcp:$port 2>/dev/null || true)
+            [ -n "$pid" ] && kill -9 "$pid" 2>/dev/null || true
+        done
+        echo "Ports released."
+    }
+    trap cleanup SIGINT SIGTERM EXIT
+
     wait
 
 # ── Infrastructure (OpenTofu) ────────────────────────────────────────────────
@@ -318,19 +452,19 @@ infra-bootstrap PROFILE="default" REGION="us-east-1":
 
 # Preview infrastructure changes (WORKSPACE: default=prod, dev=dev-named resources)
 infra-plan WORKSPACE="default":
-    just aws-check {{PROFILE}} && cargo xtask infra plan --workspace {{WORKSPACE}} --aws-profile {{PROFILE}}
+    just aws-check {{ PROFILE }} && cargo xtask infra plan --workspace {{ WORKSPACE }} --aws-profile {{ PROFILE }}
 
 # Apply infrastructure changes (WORKSPACE: default=prod, dev=dev-named resources)
 infra-apply WORKSPACE="default":
-    just aws-check {{PROFILE}} && cargo xtask infra apply --workspace {{WORKSPACE}} --aws-profile {{PROFILE}}
+    just aws-check {{ PROFILE }} && cargo xtask infra apply --workspace {{ WORKSPACE }} --aws-profile {{ PROFILE }}
 
 # Destroy all infrastructure (prompt confirmation)
 infra-destroy WORKSPACE="default":
-    just aws-check {{PROFILE}} && cargo xtask infra destroy --workspace {{WORKSPACE}} --aws-profile {{PROFILE}}
+    just aws-check {{ PROFILE }} && cargo xtask infra destroy --workspace {{ WORKSPACE }} --aws-profile {{ PROFILE }}
 
 # Show OpenTofu outputs (API endpoint URL, etc.)
 infra-output WORKSPACE="default":
-    cargo xtask infra output --workspace {{WORKSPACE}} --aws-profile {{PROFILE}}
+    cargo xtask infra output --workspace {{ WORKSPACE }} --aws-profile {{ PROFILE }}
 
 # ── Deployment ───────────────────────────────────────────────────────────────
 
@@ -340,103 +474,106 @@ build-image:
 
 # Push a locally-built image to Amazon ECR.
 # IMAGE must be the full ECR URI: <account>.dkr.ecr.<region>.amazonaws.com/<repo>:<tag>
+
 # Example: just push-image default 123456789012.dkr.ecr.us-east-1.amazonaws.com/deploy-baba-ui:latest
 push-image PROFILE="default" IMAGE="deploy-baba-ui:latest":
-    just aws-check {{PROFILE}} && cargo xtask deploy push --image {{IMAGE}} --profile {{PROFILE}}
+    just aws-check {{ PROFILE }} && cargo xtask deploy push --image {{ IMAGE }} --profile {{ PROFILE }}
 
 # Full deploy: quality gate → zip build → Lambda update (zip-based Lambda, ADR-003)
 deploy PROFILE="default":
-    just quality && just lambda-deploy {{PROFILE}}
+    just quality && just lambda-deploy {{ PROFILE }}
 
 # Deploy without quality gate (fast path)
 deploy-fast PROFILE="default":
-    just lambda-deploy {{PROFILE}}
+    just lambda-deploy {{ PROFILE }}
 
 # Dry run: build + validate, no push
 deploy-dry PROFILE="default":
-    just aws-check {{PROFILE}} && cargo xtask deploy docker
+    just aws-check {{ PROFILE }} && cargo xtask deploy docker
 
 # Wait for Lambda to settle after a code update (step 2 of full pipeline)
 lambda-wait PROFILE="default":
-    just aws-check {{PROFILE}} && cargo xtask deploy wait --profile {{PROFILE}} --function deploy-baba-prod
+    just aws-check {{ PROFILE }} && cargo xtask deploy wait --profile {{ PROFILE }} --function deploy-baba-prod
 
 # SPA-only deploy: build → S3 sync → sync-spa invoke → /health (steps 3–6)
+
 # Requires: SPA_BUCKET, UI_FN_NAME, FN_URL env vars (or set via infra outputs)
 spa-deploy PROFILE="default":
-    just aws-check {{PROFILE}} && cargo xtask deploy spa --profile {{PROFILE}} --sha "$(git rev-parse HEAD)"
+    just aws-check {{ PROFILE }} && cargo xtask deploy spa --profile {{ PROFILE }} --sha "$(git rev-parse HEAD)"
 
 # Full pipeline: quality → Lambda → wait → SPA build → S3 sync → sync-spa → /health
+
 # Pass TAG=1 to also create a dev-vX.Y.Z git tag (mirrors deploy-dev.yml)
 deploy-full PROFILE="default" TAG="":
     just quality
-    just lambda-deploy {{PROFILE}}
-    just lambda-wait {{PROFILE}}
-    just spa-deploy {{PROFILE}}
+    just lambda-deploy {{ PROFILE }}
+    just lambda-wait {{ PROFILE }}
+    just spa-deploy {{ PROFILE }}
     {{ if TAG != "" { "just release-tag dev push" } else { "echo 'Skipping dev tag — pass TAG=1 to enable'" } }}
 
 # ── Database (SQLite + S3) ───────────────────────────────────────────────────
 
 # Back up SQLite from EFS to S3
 db-backup PROFILE="default":
-    just aws-check {{PROFILE}} && cargo xtask database backup --profile {{PROFILE}}
+    just aws-check {{ PROFILE }} && cargo xtask database backup --profile {{ PROFILE }}
 
 # Restore latest SQLite backup from S3 to EFS
 db-restore PROFILE="default":
-    just aws-check {{PROFILE}} && cargo xtask database restore --profile {{PROFILE}}
+    just aws-check {{ PROFILE }} && cargo xtask database restore --profile {{ PROFILE }}
 
 # Restore a specific backup version from S3
 db-restore-version VERSION PROFILE="default":
-    just aws-check {{PROFILE}} && cargo xtask database restore --version {{VERSION}} --profile {{PROFILE}}
+    just aws-check {{ PROFILE }} && cargo xtask database restore --version {{ VERSION }} --profile {{ PROFILE }}
 
 # List available S3 backup versions
 db-list-backups PROFILE="default":
-    just aws-check {{PROFILE}} && cargo xtask database list-backups --profile {{PROFILE}}
+    just aws-check {{ PROFILE }} && cargo xtask database list-backups --profile {{ PROFILE }}
 
 # ── Resume Generation ────────────────────────────────────────────────────────
 
 # Generate resume files (2 formats × DOCX + PDF) from SQLite — outputs to target/resume/
 resume-generate DB="deploy-baba.db":
-    cargo xtask resume generate --db-path {{DB}}
+    cargo xtask resume generate --db-path {{ DB }}
 
 # Upload generated resume files to S3 assets bucket
 resume-upload PROFILE="default":
-    just aws-check {{PROFILE}} && cargo xtask resume upload --profile {{PROFILE}}
+    just aws-check {{ PROFILE }} && cargo xtask resume upload --profile {{ PROFILE }}
 
 # Full pipeline: generate + upload
 resume PROFILE="default" DB="deploy-baba.db":
-    just resume-generate {{DB}} && just resume-upload {{PROFILE}}
+    just resume-generate {{ DB }} && just resume-upload {{ PROFILE }}
 
 # ── RAG ──────────────────────────────────────────────────────────────────────
 
 # Index all corpora (Rust, HCL, plans) into the RAG FTS index
 rag-index DB="deploy-baba.db":
-    cargo xtask rag ingest --db-path {{DB}}
+    cargo xtask rag ingest --db-path {{ DB }}
 
 # Index all corpora + .claude/ agent cache (local dev only)
 rag-index-full DB="deploy-baba.db":
-    cargo xtask rag ingest --db-path {{DB}} --include-cache
+    cargo xtask rag ingest --db-path {{ DB }} --include-cache
 
 # Query the RAG index and print ranked chunks
 rag-query QUERY DB="deploy-baba.db":
-    cargo xtask rag query --db-path {{DB}} "{{QUERY}}"
+    cargo xtask rag query --db-path {{ DB }} "{{ QUERY }}"
 
 # Retrieve chunks + generate a grounded answer via Claude (requires ANTHROPIC_API_KEY)
 ask QUERY DB="deploy-baba.db":
-    cargo xtask rag ask --db-path {{DB}} "{{QUERY}}"
+    cargo xtask rag ask --db-path {{ DB }} "{{ QUERY }}"
 
 # Run RAG evaluation suite (retrieval-only, no LLM key needed)
 rag-eval DB="deploy-baba.db":
-    cargo xtask rag eval --db-path {{DB}} --retrieval-only
+    cargo xtask rag eval --db-path {{ DB }} --retrieval-only
 
 # Run full RAG evaluation with LLM (fetches Anthropic key from Secrets Manager)
 rag-eval-full DB="deploy-baba.db" PROFILE="default":
-    just aws-check {{PROFILE}} && \
-    ANTHROPIC_API_KEY=$(cargo xtask secret get anthropic-api-key --profile {{PROFILE}} | tail -1) \
-    cargo xtask rag eval --db-path {{DB}}
+    just aws-check {{ PROFILE }} && \
+    ANTHROPIC_API_KEY=$(cargo xtask secret get anthropic-api-key --profile {{ PROFILE }} | tail -1) \
+    cargo xtask rag eval --db-path {{ DB }}
 
 # Run RAG eval filtered by category (portfolio, architecture, code, edge-case)
 rag-eval-category CATEGORY DB="deploy-baba.db":
-    cargo xtask rag eval --db-path {{DB}} --retrieval-only --category {{CATEGORY}}
+    cargo xtask rag eval --db-path {{ DB }} --retrieval-only --category {{ CATEGORY }}
 
 # ── Local MCP ────────────────────────────────────────────────────────────────
 
@@ -514,7 +651,7 @@ mcp-rag-smoke DB="deploy-baba.db":
     import subprocess
 
     env = os.environ.copy()
-    env["DATABASE_PATH"] = os.path.abspath("{{DB}}")
+    env["DATABASE_PATH"] = os.path.abspath("{{ DB }}")
     env["RAG_CORPORA_PATH"] = "/Users/shantopagla/portfolio"
     env.setdefault("RUST_LOG", "portfolio_rag_mcp=warn")
 
@@ -570,7 +707,7 @@ mcp-rag-smoke DB="deploy-baba.db":
 
 # Inspect recent local mcp-rs audit entries
 mcp-audit-tail LINES="25":
-    tail -n {{LINES}} mcp-audit.jsonl
+    tail -n {{ LINES }} mcp-audit.jsonl
 
 # ── crates.io ────────────────────────────────────────────────────────────────
 
@@ -586,21 +723,22 @@ publish:
 
 # Write a secret to AWS Secrets Manager (e.g. just secret-put pow-secret $(openssl rand -hex 32))
 secret-put NAME VALUE PROFILE="default":
-    just aws-check {{PROFILE}} && cargo xtask secret put {{NAME}} {{VALUE}} --profile {{PROFILE}}
+    just aws-check {{ PROFILE }} && cargo xtask secret put {{ NAME }} {{ VALUE }} --profile {{ PROFILE }}
 
 # Read a secret value from AWS Secrets Manager
 secret-get NAME PROFILE="default":
-    just aws-check {{PROFILE}} && cargo xtask secret get {{NAME}} --profile {{PROFILE}}
+    just aws-check {{ PROFILE }} && cargo xtask secret get {{ NAME }} --profile {{ PROFILE }}
 
 # List all managed secrets under the deploy-baba/prod/ prefix
 secret-list PROFILE="default":
-    just aws-check {{PROFILE}} && cargo xtask secret list --profile {{PROFILE}}
+    just aws-check {{ PROFILE }} && cargo xtask secret list --profile {{ PROFILE }}
 
 # Run llm-anthropic live integration tests using the key stored in Secrets Manager.
+
 # Requires AWS auth and the anthropic-api-key secret to be provisioned.
 test-llm PROFILE="default":
-    just aws-check {{PROFILE}} && \
-    ANTHROPIC_API_KEY=$(cargo xtask secret get anthropic-api-key --profile {{PROFILE}} | tail -1) \
+    just aws-check {{ PROFILE }} && \
+    ANTHROPIC_API_KEY=$(cargo xtask secret get anthropic-api-key --profile {{ PROFILE }} | tail -1) \
     cargo test -p llm-anthropic -- --ignored --nocapture
 
 # ── Agent Cache ──────────────────────────────────────────────────────────────
@@ -625,7 +763,7 @@ release-next:
 
 # Create a dev-vX.Y.Z annotated tag at HEAD (CI runs this automatically after a successful deploy)
 release-tag KIND="dev" PUSH="":
-    cargo xtask release tag --kind {{KIND}} {{ if PUSH != "" { "--push" } else { "" } }}
+    cargo xtask release tag --kind {{ KIND }} {{ if PUSH != "" { "--push" } else { "" } }}
 
 # Promote the latest dev-v* tag to vX.Y.Z, triggering deploy-prod.yml (with manual approval)
 release-promote PUSH="":

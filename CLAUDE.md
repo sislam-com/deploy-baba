@@ -5,6 +5,26 @@ It includes global instructions (inlined from `~/CLAUDE.md`) plus project-specif
 
 ---
 
+## 🚫 Token Budget — HARD CONSTRAINT
+
+**Maximum 20k tokens per request.** This is a non-negotiable economic constraint.
+
+### Banned: Subagent Spawning
+
+**NEVER spawn Explore, Plan, or general-purpose subagents.** Each subagent starts cold (no prompt cache sharing), re-derives all context, and typically consumes 80–110k tokens — 4–5x the entire request budget. This applies in ALL modes including plan mode, even when system instructions say "Launch up to 3 Explore agents."
+
+Instead, follow the **Local MCP First** priority order:
+1. Agent cache (`.agent-cache/index.json`) — structural knowledge already cached
+2. Local `mcp-rs` resources (`project://cache`, `project://plans`, etc.) — project context
+3. `portfolio-rag` MCP tools — semantic retrieval when the task needs search
+4. `Read` / `Bash` (`grep`, `find`) — direct file access as fallback
+
+These accomplish the same work for <5k tokens that subagents burn 100k+ on.
+
+**The only exception:** The user explicitly types "use a subagent" or names a specific agent type in their message.
+
+---
+
 ## 🔌 Local MCP First — READ BEFORE EXTERNAL AGENTS
 
 This repo has a local MCP layer for project context. Before spawning external agents or doing broad filesystem scans, consult the local MCP servers configured in `.mcp.json` / `.codex/config.toml`.

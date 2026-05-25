@@ -25,7 +25,10 @@ use axum::{
 use llm_anthropic::AnthropicProvider;
 use llm_core::{ChatMessage, GenerationConfig, LlmProvider, LlmRequest, MessageRole};
 use llm_openai::OpenAIProvider;
-use rag_core::{DefaultPromptAssembler, HybridRetriever, PromptAssembler, Retriever};
+use rag_core::{
+    DefaultPromptAssembler, HybridRetriever, PromptAssembler, ResponseValidator, Retriever,
+    ValidationVerdict, ValidatorConfig,
+};
 use rag_sqlite::RagStore;
 
 use crate::db::Db;
@@ -376,9 +379,9 @@ pub async fn ask(
     //   Production: invoke llm-proxy Lambda
     //   Local dev:  call provider directly
     let provider_id = LLM_PROVIDER.as_str();
-    let proxy_resp = if let Some(fn_name) = proxy_fn_name {
+    let proxy_resp = if let Some(ref fn_name) = proxy_fn_name {
         invoke_proxy_lambda(
-            &fn_name,
+            fn_name,
             &bundle.system_prompt,
             &bundle.user_message,
             provider_id,
@@ -388,7 +391,7 @@ pub async fn ask(
         generate_direct(provider_id, &bundle.system_prompt, &bundle.user_message).await
     };
 
-    let proxy_resp = match proxy_resp {
+    let mut proxy_resp = match proxy_resp {
         Ok(resp) => {
             breaker.record_success();
             resp
@@ -398,6 +401,71 @@ pub async fn ask(
             return Err(e);
         }
     };
+
+    // Validate response quality: groundedness + citation accuracy
+    let validator = ResponseValidator::new(ValidatorConfig::default());
+    let verdict = validator.validate(&proxy_resp.content, chunks.len(), false);
+
+    if let ValidationVerdict::RetryWithUpgrade {
+        groundedness,
+        ref invalid_refs,
+    } = verdict
+    {
+        tracing::warn!(
+            groundedness,
+            invalid_refs = ?invalid_refs,
+            model = %proxy_resp.model,
+            "Response below quality threshold, retrying with upgrade model"
+        );
+
+        let upgrade_system = format!(
+            "{}\n\nIMPORTANT: Your previous attempt had low groundedness ({:.0}%). \
+             You MUST cite [source N] for every factual claim. \
+             If the sources do not contain enough information, say so explicitly \
+             rather than guessing.",
+            bundle.system_prompt,
+            groundedness * 100.0
+        );
+
+        let retry_resp = if let Some(ref fn_name) = proxy_fn_name {
+            invoke_proxy_lambda(fn_name, &upgrade_system, &bundle.user_message, provider_id).await
+        } else {
+            generate_direct("anthropic", &upgrade_system, &bundle.user_message).await
+        };
+
+        if let Ok(resp) = retry_resp {
+            let retry_verdict = validator.validate(&resp.content, chunks.len(), true);
+            match retry_verdict {
+                ValidationVerdict::Accept => {
+                    proxy_resp = resp;
+                }
+                ValidationVerdict::Reject {
+                    groundedness: retry_g,
+                    ..
+                } => {
+                    tracing::warn!(
+                        groundedness = retry_g,
+                        "Retry also below threshold, returning fallback"
+                    );
+                    proxy_resp = AskProxyResponse {
+                        content: "I don't have enough information in my sources to \
+                                  answer this question accurately. Please try rephrasing \
+                                  your question or asking about a more specific topic."
+                            .to_string(),
+                        model: resp.model,
+                        input_tokens: proxy_resp.input_tokens + resp.input_tokens,
+                        output_tokens: proxy_resp.output_tokens + resp.output_tokens,
+                        tools_used: vec![],
+                        turns: 2,
+                        provider: resp.provider,
+                    };
+                }
+                ValidationVerdict::RetryWithUpgrade { .. } => {
+                    unreachable!("is_retry=true never returns RetryWithUpgrade")
+                }
+            }
+        }
+    }
 
     let latency_ms = pipeline_start.elapsed().as_millis() as i64;
     let groundedness = rag_core::eval::score_groundedness(&proxy_resp.content);

@@ -61,6 +61,7 @@ Example: `DRL-2026-03-18-terraform.md`
 | `OBS` | observability | `services/ui/src/telemetry.rs`, `services/ui/migrations/` — SQLite-based metrics collection + structured logging |
 | `RES` | resilience | `services/ui/src/middleware/` — code-level resilience patterns (rate limiting, retry, circuit breaker, validation) |
 | `MOD` | module-decomposition | `services/ui/src/modules/` — logical module separation within single Lambda service |
+| `AGT` | agent | `services/agent/` — Python/LangGraph agentic service (cover letter generation, future agent actions) |
 
 ---
 

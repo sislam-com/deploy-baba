@@ -18,7 +18,13 @@ members = [
     "crates/api-merger",
     "crates/infra-types",
     "crates/portfolio-rag-mcp",
+    "crates/service-protocol",
     "services/ui",
+    "services/auth",
+    "services/portfolio",
+    "services/rag",
+    "services/admin",
+    "services/contact",
     "services/email",
     "services/llm-proxy",
     "services/mcp-gateway",
@@ -84,6 +90,7 @@ aws-sdk-efs = { version = "1", default-features = false, features = ["default-ht
 aws-sdk-dynamodb = { version = "1", default-features = false, features = ["default-https-client", "rt-tokio"] }
 aws-sdk-sesv2 = { version = "1", default-features = false, features = ["behavior-version-latest", "sigv4a", "default-https-client", "rt-tokio"] }
 aws-sdk-secretsmanager = { version = "1", default-features = false, features = ["default-https-client", "rt-tokio"] }
+aws-sdk-cognitoidentityprovider = { version = "1", default-features = false, features = ["default-https-client", "rt-tokio"] }
 
 # CLI
 clap = { version = "4", features = ["derive"] }
@@ -92,7 +99,7 @@ clap = { version = "4", features = ["derive"] }
 flate2 = "1"
 
 # Database
-rusqlite = { version = "0.32", features = ["bundled"] }
+rusqlite = { version = "0.32", features = ["bundled", "backup"] }
 
 # Auth
 jsonwebtoken = "9"

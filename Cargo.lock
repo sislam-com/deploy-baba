@@ -9,6 +9,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
+name = "admin-lambda"
+version = "0.1.0"
+dependencies = [
+ "api-openapi",
+ "axum",
+ "lambda_http",
+ "lambda_runtime",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "service-protocol",
+ "thiserror",
+ "tokio",
+ "tower 0.4.13",
+ "tower-http 0.5.2",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "ahash"
 version = "0.8.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -197,6 +217,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
+name = "auth-lambda"
+version = "0.1.0"
+dependencies = [
+ "aws-config",
+ "aws-sdk-cognitoidentityprovider",
+ "axum",
+ "lambda_http",
+ "lambda_runtime",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tower 0.4.13",
+ "tower-http 0.5.2",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -292,6 +331,30 @@ dependencies = [
  "pin-project-lite",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "aws-sdk-cognitoidentityprovider"
+version = "1.116.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "899b3d6db855b2ef0180aec775ae4d234bd5c0d8774a8695ba4894c7c00ed2f8"
+dependencies = [
+ "aws-credential-types",
+ "aws-runtime",
+ "aws-smithy-async",
+ "aws-smithy-http",
+ "aws-smithy-json",
+ "aws-smithy-observability",
+ "aws-smithy-runtime",
+ "aws-smithy-runtime-api",
+ "aws-smithy-types",
+ "aws-types",
+ "bytes",
+ "fastrand",
+ "http 0.2.12",
+ "http 1.4.0",
+ "regex-lite",
+ "tracing",
 ]
 
 [[package]]
@@ -1163,6 +1226,29 @@ name = "const-oid"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6ef517f0926dd24a1582492c791b6a4818a4d94e789a334894aa15b0d12f55c"
+
+[[package]]
+name = "contact-lambda"
+version = "0.1.0"
+dependencies = [
+ "aws-config",
+ "aws-sdk-lambda",
+ "axum",
+ "hex",
+ "lambda_http",
+ "lambda_runtime",
+ "rand 0.8.6",
+ "serde",
+ "serde_json",
+ "service-protocol",
+ "sha2 0.10.9",
+ "thiserror",
+ "tokio",
+ "tower 0.4.13",
+ "tower-http 0.5.2",
+ "tracing",
+ "tracing-subscriber",
+]
 
 [[package]]
 name = "core-foundation"
@@ -2904,6 +2990,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19f132c84eca552bf34cab8ec81f1c1dcc229b811638f9d283dceabe58c5569e"
 
 [[package]]
+name = "portfolio-lambda"
+version = "0.1.0"
+dependencies = [
+ "api-openapi",
+ "axum",
+ "lambda_http",
+ "lambda_runtime",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "service-protocol",
+ "thiserror",
+ "tokio",
+ "tower 0.4.13",
+ "tower-http 0.5.2",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "portfolio-rag-mcp"
 version = "0.1.0"
 dependencies = [
@@ -3066,6 +3172,28 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tokio",
+]
+
+[[package]]
+name = "rag-lambda"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "lambda_http",
+ "lambda_runtime",
+ "llm-core",
+ "rag-core",
+ "rag-sqlite",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "service-protocol",
+ "thiserror",
+ "tokio",
+ "tower 0.4.13",
+ "tower-http 0.5.2",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -3539,6 +3667,16 @@ dependencies = [
  "ryu",
  "serde",
  "unsafe-libyaml",
+]
+
+[[package]]
+name = "service-protocol"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

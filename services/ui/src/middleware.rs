@@ -76,7 +76,7 @@ fn extract_token(headers: &HeaderMap) -> Option<String> {
     None
 }
 
-fn redirect_or_401(headers: &HeaderMap, auth: &AuthConfig) -> Response {
+fn redirect_or_401(headers: &HeaderMap, _auth: &AuthConfig) -> Response {
     let wants_json = headers
         .get("accept")
         .and_then(|v| v.to_str().ok())
@@ -90,15 +90,8 @@ fn redirect_or_401(headers: &HeaderMap, auth: &AuthConfig) -> Response {
         )
             .into_response()
     } else {
-        let location = if auth.dev_mode {
-            "/auth/login".to_string()
-        } else {
-            format!(
-                "https://{}/oauth2/authorize?client_id={}&response_type=code\
-                 &scope=openid+email+profile&redirect_uri={}/auth/callback",
-                auth.cognito_domain, auth.client_id, auth.app_domain
-            )
-        };
+        // Redirect to SPA login page (client-side routing handles it).
+        let location = "/auth/login".to_string();
 
         let mut resp_headers = HeaderMap::new();
         resp_headers.insert(

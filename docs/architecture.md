@@ -2,7 +2,7 @@
 
 Last updated: 2026-05-19
 
-deploy-baba is a full-stack portfolio platform running on AWS Lambda with near-zero monthly cost. A React SPA talks to three Rust Lambda functions backed by SQLite on EFS, all provisioned via OpenTofu and deployed through GitHub Actions with OIDC.
+deploy-baba is a full-stack portfolio platform running on AWS Lambda with near-zero monthly cost. A React SPA talks to four Rust Lambda functions backed by SQLite on EFS, all provisioned via OpenTofu and deployed through GitHub Actions with OIDC.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -15,18 +15,19 @@ deploy-baba is a full-stack portfolio platform running on AWS Lambda with near-z
 └─────┬───────────────────────────────────┬───────────────────────┘
       │                                   │
       ▼                                   ▼
-┌───────────────┐  ┌───────────────┐  ┌───────────────────┐
-│ services/ui   │  │ services/     │  │ services/         │
-│ Main Lambda   │──│ email         │  │ llm-proxy         │
-│ (Axum+SQLite) │  │ (SES Lambda)  │  │ (Anthropic proxy) │
-└──────┬────────┘  └───────────────┘  └───────────────────┘
+┌───────────────┐  ┌───────────────┐  ┌───────────────────┐  ┌───────────────┐
+│ services/ui   │  │ services/     │  │ services/         │  │ services/     │
+│ Main Lambda   │──│ email         │  │ llm-proxy       │  │ auth          │
+│ (Axum+SQLite) │  │ (SES Lambda)  │  │ (Anthropic proxy) │  │ (Cognito IDP) │
+│ VPC + EFS     │  │ no VPC        │  │ no VPC            │  │ no VPC        │
+└──────┬────────┘  └───────────────┘  └───────────────────┘  └───────────────┘
        │
 ┌──────▼────────────────────────────────────────────────────────┐
-│  SQLite on EFS  (28 migrations, WAL mode)  +  S3 backup       │
+│  SQLite on EFS  (28 migrations, WAL mode)  +  S3 backup         │
 └───────────────────────────────────────────────────────────────┘
        │
 ┌──────▼────────────────────────────────────────────────────────┐
-│  Library Crates (16)                                           │
+│  Library Crates (16)                                          │
 │  config-* (4) · api-* (5) · llm-* (3) · rag-* (3) · infra-1 │
 └───────────────────────────────────────────────────────────────┘
 ```
@@ -91,10 +92,11 @@ Three Lambda functions, each purpose-built for its workload. See [services.md](s
 | Service | Runtime | VPC | Purpose |
 |---------|---------|-----|---------|
 | `services/ui` | Axum + lambda_http | Yes (EFS) | Main API + portfolio site backend |
+| `services/auth` | Axum + lambda_http | No | Cognito IDP proxy — custom login flow for SPA |
 | `services/email` | lambda_runtime | No | SES email delivery |
 | `services/llm-proxy` | lambda_runtime | No | LLM routing + tool dispatch |
 
-The UI Lambda is the only service that needs VPC access (for EFS-mounted SQLite). Email and LLM proxy run outside the VPC for direct internet access to SES and Anthropic APIs respectively.
+The UI Lambda is the only service that needs VPC access (for EFS-mounted SQLite). Auth, email, and LLM proxy run outside the VPC for direct internet access to Cognito, SES, and Anthropic APIs respectively.
 
 ## Frontend
 
@@ -109,7 +111,7 @@ React 18 SPA built with Vite and TypeScript, styled with Tailwind CSS. The SPA r
 
 21 OpenTofu HCL files in `infra/` provisioning 100+ AWS resources. See [aws-setup.md](aws-setup.md) for setup instructions.
 
-Key resources: 3 Lambda functions, EFS file system + mount targets, 3 S3 buckets (SPA, assets, state), CloudFront distribution with OAC, Cognito user pool, SES email identity, API Gateway HTTP API (POST /api/contact only), VPC endpoints, EventBridge backup schedule, Secrets Manager, SSM Parameter Store, IAM roles + OIDC for CI/CD.
+Key resources: 4 Lambda functions, EFS file system + mount targets, 3 S3 buckets (SPA, assets, state), CloudFront distribution with OAC, Cognito user pool, SES email identity, API Gateway HTTP API (POST /api/contact only), VPC endpoints, EventBridge backup schedule, Secrets Manager, SSM Parameter Store, IAM roles + OIDC for CI/CD.
 
 ## Data Layer
 

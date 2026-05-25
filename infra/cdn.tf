@@ -58,7 +58,8 @@ resource "aws_cloudfront_origin_request_policy" "lambda_oac" {
 
 locals {
   # Strip "https://" prefix and trailing "/" from the Lambda Function URL
-  lambda_origin_domain = replace(replace(aws_lambda_function_url.baba.function_url, "https://", ""), "/", "")
+  lambda_origin_domain      = replace(replace(aws_lambda_function_url.baba.function_url, "https://", ""), "/", "")
+  auth_lambda_origin_domain = replace(replace(aws_lambda_function_url.auth.function_url, "https://", ""), "/", "")
 }
 
 # ─── CloudFront OAC for Lambda ─────────────────────────────────────────────────
@@ -126,6 +127,20 @@ resource "aws_cloudfront_distribution" "main" {
     origin_access_control_id = aws_cloudfront_origin_access_control.spa[0].id
   }
 
+  # Auth Lambda origin — public Function URL for SPA login flow
+  origin {
+    domain_name              = local.auth_lambda_origin_domain
+    origin_id                = "auth-lambda-function-url"
+    origin_access_control_id = aws_cloudfront_origin_access_control.lambda[0].id
+
+    custom_origin_config {
+      http_port              = 80
+      https_port             = 443
+      origin_protocol_policy = "https-only"
+      origin_ssl_protocols   = ["TLSv1.2"]
+    }
+  }
+
   # API Gateway origin for POST /api/contact (no OAC — body hash works correctly)
   origin {
     domain_name = local.apigw_contact_domain
@@ -150,6 +165,19 @@ resource "aws_cloudfront_distribution" "main" {
 
     # CachingOptimized — honors Cache-Control headers set during upload
     cache_policy_id = data.aws_cloudfront_cache_policy.caching_optimized.id
+  }
+
+  # Auth service — MUST appear before the general /api/* behavior.
+  ordered_cache_behavior {
+    path_pattern           = "/api/auth/*"
+    target_origin_id       = "auth-lambda-function-url"
+    viewer_protocol_policy = "redirect-to-https"
+
+    allowed_methods = ["GET", "HEAD", "OPTIONS", "PUT", "PATCH", "POST", "DELETE"]
+    cached_methods  = ["GET", "HEAD"]
+
+    cache_policy_id          = data.aws_cloudfront_cache_policy.caching_disabled.id
+    origin_request_policy_id = aws_cloudfront_origin_request_policy.lambda_oac[0].id
   }
 
   # Cache behaviors for POST /api/* routed via API Gateway (no OAC — body hash works correctly)

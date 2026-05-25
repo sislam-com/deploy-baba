@@ -17,6 +17,7 @@ pub mod portfolio;
 pub mod types;
 
 pub use error::RagError;
+pub use eval::{ResponseValidator, ValidationVerdict, ValidatorConfig};
 pub use hybrid::HybridRetriever;
 pub use portfolio::PortfolioDataProvider;
 pub use types::{Chunk, CitationRef, PromptBundle, RankedChunk, SourceKind};

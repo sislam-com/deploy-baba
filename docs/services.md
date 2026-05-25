@@ -2,7 +2,7 @@
 
 Last updated: 2026-05-19
 
-deploy-baba runs three Lambda functions, each purpose-built for its workload.
+deploy-baba runs four Lambda functions, each purpose-built for its workload.
 
 ```
                     ┌──────────────┐
@@ -30,6 +30,11 @@ deploy-baba runs three Lambda functions, each purpose-built for its workload.
    └────────┬────────┘              └────────┬────────┘
             │                                │
        SES v2 API                    Anthropic API
+
+   ┌─────────────────────────────────────────┐
+   │  services/auth  (no VPC)                │
+   │  Cognito IDP proxy — SPA login flow     │
+   └─────────────────────────────────────────┘
 ```
 
 ## services/ui — Main Lambda
@@ -82,6 +87,42 @@ All 29 API models are defined in `crates/api-openapi/` (SSOT). The `services/ui`
 - `services/ui/src/router.rs` — Axum router assembly
 - `services/ui/src/db.rs` — SQLite connection + migration runner
 - `services/ui/src/auth.rs` — JWT verification + session middleware
+
+## services/auth — Cognito Auth Proxy Lambda
+
+Branded login flow for the React SPA. Replaces the Cognito hosted-UI redirect with a custom dark-themed login page that communicates with Cognito via the AWS SDK.
+
+| Property | Value |
+|----------|-------|
+| Binary | `auth-lambda` |
+| Framework | Axum + `lambda_http` |
+| Runtime | `provided.al2023`, aarch64, 128 MB |
+| VPC | No (needs direct internet access for Cognito IDP) |
+| Auth | No app-layer auth (this *is* the auth service) |
+
+**Endpoints:**
+
+| Route | Method | Purpose |
+|-------|--------|---------|
+| `/api/auth/signin` | POST | Username + password → Cognito `InitiateAuth` |
+| `/api/auth/forgot-password` | POST | Initiate password reset |
+| `/api/auth/confirm-forgot-password` | POST | Confirm reset with code + new password |
+| `/api/auth/respond-to-challenge` | POST | Force-change-password or MFA challenge response |
+| `/api/auth/signout` | POST | Global sign-out (revoke tokens) |
+
+**Flow:**
+1. SPA POSTs credentials to `services/auth` endpoint
+2. Auth Lambda calls `cognito-idp:InitiateAuth` via AWS SDK
+3. On success, Cognito returns tokens; SPA then calls UI Lambda `/auth/set-session` to exchange the `id_token` for an HttpOnly cookie
+4. On challenge (e.g. `NEW_PASSWORD_REQUIRED`), SPA redirects to challenge page and calls `/api/auth/respond-to-challenge`
+
+**Dual-mode entry point** ([ADR-004](../plans/adr/ADR-004-dual-mode-entry-point.md)): when `COGNITO_POOL_ID` is absent, returns a dev-mode bypass token so `just ui` works without AWS credentials.
+
+### Key files
+
+- `services/auth/src/main.rs` — entry point with dual-mode detection
+- `services/auth/src/cognito.rs` — AWS SDK Cognito IDP client wrapper
+- `services/auth/src/routes.rs` — Axum route handlers
 
 ## services/email — SES Lambda
 
@@ -136,14 +177,17 @@ This architecture keeps the LLM API key out of the VPC-bound UI Lambda and allow
 ```
 Browser → CloudFront → UI Lambda (VPC)
                            ├── invoke() → Email Lambda (no VPC) → SES
-                           └── invoke() → LLM Proxy (no VPC) → Anthropic API
-                                              └── HTTP callback → UI Lambda (for tool results)
+                           ├── invoke() → LLM Proxy (no VPC) → Anthropic API
+                           │               └── HTTP callback → UI Lambda (for tool results)
+                           └── HTTP → Auth Lambda (no VPC) → Cognito IDP
 ```
 
 The VPC boundary is the key architectural constraint. The UI Lambda sits in a VPC for EFS access but cannot reach the internet directly. All outbound calls go through VPC endpoints:
 - `com.amazonaws.us-east-1.lambda` — to invoke email and llm-proxy Lambdas
 - `com.amazonaws.us-east-1.secretsmanager` — to read secrets at cold start
 - `com.amazonaws.us-east-1.s3` — for S3 backup operations
+
+The auth Lambda is invoked directly from the browser (via its Lambda Function URL or through CloudFront origin routing), not from the UI Lambda. It needs direct internet access to call the Cognito IDP public endpoint.
 
 ## Cross-References
 

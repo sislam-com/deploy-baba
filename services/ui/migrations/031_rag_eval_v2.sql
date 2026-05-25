@@ -1,10 +1,13 @@
+-- Add source classification columns to eval cases and top_k tracking to results.
+-- Uses ALTER TABLE ADD COLUMN (simpler and more robust than create-copy-drop-rename).
+-- The _migrations table ensures this only runs once per database.
+
 ALTER TABLE rag_eval_cases ADD COLUMN expected_source_kind TEXT;
 ALTER TABLE rag_eval_cases ADD COLUMN expected_entity_type TEXT;
+
 ALTER TABLE rag_eval_results ADD COLUMN top_k_hit INTEGER;
 
-UPDATE rag_eval_results
-SET top_k_hit = retrieval_hit
-WHERE top_k_hit IS NULL;
+-- Backfill source classification metadata
 
 UPDATE rag_eval_cases
 SET expected_source_kind = COALESCE(expected_source_kind, 'portfolio'),

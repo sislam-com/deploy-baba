@@ -144,7 +144,7 @@ export default function Layout() {
                   external
                 />
               ))}
-              <NavIcon to="/auth/login" icon="key" label="Login" external />
+              <NavIcon to="/auth/login" icon="key" label="Login" />
             </div>
 
             {/* Mobile hamburger */}
@@ -176,7 +176,7 @@ export default function Layout() {
                 onClose={closeMenu}
               />
             ))}
-            <MobileNavItem to="/auth/login" icon="key" label="Login" external onClose={closeMenu} />
+            <MobileNavItem to="/auth/login" icon="key" label="Login" onClose={closeMenu} />
           </div>
         )}
       </nav>

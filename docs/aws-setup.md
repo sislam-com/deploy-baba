@@ -158,6 +158,18 @@ CI/CD operations and full OpenTofu provisioning (first-time `just infra-apply`).
         "events:ListTargetsByRule", "events:TagResource"
       ],
       "Resource": "arn:aws:events:*:*:rule/deploy-baba-*"
+    },
+    {
+      "Sid": "CognitoIdpForAuthLambda",
+      "Effect": "Allow",
+      "Action": [
+        "cognito-idp:InitiateAuth",
+        "cognito-idp:RespondToAuthChallenge",
+        "cognito-idp:ForgotPassword",
+        "cognito-idp:ConfirmForgotPassword",
+        "cognito-idp:GlobalSignOut"
+      ],
+      "Resource": "arn:aws:cognito-idp:*:*:userpool/*"
     }
   ]
 }

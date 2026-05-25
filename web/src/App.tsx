@@ -8,6 +8,11 @@ const AboutRepo = lazy(() => import('./routes/AboutRepo'))
 const Contact = lazy(() => import('./routes/Contact'))
 const NotFound = lazy(() => import('./routes/NotFound'))
 
+const Login = lazy(() => import('./routes/auth/Login'))
+const ForgotPassword = lazy(() => import('./routes/auth/ForgotPassword'))
+const ResetPassword = lazy(() => import('./routes/auth/ResetPassword'))
+const ChangePassword = lazy(() => import('./routes/auth/ChangePassword'))
+
 const DashboardLayout = lazy(() => import('./routes/dashboard/Layout'))
 const DashboardHome = lazy(() => import('./routes/dashboard/index'))
 const Jobs = lazy(() => import('./routes/dashboard/Jobs'))
@@ -41,6 +46,12 @@ export default function App() {
           <Route path="/contact" element={<Contact />} />
           <Route path="*" element={<NotFound />} />
         </Route>
+
+        {/* Auth routes — no nav/footer */}
+        <Route path="/auth/login" element={<Login />} />
+        <Route path="/auth/forgot-password" element={<ForgotPassword />} />
+        <Route path="/auth/reset-password" element={<ResetPassword />} />
+        <Route path="/auth/change-password" element={<ChangePassword />} />
 
         {/* Dashboard — own sidebar layout, auth-gated */}
         <Route path="/dashboard" element={<DashboardLayout />}>

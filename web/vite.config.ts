@@ -17,6 +17,8 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
+      '/api/v1/agent': 'http://localhost:3003',
+      '/api/auth': 'http://localhost:3002',
       '/api': 'http://localhost:3001',
       '/auth': 'http://localhost:3001',
       '/resume': 'http://localhost:3001',

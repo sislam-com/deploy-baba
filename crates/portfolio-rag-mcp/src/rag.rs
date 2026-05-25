@@ -69,8 +69,7 @@ impl PortfolioRAG {
             .map(|c| {
                 let (content, truncated) = match max_content_len {
                     Some(max) if c.content.len() > max => {
-                        let truncated_content: String =
-                            c.content.chars().take(max).collect();
+                        let truncated_content: String = c.content.chars().take(max).collect();
                         (truncated_content, true)
                     }
                     _ => (c.content, false),
@@ -105,8 +104,8 @@ impl PortfolioRAG {
              WHERE rd.source_kind = ?1",
         )?;
 
-        let (chunk_count, avg_tokens, oldest, newest): (i64, f64, String, String) =
-            stmt.query_row([corpus], |row| {
+        let (chunk_count, avg_tokens, oldest, newest): (i64, f64, String, String) = stmt
+            .query_row([corpus], |row| {
                 Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
             })?;
 
@@ -127,8 +126,7 @@ impl PortfolioRAG {
     }
 
     pub fn project_health(&self) -> Result<Value> {
-        let workspace_root =
-            std::env::var("RAG_CORPORA_PATH").unwrap_or_else(|_| ".".to_string());
+        let workspace_root = std::env::var("RAG_CORPORA_PATH").unwrap_or_else(|_| ".".to_string());
         let root = Path::new(&workspace_root);
 
         let plan_coverage = self.compute_plan_coverage(root);
@@ -136,13 +134,17 @@ impl PortfolioRAG {
         let cache_age = self.compute_cache_age(root);
         let total_chunks = {
             let conn = self.db_conn.lock().unwrap();
-            conn.query_row("SELECT COUNT(*) FROM rag_chunks", [], |row| row.get::<_, i64>(0))
-                .unwrap_or(0)
+            conn.query_row("SELECT COUNT(*) FROM rag_chunks", [], |row| {
+                row.get::<_, i64>(0)
+            })
+            .unwrap_or(0)
         };
         let total_docs = {
             let conn = self.db_conn.lock().unwrap();
-            conn.query_row("SELECT COUNT(*) FROM rag_documents", [], |row| row.get::<_, i64>(0))
-                .unwrap_or(0)
+            conn.query_row("SELECT COUNT(*) FROM rag_documents", [], |row| {
+                row.get::<_, i64>(0)
+            })
+            .unwrap_or(0)
         };
         let eval_score = self.latest_eval_score();
 

@@ -106,3 +106,15 @@ variable "mcp_gateway_lambda_code_path" {
   type        = string
   default     = "./build/mcp-gateway-lambda.zip"
 }
+
+variable "auth_lambda_code_path" {
+  description = "Path to the auth Lambda zip file (built by just auth-build)"
+  type        = string
+  default     = "./build/auth-lambda.zip"
+}
+
+variable "agent_lambda_code_path" {
+  description = "Path to the agent Lambda zip file (built by just agent-build)"
+  type        = string
+  default     = "./build/agent-lambda.zip"
+}
