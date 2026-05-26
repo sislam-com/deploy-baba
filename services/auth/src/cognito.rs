@@ -5,8 +5,18 @@ use aws_sdk_cognitoidentityprovider::{
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use aws_sdk_cognitoidentityprovider::error::ProvideErrorMetadata;
+
 use crate::error::AuthError;
 use crate::state::AuthConfig;
+
+fn cognito_err<E: ProvideErrorMetadata + std::fmt::Display>(e: E) -> AuthError {
+    let msg = e
+        .message()
+        .map(|m| m.to_string())
+        .unwrap_or_else(|| e.to_string());
+    AuthError::Cognito(msg)
+}
 
 /// Successful authentication result from Cognito.
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -57,7 +67,7 @@ pub async fn sign_in(
         .set_auth_parameters(Some(auth_params))
         .send()
         .await
-        .map_err(|e| AuthError::Cognito(format!("{e:?}")))?;
+        .map_err(cognito_err)?;
 
     parse_initiate_auth_response(resp)
 }
@@ -96,7 +106,7 @@ pub async fn respond_to_challenge(
         .set_challenge_responses(Some(challenge_responses))
         .send()
         .await
-        .map_err(|e| AuthError::Cognito(format!("{e:?}")))?;
+        .map_err(cognito_err)?;
 
     parse_challenge_response(resp)
 }
@@ -117,7 +127,7 @@ pub async fn forgot_password(
         .username(username)
         .send()
         .await
-        .map_err(|e| AuthError::Cognito(format!("{e:?}")))?;
+        .map_err(cognito_err)?;
 
     Ok(())
 }
@@ -142,7 +152,7 @@ pub async fn confirm_forgot_password(
         .password(new_password)
         .send()
         .await
-        .map_err(|e| AuthError::Cognito(format!("{e:?}")))?;
+        .map_err(cognito_err)?;
 
     Ok(())
 }
@@ -158,7 +168,7 @@ pub async fn global_sign_out(
         .access_token(access_token)
         .send()
         .await
-        .map_err(|e| AuthError::Cognito(format!("{e:?}")))?;
+        .map_err(cognito_err)?;
 
     Ok(())
 }

@@ -11,23 +11,6 @@ use std::sync::Arc;
 use crate::auth::AuthConfig;
 use crate::state::AppState;
 
-/// GET /auth/login — dev bypass, or redirect to SPA root (React Router renders login page).
-pub async fn login_handler(State(auth): State<Arc<AuthConfig>>) -> Response {
-    if auth.dev_mode {
-        // Skip Cognito; issue a fake cookie so the dashboard is reachable locally.
-        let cookie = "auth_token=dev-bypass; Path=/; HttpOnly; SameSite=Lax; Max-Age=3600";
-        let mut headers = HeaderMap::new();
-        headers.insert(header::SET_COOKIE, HeaderValue::from_static(cookie));
-        headers.insert(header::LOCATION, HeaderValue::from_static("/dashboard"));
-        return (StatusCode::FOUND, headers).into_response();
-    }
-
-    // Redirect to SPA root — client-side routing will show the login page.
-    let mut headers = HeaderMap::new();
-    headers.insert(header::LOCATION, HeaderValue::from_static("/"));
-    (StatusCode::FOUND, headers).into_response()
-}
-
 /// GET /auth/callback — serve HTML page that extracts id_token from URL fragment via JS.
 ///
 /// With implicit grant the token is in the fragment (#id_token=...) which is never sent to
@@ -74,7 +57,18 @@ pub async fn callback_handler() -> Response {
     return;
   }
 
-  window.location.href = '/auth/set-session?id_token=' + encodeURIComponent(idToken);
+  fetch('/auth/set-session?id_token=' + encodeURIComponent(idToken))
+    .then(function(r) {
+      if (r.ok) { window.location.href = '/dashboard'; }
+      else {
+        document.getElementById('msg').className = 'msg error';
+        document.getElementById('msg').textContent = 'Session failed. Please try again.';
+      }
+    })
+    .catch(function() {
+      document.getElementById('msg').className = 'msg error';
+      document.getElementById('msg').textContent = 'Network error. Please try again.';
+    });
 })();
 </script>
 </body>
@@ -95,8 +89,9 @@ pub struct SetSessionQuery {
 
 /// GET /auth/set-session?id_token=... — validate id_token and set HttpOnly cookie.
 ///
-/// Called by the /auth/callback JS via redirect after extracting the id_token from the URL
-/// fragment. Using GET avoids SigV4 body hash mismatch with CloudFront OAC + Lambda Function URL.
+/// Returns 200 with Set-Cookie header. The SPA navigates to /dashboard via React Router
+/// after a successful response. Using 200 (not 302) ensures the browser stores the cookie
+/// when called from fetch().
 pub async fn set_session_handler(
     State(auth): State<Arc<AuthConfig>>,
     Query(params): Query<SetSessionQuery>,
@@ -117,8 +112,7 @@ pub async fn set_session_handler(
                 header::SET_COOKIE,
                 HeaderValue::from_str(&cookie).unwrap_or_else(|_| HeaderValue::from_static("")),
             );
-            headers.insert(header::LOCATION, HeaderValue::from_static("/dashboard"));
-            (StatusCode::FOUND, headers).into_response()
+            (StatusCode::OK, headers, "ok").into_response()
         }
         Err(_) => (StatusCode::UNAUTHORIZED, "Invalid token").into_response(),
     }
@@ -135,7 +129,6 @@ pub async fn logout_handler() -> Response {
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route("/login", get(login_handler))
         .route("/callback", get(callback_handler))
         .route("/set-session", get(set_session_handler))
         .route("/logout", get(logout_handler))

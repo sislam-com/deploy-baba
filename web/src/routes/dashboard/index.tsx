@@ -5,6 +5,7 @@ interface Counts {
   competencies: number
   about: number
   socialLinks: number
+  linkedinUnreviewed: number
 }
 
 function StatTile({ label, count }: { label: string; count: number | null }) {
@@ -27,13 +28,21 @@ export default function DashboardHome() {
       fetch('/api/competencies').then(r => r.json()),
       fetch('/api/about/sections').then(r => r.json()),
       fetch('/api/social-links').then(r => r.json()),
+      fetch('/api/v1/admin/linkedin/positions').then(r => r.json()).catch(() => []),
+      fetch('/api/v1/admin/linkedin/projects').then(r => r.json()).catch(() => []),
     ])
-      .then(([jobs, comps, about, links]) => {
+      .then(([jobs, comps, about, links, liPositions, liProjects]) => {
+        const positions = Array.isArray(liPositions) ? liPositions : []
+        const projects = Array.isArray(liProjects) ? liProjects : []
+        const unreviewed = [...positions, ...projects].filter(
+          (item: { sync_status: string }) => item.sync_status === 'unreviewed'
+        ).length
         setCounts({
           jobs: Array.isArray(jobs) ? jobs.length : 0,
           competencies: Array.isArray(comps) ? comps.length : 0,
           about: Array.isArray(about) ? about.length : 0,
           socialLinks: Array.isArray(links) ? links.length : 0,
+          linkedinUnreviewed: unreviewed,
         })
       })
       .catch(() => {})
@@ -42,11 +51,12 @@ export default function DashboardHome() {
   return (
     <div className="p-8">
       <h1 className="text-2xl font-bold text-white mb-6">Overview</h1>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
         <StatTile label="Jobs" count={counts?.jobs ?? null} />
         <StatTile label="Competencies" count={counts?.competencies ?? null} />
         <StatTile label="About sections" count={counts?.about ?? null} />
         <StatTile label="Social links" count={counts?.socialLinks ?? null} />
+        <StatTile label="LI Unreviewed" count={counts?.linkedinUnreviewed ?? null} />
       </div>
     </div>
   )

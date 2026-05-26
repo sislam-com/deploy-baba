@@ -137,6 +137,45 @@ pub const ALL_MODELS: &[(&str, ModelFactory)] = &[
     ("ResumeData", || {
         serde_json::to_value(ResumeData::example()).expect("ResumeData example")
     }),
+    // linkedin
+    ("LinkedInPosition", || {
+        serde_json::to_value(LinkedInPosition::example()).expect("LinkedInPosition example")
+    }),
+    ("LinkedInProject", || {
+        serde_json::to_value(LinkedInProject::example()).expect("LinkedInProject example")
+    }),
+    ("LinkedInPositionInput", || {
+        serde_json::to_value(LinkedInPositionInput::example())
+            .expect("LinkedInPositionInput example")
+    }),
+    ("LinkedInProjectInput", || {
+        serde_json::to_value(LinkedInProjectInput::example()).expect("LinkedInProjectInput example")
+    }),
+    ("LinkedInImportPayload", || {
+        serde_json::to_value(LinkedInImportPayload::example())
+            .expect("LinkedInImportPayload example")
+    }),
+    ("LinkedInImportResult", || {
+        serde_json::to_value(LinkedInImportResult::example()).expect("LinkedInImportResult example")
+    }),
+    ("LinkedInSyncLogEntry", || {
+        serde_json::to_value(LinkedInSyncLogEntry::example()).expect("LinkedInSyncLogEntry example")
+    }),
+    ("SyncFieldComparison", || {
+        serde_json::to_value(SyncFieldComparison::example()).expect("SyncFieldComparison example")
+    }),
+    ("PositionDiff", || {
+        serde_json::to_value(PositionDiff::example()).expect("PositionDiff example")
+    }),
+    ("ProjectDiff", || {
+        serde_json::to_value(ProjectDiff::example()).expect("ProjectDiff example")
+    }),
+    ("MapRequest", || {
+        serde_json::to_value(MapRequest::example()).expect("MapRequest example")
+    }),
+    ("StatusUpdateRequest", || {
+        serde_json::to_value(StatusUpdateRequest::example()).expect("StatusUpdateRequest example")
+    }),
 ];
 
 #[cfg(test)]

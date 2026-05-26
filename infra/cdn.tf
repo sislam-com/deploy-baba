@@ -54,6 +54,30 @@ resource "aws_cloudfront_origin_request_policy" "lambda_oac" {
   }
 }
 
+# ─── Custom cache policy for cookie-setting endpoints ─────────────────────────
+# CachingDisabled (cookie_behavior=none) strips Set-Cookie from origin responses.
+# This policy disables caching (TTL=0) but includes cookies in the cache key so
+# CloudFront passes Set-Cookie through to the viewer.
+resource "aws_cloudfront_cache_policy" "no_cache_with_cookies" {
+  count       = local.is_prod_cdn ? 1 : 0
+  name        = "deploy-baba-no-cache-with-cookies"
+  min_ttl     = 0
+  max_ttl     = 1
+  default_ttl = 0
+
+  parameters_in_cache_key_and_forwarded_to_origin {
+    cookies_config {
+      cookie_behavior = "all"
+    }
+    headers_config {
+      header_behavior = "none"
+    }
+    query_strings_config {
+      query_string_behavior = "all"
+    }
+  }
+}
+
 # ─── Locals ────────────────────────────────────────────────────────────────────
 
 locals {
@@ -167,17 +191,19 @@ resource "aws_cloudfront_distribution" "main" {
     cache_policy_id = data.aws_cloudfront_cache_policy.caching_optimized.id
   }
 
-  # Auth service — MUST appear before the general /api/* behavior.
+  # Auth service — routed via API Gateway (same OAC-bypass as /api/contact).
+  # POST through CloudFront OAC → Lambda Function URL fails due to SigV4 body hash
+  # mismatch (UNSIGNED-PAYLOAD). MUST appear before the general /api/* behavior.
   ordered_cache_behavior {
     path_pattern           = "/api/auth/*"
-    target_origin_id       = "auth-lambda-function-url"
+    target_origin_id       = "apigw-contact"
     viewer_protocol_policy = "redirect-to-https"
 
     allowed_methods = ["GET", "HEAD", "OPTIONS", "PUT", "PATCH", "POST", "DELETE"]
     cached_methods  = ["GET", "HEAD"]
 
     cache_policy_id          = data.aws_cloudfront_cache_policy.caching_disabled.id
-    origin_request_policy_id = aws_cloudfront_origin_request_policy.lambda_oac[0].id
+    origin_request_policy_id = data.aws_cloudfront_origin_request_policy.all_viewer_except_host.id
   }
 
   # Cache behaviors for POST /api/* routed via API Gateway (no OAC — body hash works correctly)
@@ -231,15 +257,41 @@ resource "aws_cloudfront_distribution" "main" {
     origin_request_policy_id = aws_cloudfront_origin_request_policy.lambda_oac[0].id
   }
 
+  # Server-side auth routes only — /auth/login is a React Router SPA route and must
+  # fall through to the default S3 SPA behavior (index.html).
   ordered_cache_behavior {
-    path_pattern           = "/auth/*"
+    path_pattern           = "/auth/callback"
     target_origin_id       = "lambda-function-url"
     viewer_protocol_policy = "redirect-to-https"
 
-    allowed_methods = ["GET", "HEAD", "OPTIONS", "PUT", "PATCH", "POST", "DELETE"]
+    allowed_methods = ["GET", "HEAD"]
     cached_methods  = ["GET", "HEAD"]
 
     cache_policy_id          = data.aws_cloudfront_cache_policy.caching_disabled.id
+    origin_request_policy_id = aws_cloudfront_origin_request_policy.lambda_oac[0].id
+  }
+
+  ordered_cache_behavior {
+    path_pattern           = "/auth/set-session"
+    target_origin_id       = "lambda-function-url"
+    viewer_protocol_policy = "redirect-to-https"
+
+    allowed_methods = ["GET", "HEAD"]
+    cached_methods  = ["GET", "HEAD"]
+
+    cache_policy_id          = aws_cloudfront_cache_policy.no_cache_with_cookies[0].id
+    origin_request_policy_id = aws_cloudfront_origin_request_policy.lambda_oac[0].id
+  }
+
+  ordered_cache_behavior {
+    path_pattern           = "/auth/logout"
+    target_origin_id       = "lambda-function-url"
+    viewer_protocol_policy = "redirect-to-https"
+
+    allowed_methods = ["GET", "HEAD"]
+    cached_methods  = ["GET", "HEAD"]
+
+    cache_policy_id          = aws_cloudfront_cache_policy.no_cache_with_cookies[0].id
     origin_request_policy_id = aws_cloudfront_origin_request_policy.lambda_oac[0].id
   }
 

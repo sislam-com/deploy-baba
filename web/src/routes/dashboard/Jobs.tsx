@@ -12,15 +12,41 @@ interface Job {
   sort_order: number
 }
 
+interface LinkedInSyncInfo {
+  mapped_job_id: number | null
+  sync_status: string
+}
+
+const SYNC_COLORS: Record<string, string> = {
+  synced: 'bg-green-900 text-green-300',
+  diverged: 'bg-yellow-900 text-yellow-300',
+  linkedin_only: 'bg-blue-900 text-blue-300',
+  unreviewed: 'bg-purple-900 text-purple-300',
+}
+
 export default function Jobs() {
   const [jobs, setJobs] = useState<Job[]>([])
+  const [syncMap, setSyncMap] = useState<Map<number, string>>(new Map())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/jobs')
-      .then(r => r.json())
-      .then((data: Job[]) => setJobs(data))
+    Promise.all([
+      fetch('/api/jobs').then(r => r.json()),
+      fetch('/api/v1/admin/linkedin/positions').then(r => r.json()).catch(() => []),
+    ])
+      .then(([jobsData, positions]) => {
+        setJobs(Array.isArray(jobsData) ? jobsData : [])
+        const map = new Map<number, string>()
+        if (Array.isArray(positions)) {
+          for (const p of positions as LinkedInSyncInfo[]) {
+            if (p.mapped_job_id != null) {
+              map.set(p.mapped_job_id, p.sync_status)
+            }
+          }
+        }
+        setSyncMap(map)
+      })
       .catch(() => setError('Failed to load jobs'))
       .finally(() => setLoading(false))
   }, [])
@@ -49,7 +75,18 @@ export default function Jobs() {
                        hover:border-gray-500 rounded-xl px-5 py-4 transition"
           >
             <div>
-              <p className="text-white font-medium">{job.title}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-white font-medium">{job.title}</p>
+                {syncMap.has(job.id) ? (
+                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${SYNC_COLORS[syncMap.get(job.id)!] ?? 'bg-gray-700 text-gray-400'}`}>
+                    LI: {syncMap.get(job.id)!.replace('_', ' ')}
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-gray-700 text-gray-500">
+                    No LI
+                  </span>
+                )}
+              </div>
               <p className="text-sm text-gray-400">{job.company} · {job.location ?? 'Remote'}</p>
             </div>
             <p className="text-xs text-gray-500 shrink-0 ml-4">

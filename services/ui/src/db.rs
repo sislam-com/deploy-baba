@@ -130,6 +130,10 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "031_rag_eval_v2",
         include_str!("../migrations/031_rag_eval_v2.sql"),
     ),
+    (
+        "032_create_linkedin_sync",
+        include_str!("../migrations/032_create_linkedin_sync.sql"),
+    ),
 ];
 
 /// Re-exported from `api_openapi::models::social` — the canonical SSOT.

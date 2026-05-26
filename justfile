@@ -59,9 +59,8 @@ dev:
 quality:
     just web-types-offline && cargo xtask quality all && just web-coverage && just agent-lint && just agent-test && tofu fmt -check -recursive infra/
 
-# Build all crates (release)
-build:
-    cargo build --workspace --release
+# Build everything: all Rust Lambda zips + SPA + agent package + MCP gateway bundle
+build: lambda-build-all web-build agent-build mcp-cloud-build
 
 # ── Documentation ────────────────────────────────────────────────────────────
 
@@ -79,57 +78,122 @@ doc-check:
 example NAME:
     cargo run -p example_{{ NAME }}
 
-# Build the Lambda zip for aarch64 (requires cargo-lambda + aarch64 toolchain)
+# ── Lambda Builds (per-service) ──────────────────────────────────────────────
+# Each Rust service compiles to an aarch64 Lambda zip via cargo-lambda.
+# Convention: <service>-build produces infra/build/<service>-lambda.zip,
+#             <service>-deploy builds + updates the live Lambda function.
+
+# UI (main VPC Lambda — serves /api/*, /auth/*, /health, /docs)
 lambda-build:
     PATH="$HOME/.cargo/bin:$PATH" cargo lambda build --release --package deploy-baba-ui --target aarch64-unknown-linux-gnu
 
-# Build Lambda zip + upload to the deployed function
 lambda-deploy PROFILE="default":
     just aws-check {{ PROFILE }} && just lambda-build && cargo xtask deploy lambda --profile {{ PROFILE }}
 
-# Build the email Lambda zip for aarch64 (separate non-VPC Lambda, handles SES sends)
-
-# Output goes to infra/build/ so `tofu apply` (which runs with -chdir=infra) can find it
+# Email (non-VPC, SES sends)
 email-build:
     PATH="$HOME/.cargo/bin:$PATH" cargo lambda build --release --package email-lambda --target aarch64-unknown-linux-gnu
     mkdir -p infra/build
     zip -j infra/build/email-lambda.zip target/lambda/email-lambda/bootstrap
 
-# Build email Lambda zip + update the deployed function
 email-deploy PROFILE="default":
     just aws-check {{ PROFILE }} && just email-build && aws lambda update-function-code \
         --function-name deploy-baba-email \
         --zip-file fileb://infra/build/email-lambda.zip \
         --profile {{ PROFILE }}
 
-# Build the LLM-proxy Lambda zip for aarch64 (non-VPC Lambda, reaches api.anthropic.com)
+# LLM Proxy (non-VPC, reaches api.anthropic.com)
 llm-proxy-build:
     PATH="$HOME/.cargo/bin:$PATH" cargo lambda build --release --package llm-proxy --target aarch64-unknown-linux-gnu
     mkdir -p infra/build
     zip -j infra/build/llm-proxy-lambda.zip target/lambda/llm-proxy/bootstrap
 
-# Build LLM-proxy Lambda zip + update the deployed function
 llm-proxy-deploy PROFILE="default":
     just aws-check {{ PROFILE }} && just llm-proxy-build && aws lambda update-function-code \
         --function-name deploy-baba-llm-proxy \
         --zip-file fileb://infra/build/llm-proxy-lambda.zip \
         --profile {{ PROFILE }}
 
-# Build the auth Lambda zip for aarch64 (non-VPC Lambda, reaches Cognito IDP)
+# Auth (non-VPC, reaches Cognito IDP)
 auth-build:
     PATH="$HOME/.cargo/bin:$PATH" cargo lambda build --release --package auth-lambda --target aarch64-unknown-linux-gnu
     mkdir -p infra/build
     zip -j infra/build/auth-lambda.zip target/lambda/auth-lambda/bootstrap
 
-# Build auth Lambda zip + update the deployed function
 auth-deploy PROFILE="default":
     just aws-check {{ PROFILE }} && just auth-build && aws lambda update-function-code \
         --function-name deploy-baba-auth \
         --zip-file fileb://infra/build/auth-lambda.zip \
         --profile {{ PROFILE }}
 
+# Portfolio (VPC, read-only data — jobs, competencies, about, social-links, resume, challenges)
+portfolio-build:
+    PATH="$HOME/.cargo/bin:$PATH" cargo lambda build --release --package portfolio-lambda --target aarch64-unknown-linux-gnu
+    mkdir -p infra/build
+    zip -j infra/build/portfolio-lambda.zip target/lambda/portfolio-lambda/bootstrap
+
+portfolio-deploy PROFILE="default":
+    just aws-check {{ PROFILE }} && just portfolio-build && aws lambda update-function-code \
+        --function-name deploy-baba-portfolio \
+        --zip-file fileb://infra/build/portfolio-lambda.zip \
+        --profile {{ PROFILE }}
+
+# Admin (VPC, dashboard CRUD — migration owner)
+admin-build:
+    PATH="$HOME/.cargo/bin:$PATH" cargo lambda build --release --package admin-lambda --target aarch64-unknown-linux-gnu
+    mkdir -p infra/build
+    zip -j infra/build/admin-lambda.zip target/lambda/admin-lambda/bootstrap
+
+admin-deploy PROFILE="default":
+    just aws-check {{ PROFILE }} && just admin-build && aws lambda update-function-code \
+        --function-name deploy-baba-admin \
+        --zip-file fileb://infra/build/admin-lambda.zip \
+        --profile {{ PROFILE }}
+
+# Contact (non-VPC, PoW validation + email Lambda delegation)
+contact-build:
+    PATH="$HOME/.cargo/bin:$PATH" cargo lambda build --release --package contact-lambda --target aarch64-unknown-linux-gnu
+    mkdir -p infra/build
+    zip -j infra/build/contact-lambda.zip target/lambda/contact-lambda/bootstrap
+
+contact-deploy PROFILE="default":
+    just aws-check {{ PROFILE }} && just contact-build && aws lambda update-function-code \
+        --function-name deploy-baba-contact \
+        --zip-file fileb://infra/build/contact-lambda.zip \
+        --profile {{ PROFILE }}
+
+# RAG (VPC, FTS5 retrieval + grounded generation)
+rag-build:
+    PATH="$HOME/.cargo/bin:$PATH" cargo lambda build --release --package rag-lambda --target aarch64-unknown-linux-gnu
+    mkdir -p infra/build
+    zip -j infra/build/rag-lambda.zip target/lambda/rag-lambda/bootstrap
+
+rag-deploy PROFILE="default":
+    just aws-check {{ PROFILE }} && just rag-build && aws lambda update-function-code \
+        --function-name deploy-baba-rag \
+        --zip-file fileb://infra/build/rag-lambda.zip \
+        --profile {{ PROFILE }}
+
+# ── Consolidated Lambda Builds ───────────────────────────────────────────────
+
+# Build all Rust Lambda zips (excludes Python agent and MCP gateway which have extra bundling steps)
+lambda-build-all: lambda-build email-build llm-proxy-build auth-build portfolio-build admin-build contact-build rag-build
+
+# Deploy all Rust Lambdas
+lambda-deploy-all PROFILE="default":
+    just lambda-deploy {{ PROFILE }}
+    just email-deploy {{ PROFILE }}
+    just llm-proxy-deploy {{ PROFILE }}
+    just auth-deploy {{ PROFILE }}
+    just portfolio-deploy {{ PROFILE }}
+    just admin-deploy {{ PROFILE }}
+    just contact-deploy {{ PROFILE }}
+    just rag-deploy {{ PROFILE }}
+
 # Build the read-only context bundle consumed by the private cloud MCP gateway
 mcp-context-build:
+    #!/usr/bin/env bash
+    set -euo pipefail
     rm -rf build/mcp-context build/mcp-gateway
     mkdir -p build/mcp-context/.agent-cache build/mcp-context/plans/modules build/mcp-context/plans/adr build/mcp-context/services/ui/migrations build/mcp-gateway
     cp .agent-cache/index.json build/mcp-context/.agent-cache/index.json
@@ -196,8 +260,8 @@ agent-build:
     rm -rf build/agent-lambda
     mkdir -p build/agent-lambda infra/build
     cd services/agent
-    uv export --frozen --no-dev > /tmp/agent-requirements.txt
-    pip install --target ../../build/agent-lambda -r /tmp/agent-requirements.txt --quiet
+    uv export --frozen --no-dev --no-emit-project > /tmp/agent-requirements.txt
+    uv pip install --python 3.13 --target ../../build/agent-lambda -r /tmp/agent-requirements.txt --only-binary :all: --quiet
     cp -r src/* ../../build/agent-lambda/
     cd ../../build/agent-lambda
     zip -qr ../../infra/build/agent-lambda.zip .
@@ -374,7 +438,7 @@ dev-stack:
     set -euo pipefail
 
     # Pre-empt any stale processes on our ports
-    for port in 3000 3001 3003; do
+    for port in 3000 3001 3002 3003; do
         pid=$(lsof -ti tcp:$port 2>/dev/null || true)
         if [ -n "$pid" ]; then
             echo "Port $port occupied by PID $pid — stopping..."
@@ -392,6 +456,12 @@ dev-stack:
     env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN \
         AWS_PROFILE={{ PROFILE }} cargo run --package deploy-baba-ui &
     API_PID=$!
+
+    # Start auth service (Cognito IDP proxy on :3002)
+    echo "Starting auth service on :3002..."
+    env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN \
+        AWS_PROFILE={{ PROFILE }} cargo run --package auth-lambda &
+    AUTH_PID=$!
 
     # Wait for API to be ready before starting Vite (avoids proxy errors)
     for i in $(seq 1 60); do
@@ -429,12 +499,14 @@ dev-stack:
         echo "Shutting down dev servers..."
         kill $WEB_PID 2>/dev/null || true
         kill $API_PID 2>/dev/null || true
+        kill $AUTH_PID 2>/dev/null || true
         [ -n "$AGENT_PID" ] && kill $AGENT_PID 2>/dev/null || true
         sleep 1
         kill -9 $WEB_PID 2>/dev/null || true
         kill -9 $API_PID 2>/dev/null || true
+        kill -9 $AUTH_PID 2>/dev/null || true
         [ -n "$AGENT_PID" ] && kill -9 $AGENT_PID 2>/dev/null || true
-        for port in 3000 3001 3003; do
+        for port in 3000 3001 3002 3003; do
             pid=$(lsof -ti tcp:$port 2>/dev/null || true)
             [ -n "$pid" ] && kill -9 "$pid" 2>/dev/null || true
         done

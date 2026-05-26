@@ -11,6 +11,7 @@ const KNOWN_SECRETS: &[&str] = &[
     "cognito-temp-password",
     "anthropic-api-key",
     "openai-api-key",
+    "linkedin-api-key",
 ];
 
 fn full_id(name: &str) -> String {

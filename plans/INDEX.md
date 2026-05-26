@@ -51,6 +51,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | env-promote | W-PROM | `xtask/src/deploy/promote.rs`, `infra/*.tf`, `.github/workflows/` | TODO | Dev/prod separation via OT workspaces; `just promote` artifact promotion; xtask workspace refactoring (ADR-029) |
 | saas-onboard | W-SAAS | `xtask/src/onboard.rs`, `crates/portfolio-rag-mcp/`, `services/ui/src/routes/api/eval.rs` | WIP | Project onboarding for external repos; eval dashboard; project_health MCP tool (ADR-030) |
 | agent | W-AGT | `services/agent/` (Python/LangGraph) | TODO | Cover letter generation agent; first Python Lambda; LangGraph ReAct with 4 tools (ADR-032/033/034) |
+| linkedin-sync | W-LINK | `services/ui/src/routes/api/linkedin.rs`, `web/src/routes/dashboard/LinkedInSync.tsx` | WIP | LinkedIn data import (CSV export); admin diff UI; sync status badges on Jobs/Challenges; secret pre-wired |
 
 ---
 

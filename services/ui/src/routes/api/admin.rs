@@ -1062,4 +1062,5 @@ pub fn router() -> Router<AppState> {
             "/challenges/:id",
             put(update_challenge).delete(delete_challenge),
         )
+        .nest("/linkedin", super::linkedin::router())
 }

@@ -194,6 +194,19 @@ export const handlers = [
     })
   }),
 
+  // LinkedIn sync (admin)
+  http.get('/api/v1/admin/linkedin/positions', () => {
+    return HttpResponse.json([])
+  }),
+
+  http.get('/api/v1/admin/linkedin/projects', () => {
+    return HttpResponse.json([])
+  }),
+
+  http.get('/api/v1/admin/linkedin/sync-log', () => {
+    return HttpResponse.json([])
+  }),
+
   // Ask endpoint
   http.post('/api/ask', () => {
     return HttpResponse.json({

@@ -24,7 +24,7 @@ impl IntoResponse for AuthError {
         let status = match &self {
             AuthError::MissingField(_) => StatusCode::BAD_REQUEST,
             AuthError::InvalidInput(_) => StatusCode::BAD_REQUEST,
-            AuthError::Cognito(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            AuthError::Cognito(_) => StatusCode::BAD_REQUEST,
             AuthError::AuthFailed(_) => StatusCode::UNAUTHORIZED,
         };
 

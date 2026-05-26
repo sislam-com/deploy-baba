@@ -25,6 +25,9 @@ const SocialLinks = lazy(() => import('./routes/dashboard/SocialLinks'))
 const SocialLinkDetail = lazy(() => import('./routes/dashboard/SocialLinkDetail'))
 const Challenges = lazy(() => import('./routes/dashboard/Challenges'))
 const ChallengeDetail = lazy(() => import('./routes/dashboard/ChallengeDetail'))
+const LinkedInSync = lazy(() => import('./routes/dashboard/LinkedInSync'))
+const LinkedInPositionDiff = lazy(() => import('./routes/dashboard/LinkedInPositionDiff'))
+const LinkedInProjectDiff = lazy(() => import('./routes/dashboard/LinkedInProjectDiff'))
 
 function LoadingSpinner() {
   return (
@@ -66,6 +69,9 @@ export default function App() {
           <Route path="social-links/:id" element={<SocialLinkDetail />} />
           <Route path="challenges" element={<Challenges />} />
           <Route path="challenges/:id" element={<ChallengeDetail />} />
+          <Route path="linkedin" element={<LinkedInSync />} />
+          <Route path="linkedin/positions/:id" element={<LinkedInPositionDiff />} />
+          <Route path="linkedin/projects/:id" element={<LinkedInProjectDiff />} />
         </Route>
       </Routes>
     </Suspense>

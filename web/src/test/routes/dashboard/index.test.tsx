@@ -23,6 +23,7 @@ describe('DashboardHome', () => {
       expect(screen.getByText('Competencies')).toBeInTheDocument()
       expect(screen.getByText('About sections')).toBeInTheDocument()
       expect(screen.getByText('Social links')).toBeInTheDocument()
+      expect(screen.getByText('LI Unreviewed')).toBeInTheDocument()
     })
   })
 
@@ -80,12 +81,20 @@ describe('DashboardHome', () => {
       http.get('/api/social-links', async () => {
         await new Promise(r => setTimeout(r, 1000))
         return HttpResponse.json([])
+      }),
+      http.get('/api/v1/admin/linkedin/positions', async () => {
+        await new Promise(r => setTimeout(r, 1000))
+        return HttpResponse.json([])
+      }),
+      http.get('/api/v1/admin/linkedin/projects', async () => {
+        await new Promise(r => setTimeout(r, 1000))
+        return HttpResponse.json([])
       })
     )
 
     render(<DashboardHome />, { router: 'memory', route: '/dashboard' })
 
-    expect(screen.getAllByText('—').length).toBe(4)
+    expect(screen.getAllByText('—').length).toBe(5)
   })
 
   it('applies correct styling to stat tiles', async () => {
@@ -144,14 +153,16 @@ describe('DashboardHome', () => {
       http.get('/api/jobs', () => HttpResponse.error()),
       http.get('/api/competencies', () => HttpResponse.error()),
       http.get('/api/about/sections', () => HttpResponse.error()),
-      http.get('/api/social-links', () => HttpResponse.error())
+      http.get('/api/social-links', () => HttpResponse.error()),
+      http.get('/api/v1/admin/linkedin/positions', () => HttpResponse.error()),
+      http.get('/api/v1/admin/linkedin/projects', () => HttpResponse.error())
     )
 
     render(<DashboardHome />, { router: 'memory', route: '/dashboard' })
 
     // Should not crash; on error counts stays null so dashes persist
     await waitFor(() => {
-      expect(screen.getAllByText('—').length).toBe(4)
+      expect(screen.getAllByText('—').length).toBe(5)
     })
   })
 })

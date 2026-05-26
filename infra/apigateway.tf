@@ -47,6 +47,66 @@ resource "aws_apigatewayv2_route" "ask_post" {
   target    = "integrations/${aws_apigatewayv2_integration.contact.id}"
 }
 
+# Lambda proxy integration → Auth Lambda (Cognito IDP proxy, no VPC)
+resource "aws_apigatewayv2_integration" "auth" {
+  api_id                 = aws_apigatewayv2_api.contact.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = aws_lambda_function.auth.invoke_arn
+  payload_format_version = "2.0"
+}
+
+resource "aws_apigatewayv2_route" "auth_signin" {
+  api_id    = aws_apigatewayv2_api.contact.id
+  route_key = "POST /api/auth/signin"
+  target    = "integrations/${aws_apigatewayv2_integration.auth.id}"
+}
+
+resource "aws_apigatewayv2_route" "auth_forgot_password" {
+  api_id    = aws_apigatewayv2_api.contact.id
+  route_key = "POST /api/auth/forgot-password"
+  target    = "integrations/${aws_apigatewayv2_integration.auth.id}"
+}
+
+resource "aws_apigatewayv2_route" "auth_confirm_forgot_password" {
+  api_id    = aws_apigatewayv2_api.contact.id
+  route_key = "POST /api/auth/confirm-forgot-password"
+  target    = "integrations/${aws_apigatewayv2_integration.auth.id}"
+}
+
+resource "aws_apigatewayv2_route" "auth_respond_to_challenge" {
+  api_id    = aws_apigatewayv2_api.contact.id
+  route_key = "POST /api/auth/respond-to-challenge"
+  target    = "integrations/${aws_apigatewayv2_integration.auth.id}"
+}
+
+resource "aws_apigatewayv2_route" "auth_signout" {
+  api_id    = aws_apigatewayv2_api.contact.id
+  route_key = "POST /api/auth/signout"
+  target    = "integrations/${aws_apigatewayv2_integration.auth.id}"
+}
+
+resource "aws_apigatewayv2_route" "auth_health" {
+  api_id    = aws_apigatewayv2_api.contact.id
+  route_key = "GET /health"
+  target    = "integrations/${aws_apigatewayv2_integration.auth.id}"
+}
+
+# GET /api/auth/me → UI Lambda (not auth Lambda) — needs cookie middleware
+resource "aws_apigatewayv2_route" "auth_me" {
+  api_id    = aws_apigatewayv2_api.contact.id
+  route_key = "GET /api/auth/me"
+  target    = "integrations/${aws_apigatewayv2_integration.contact.id}"
+}
+
+# Allow API Gateway to invoke the Auth Lambda
+resource "aws_lambda_permission" "apigw_auth" {
+  statement_id  = "AllowAPIGatewayAuthInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.auth.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.contact.execution_arn}/*/*/api/auth/*"
+}
+
 # Lambda proxy integration -> private MCP gateway Lambda
 resource "aws_apigatewayv2_integration" "mcp_gateway" {
   api_id                 = aws_apigatewayv2_api.contact.id

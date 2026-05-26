@@ -68,6 +68,22 @@ resource "aws_secretsmanager_secret_version" "openai_api_key_placeholder" {
   }
 }
 
+# --- linkedin-api-key ---
+
+resource "aws_secretsmanager_secret" "linkedin_api_key" {
+  name = "${var.project_name}/${var.environment}/linkedin-api-key"
+  tags = { Name = "${var.project_name}-linkedin-api-key" }
+}
+
+resource "aws_secretsmanager_secret_version" "linkedin_api_key_placeholder" {
+  secret_id     = aws_secretsmanager_secret.linkedin_api_key.id
+  secret_string = "placeholder-set-via-just-secret-put"
+
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
+}
+
 # --- ses-config: email sender/recipient addresses ---
 # Backing secret for SES_FROM_EMAIL, SES_ACK_FROM_EMAIL, CONTACT_TO_EMAIL.
 # The email Lambda reads these from env vars set by lambda.tf, but this secret
@@ -123,6 +139,7 @@ resource "aws_iam_role_policy" "lambda_secretsmanager" {
         aws_secretsmanager_secret.cognito_temp_password.arn,
         aws_secretsmanager_secret.anthropic_api_key.arn,
         aws_secretsmanager_secret.openai_api_key.arn,
+        aws_secretsmanager_secret.linkedin_api_key.arn,
         aws_secretsmanager_secret.ses_config.arn,
         aws_secretsmanager_secret.deploy_config.arn,
       ]

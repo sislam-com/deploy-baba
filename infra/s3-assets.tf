@@ -2,10 +2,10 @@
 # Served exclusively via CloudFront OAC — no public access.
 
 resource "aws_s3_bucket" "assets" {
-  bucket = "${local.lambda_function_name}-assets-${data.aws_caller_identity.current.account_id}"
+  bucket = "${local.assets_bucket_prefix}-assets-${data.aws_caller_identity.current.account_id}"
 
   tags = {
-    Name = "${local.lambda_function_name}-assets"
+    Name = "${local.assets_bucket_prefix}-assets"
   }
 }
 

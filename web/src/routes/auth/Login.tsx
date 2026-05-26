@@ -4,21 +4,6 @@ import { Helmet } from 'react-helmet-async'
 
 const AUTH_BASE = ''
 
-interface SignInResponse {
-  success: boolean
-  tokens?: {
-    id_token: string
-    access_token: string
-    refresh_token?: string
-    expires_in: number
-  }
-  challenge?: {
-    challenge_name: string
-    session: string
-    challenge_parameters: Record<string, string>
-  }
-}
-
 export default function Login() {
   const navigate = useNavigate()
   const [username, setUsername] = useState('')
@@ -38,10 +23,10 @@ export default function Login() {
         body: JSON.stringify({ username, password }),
       })
 
-      const data: SignInResponse = await resp.json()
+      const data = await resp.json()
 
       if (!resp.ok || !data.success) {
-        setError(data.tokens ? 'Authentication failed' : (await resp.json()).error ?? 'Login failed')
+        setError(data.error ?? 'Login failed')
         setLoading(false)
         return
       }
@@ -60,13 +45,9 @@ export default function Login() {
       }
 
       if (data.tokens?.id_token) {
-        // Exchange id_token for HttpOnly cookie via UI Lambda
-        const sessionResp = await fetch(`/auth/set-session?id_token=${encodeURIComponent(data.tokens.id_token)}`, {
-          method: 'GET',
-          redirect: 'manual',
-        })
+        const sessionResp = await fetch(`/auth/set-session?id_token=${encodeURIComponent(data.tokens.id_token)}`)
 
-        if (sessionResp.ok || sessionResp.status === 302) {
+        if (sessionResp.ok) {
           navigate('/dashboard', { replace: true })
         } else {
           setError('Failed to establish session')

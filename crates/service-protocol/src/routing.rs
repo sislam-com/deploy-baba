@@ -70,10 +70,7 @@ impl TargetService {
     /// Returns true if this service should be invoked via Lambda SDK
     /// (i.e., it has its own function, not handled inline by api-gateway).
     pub fn is_backend(&self) -> bool {
-        !matches!(
-            self,
-            TargetService::Metrics | TargetService::Health
-        )
+        !matches!(self, TargetService::Metrics | TargetService::Health)
     }
 }
 

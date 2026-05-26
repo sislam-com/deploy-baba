@@ -62,6 +62,7 @@ Example: `DRL-2026-03-18-terraform.md`
 | `RES` | resilience | `services/ui/src/middleware/` — code-level resilience patterns (rate limiting, retry, circuit breaker, validation) |
 | `MOD` | module-decomposition | `services/ui/src/modules/` — logical module separation within single Lambda service |
 | `AGT` | agent | `services/agent/` — Python/LangGraph agentic service (cover letter generation, future agent actions) |
+| `LINK` | linkedin-sync | `services/ui/src/routes/api/linkedin.rs`, `web/src/routes/dashboard/LinkedInSync.tsx` — LinkedIn data import, sync comparison, admin diff UI |
 
 ---
 
