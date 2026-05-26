@@ -7,6 +7,7 @@ Deployed as a Lambda via Mangum (ADR-034).
 from __future__ import annotations
 
 import os
+from typing import Any
 
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import AIMessage
@@ -45,7 +46,7 @@ Always complete all steps. Never skip the matching step — it ensures the cover
 is grounded in real experience."""
 
 
-async def agent_node(state: AgentState) -> dict:
+async def agent_node(state: AgentState) -> dict[str, list[Any]]:
     """Call the LLM with tools bound."""
     llm = _get_llm()
     llm_with_tools = llm.bind_tools(tools)

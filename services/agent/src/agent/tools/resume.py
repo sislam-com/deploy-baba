@@ -29,7 +29,8 @@ def _invoke_ui_lambda(method: str, path: str, body: str | None = None) -> dict[s
     result = json.loads(response["Payload"].read())
     if result.get("status_code", 200) >= 400:
         raise RuntimeError(f"UI Lambda returned {result.get('status_code')}: {result.get('body')}")
-    return json.loads(result.get("body", "{}"))
+    parsed: dict[str, Any] = json.loads(result.get("body", "{}"))
+    return parsed
 
 
 @tool
