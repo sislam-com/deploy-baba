@@ -29,7 +29,7 @@ resource "aws_secretsmanager_secret" "cognito_temp_password" {
 
 resource "aws_secretsmanager_secret_version" "cognito_temp_password_initial" {
   secret_id     = aws_secretsmanager_secret.cognito_temp_password.id
-  secret_string = "placeholder-set-via-just-secret-put"
+  secret_string = "Placeholder-set-via-just-secret-put-1!"
 
   lifecycle {
     ignore_changes = [secret_string]
@@ -61,6 +61,22 @@ resource "aws_secretsmanager_secret" "openai_api_key" {
 
 resource "aws_secretsmanager_secret_version" "openai_api_key_placeholder" {
   secret_id     = aws_secretsmanager_secret.openai_api_key.id
+  secret_string = "placeholder-set-via-just-secret-put"
+
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
+}
+
+# --- linkedin-api-key ---
+
+resource "aws_secretsmanager_secret" "linkedin_api_key" {
+  name = "${var.project_name}/${var.environment}/linkedin-api-key"
+  tags = { Name = "${var.project_name}-linkedin-api-key" }
+}
+
+resource "aws_secretsmanager_secret_version" "linkedin_api_key_placeholder" {
+  secret_id     = aws_secretsmanager_secret.linkedin_api_key.id
   secret_string = "placeholder-set-via-just-secret-put"
 
   lifecycle {
@@ -101,9 +117,9 @@ resource "aws_secretsmanager_secret_version" "deploy_config" {
   secret_id = aws_secretsmanager_secret.deploy_config.id
   secret_string = jsonencode({
     spa_bucket    = aws_s3_bucket.spa.id
-    cloudfront_id = aws_cloudfront_distribution.main.id
+    cloudfront_id = local.is_prod_cdn ? aws_cloudfront_distribution.main[0].id : ""
     ui_fn_name    = aws_lambda_function.baba.function_name
-    fn_url        = "https://${var.domain_name}"
+    fn_url        = "https://${local.effective_domain}"
   })
 }
 
@@ -123,6 +139,7 @@ resource "aws_iam_role_policy" "lambda_secretsmanager" {
         aws_secretsmanager_secret.cognito_temp_password.arn,
         aws_secretsmanager_secret.anthropic_api_key.arn,
         aws_secretsmanager_secret.openai_api_key.arn,
+        aws_secretsmanager_secret.linkedin_api_key.arn,
         aws_secretsmanager_secret.ses_config.arn,
         aws_secretsmanager_secret.deploy_config.arn,
       ]

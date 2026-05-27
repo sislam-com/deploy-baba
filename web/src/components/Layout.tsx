@@ -144,7 +144,7 @@ export default function Layout() {
                   external
                 />
               ))}
-              <NavIcon to="/auth/login" icon="key" label="Login" external />
+              <NavIcon to="/auth/login" icon="key" label="Login" />
             </div>
 
             {/* Mobile hamburger */}
@@ -176,7 +176,7 @@ export default function Layout() {
                 onClose={closeMenu}
               />
             ))}
-            <MobileNavItem to="/auth/login" icon="key" label="Login" external onClose={closeMenu} />
+            <MobileNavItem to="/auth/login" icon="key" label="Login" onClose={closeMenu} />
           </div>
         )}
       </nav>
@@ -232,7 +232,7 @@ export default function Layout() {
             </div>
           </div>
           <div className="border-t border-gray-700 pt-6 text-center text-gray-400 text-sm">
-            <p>&copy; 2026 Sharful Islam. Licensed under MIT OR Apache-2.0</p>
+            <p>&copy; 2026 Sharful Islam. Licensed under MIT</p>
           </div>
         </div>
       </footer>

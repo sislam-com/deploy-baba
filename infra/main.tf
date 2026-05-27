@@ -10,6 +10,10 @@ terraform {
       source  = "hashicorp/http"
       version = "~> 3.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
   }
 
   # Backend configuration for remote state management
@@ -42,4 +46,6 @@ locals {
   }
 
   lambda_function_name = "${var.project_name}-${var.environment}"
+  effective_domain     = var.environment == "prod" ? var.domain_name : "dev.${var.domain_name}"
+  assets_bucket_prefix = var.environment == "prod" ? var.project_name : local.lambda_function_name
 }

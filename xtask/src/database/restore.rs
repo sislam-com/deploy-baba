@@ -10,11 +10,12 @@ pub async fn restore_database(
     path: Option<String>,
     profile: Option<String>,
 ) -> anyhow::Result<()> {
-    let db_path = path.unwrap_or_else(|| "app.db".to_string());
+    let db_path = path.unwrap_or_else(|| "deploy-baba.db".to_string());
     println!("♻️  Restoring database to: {}", db_path);
 
-    let config = crate::aws::create_aws_config(profile).await?;
+    let config = crate::aws::create_aws_config(profile.clone()).await?;
     let client = S3Client::new(&config);
+    let bucket = super::resolve_bucket(&profile).await;
 
     // Determine backup key
     let backup_key = if let Some(v) = version {
@@ -24,7 +25,7 @@ pub async fn restore_database(
         println!("   Finding latest backup...");
         let response = client
             .list_objects_v2()
-            .bucket("deploy-baba-backups")
+            .bucket(&bucket)
             .prefix("db-backups/")
             .send()
             .await
@@ -39,7 +40,7 @@ pub async fn restore_database(
                     let b_key = b.key.as_ref().unwrap_or(&empty);
                     b_key.cmp(a_key)
                 });
-                objects.pop().and_then(|o| o.key)
+                objects.into_iter().next().and_then(|o| o.key)
             })
             .ok_or_else(|| anyhow::anyhow!("No backups found"))?;
 
@@ -51,7 +52,7 @@ pub async fn restore_database(
     // Download from S3
     let response = client
         .get_object()
-        .bucket("deploy-baba-backups")
+        .bucket(&bucket)
         .key(&backup_key)
         .send()
         .await

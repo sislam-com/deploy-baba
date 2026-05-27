@@ -12,6 +12,15 @@ interface Challenge {
   category: string | null
   url: string | null
   image_url: string | null
+  problem: string | null
+  constraints: string | null
+  decisions: string | null
+  implementation: string | null
+  outcomes: string | null
+  metrics: string | null
+  related_job_slug: string | null
+  related_plan_module: string | null
+  related_adr: string | null
   featured: boolean
   sort_order: number
 }
@@ -33,6 +42,15 @@ interface ChallengeForm {
   category: string
   url: string
   image_url: string
+  problem: string
+  constraints: string
+  decisions: string
+  implementation: string
+  outcomes: string
+  metrics: string
+  related_job_slug: string
+  related_plan_module: string
+  related_adr: string
   featured: boolean
   sort_order: number
 }
@@ -47,6 +65,15 @@ const EMPTY: ChallengeForm = {
   category: '',
   url: '',
   image_url: '',
+  problem: '',
+  constraints: '',
+  decisions: '',
+  implementation: '',
+  outcomes: '',
+  metrics: '',
+  related_job_slug: '',
+  related_plan_module: '',
+  related_adr: '',
   featured: false,
   sort_order: 0,
 }
@@ -88,6 +115,15 @@ export default function ChallengeDetail() {
           category: ch.category ?? '',
           url: ch.url ?? '',
           image_url: ch.image_url ?? '',
+          problem: ch.problem ?? '',
+          constraints: ch.constraints ?? '',
+          decisions: ch.decisions ?? '',
+          implementation: ch.implementation ?? '',
+          outcomes: ch.outcomes ?? '',
+          metrics: ch.metrics ?? '',
+          related_job_slug: ch.related_job_slug ?? '',
+          related_plan_module: ch.related_plan_module ?? '',
+          related_adr: ch.related_adr ?? '',
           featured: ch.featured,
           sort_order: ch.sort_order,
         })
@@ -110,6 +146,15 @@ export default function ChallengeDetail() {
       category: form.category || null,
       url: form.url || null,
       image_url: form.image_url || null,
+      problem: form.problem || null,
+      constraints: form.constraints || null,
+      decisions: form.decisions || null,
+      implementation: form.implementation || null,
+      outcomes: form.outcomes || null,
+      metrics: form.metrics || null,
+      related_job_slug: form.related_job_slug || null,
+      related_plan_module: form.related_plan_module || null,
+      related_adr: form.related_adr || null,
       featured: form.featured,
       sort_order: form.sort_order,
     }
@@ -203,6 +248,30 @@ export default function ChallengeDetail() {
               value={form[field]}
               onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
               placeholder={field === 'tech_stack' ? 'Rust, React, AWS' : undefined}
+            />
+          </label>
+        ))}
+
+        {(['problem', 'constraints', 'decisions', 'implementation', 'outcomes', 'metrics'] as const).map(field => (
+          <label key={field} className="block">
+            <span className="text-sm text-gray-400">{field}</span>
+            <textarea
+              className="mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2
+                         text-white focus:ring-2 focus:ring-cyan-500 focus:outline-none min-h-[96px]"
+              value={form[field]}
+              onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
+            />
+          </label>
+        ))}
+
+        {(['related_job_slug', 'related_plan_module', 'related_adr'] as const).map(field => (
+          <label key={field} className="block">
+            <span className="text-sm text-gray-400">{field.replace(/_/g, ' ')}</span>
+            <input
+              className="mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2
+                         text-white focus:ring-2 focus:ring-cyan-500 focus:outline-none"
+              value={form[field]}
+              onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
             />
           </label>
         ))}

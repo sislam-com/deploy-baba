@@ -2,27 +2,41 @@
 
 use aws_sdk_s3::Client as S3Client;
 use flate2::Compression;
+use rusqlite::Connection;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub async fn backup_database(path: Option<String>, profile: Option<String>) -> anyhow::Result<()> {
-    let db_path = path.unwrap_or_else(|| "app.db".to_string());
+    let db_path = path.unwrap_or_else(|| "deploy-baba.db".to_string());
     println!("💾 Backing up database: {}", db_path);
 
     if !Path::new(&db_path).exists() {
         return Err(anyhow::anyhow!("Database file not found: {}", db_path));
     }
 
-    // Read database file
-    let mut db_file =
-        File::open(&db_path).map_err(|e| anyhow::anyhow!("Failed to open database file: {}", e))?;
+    // The database runs in WAL mode (PRAGMA journal_mode=WAL), so the main
+    // .db file alone is insufficient — committed data may live in the -wal file.
+    // Use SQLite's online backup API to produce a consistent snapshot.
+    println!("   Creating consistent snapshot...");
+    let temp_path = format!("{}.backup-{}", db_path, std::process::id());
 
+    let src_conn = Connection::open(&db_path)
+        .map_err(|e| anyhow::anyhow!("Failed to open database for backup: {}", e))?;
+    src_conn
+        .backup(rusqlite::DatabaseName::Main, &temp_path, None)
+        .map_err(|e| anyhow::anyhow!("SQLite backup failed: {}", e))?;
+
+    let mut snapshot_file = File::open(&temp_path)
+        .map_err(|e| anyhow::anyhow!("Failed to open snapshot file: {}", e))?;
     let mut db_data = Vec::new();
-    db_file
+    snapshot_file
         .read_to_end(&mut db_data)
-        .map_err(|e| anyhow::anyhow!("Failed to read database file: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to read snapshot file: {}", e))?;
+
+    std::fs::remove_file(&temp_path)
+        .unwrap_or_else(|_| eprintln!("   ⚠️  Failed to clean up temp snapshot: {}", temp_path));
 
     // Compress with gzip
     println!("   Compressing...");
@@ -30,6 +44,7 @@ pub async fn backup_database(path: Option<String>, profile: Option<String>) -> a
 
     // Upload to S3
     println!("   Uploading to S3...");
+    let bucket = super::resolve_bucket(&profile).await;
     let config = crate::aws::create_aws_config(profile).await?;
     let client = S3Client::new(&config);
 
@@ -43,7 +58,7 @@ pub async fn backup_database(path: Option<String>, profile: Option<String>) -> a
 
     client
         .put_object()
-        .bucket("deploy-baba-backups")
+        .bucket(&bucket)
         .key(&backup_key)
         .body(aws_sdk_s3::primitives::ByteStream::from(compressed))
         .send()

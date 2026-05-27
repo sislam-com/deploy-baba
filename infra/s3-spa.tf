@@ -45,8 +45,9 @@ resource "aws_s3_bucket_lifecycle_configuration" "spa" {
   }
 }
 
-# Allow CloudFront OAC to read SPA assets from this bucket
+# Allow CloudFront OAC to read SPA assets from this bucket (prod only)
 resource "aws_s3_bucket_policy" "spa_cloudfront" {
+  count  = var.environment == "prod" ? 1 : 0
   bucket = aws_s3_bucket.spa.id
 
   policy = jsonencode({
@@ -62,7 +63,7 @@ resource "aws_s3_bucket_policy" "spa_cloudfront" {
         Resource = "${aws_s3_bucket.spa.arn}/*"
         Condition = {
           StringEquals = {
-            "AWS:SourceArn" = aws_cloudfront_distribution.main.arn
+            "AWS:SourceArn" = aws_cloudfront_distribution.main[0].arn
           }
         }
       }
@@ -70,10 +71,11 @@ resource "aws_s3_bucket_policy" "spa_cloudfront" {
   })
 }
 
-# IAM: allow CI to upload SPA assets to this bucket
+# IAM: allow CI to upload SPA assets to this bucket (prod-only singleton roles)
 resource "aws_iam_role_policy" "ci_s3_spa_dev" {
-  name = "${var.project_name}-ci-s3-spa-dev-policy"
-  role = aws_iam_role.ci_deploy_dev.id
+  count = local.is_prod ? 1 : 0
+  name  = "${var.project_name}-ci-s3-spa-dev-policy"
+  role  = aws_iam_role.ci_deploy_dev[0].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -89,8 +91,9 @@ resource "aws_iam_role_policy" "ci_s3_spa_dev" {
 }
 
 resource "aws_iam_role_policy" "ci_s3_spa_prod" {
-  name = "${var.project_name}-ci-s3-spa-prod-policy"
-  role = aws_iam_role.ci_deploy_prod.id
+  count = local.is_prod ? 1 : 0
+  name  = "${var.project_name}-ci-s3-spa-prod-policy"
+  role  = aws_iam_role.ci_deploy_prod[0].id
 
   policy = jsonencode({
     Version = "2012-10-17"

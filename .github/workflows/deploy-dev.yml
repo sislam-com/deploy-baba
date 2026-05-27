@@ -69,6 +69,37 @@ jobs:
             --function-name "$UI_FN_NAME" \
             --region us-east-1
 
+      # ── Build + deploy Agent Lambda ──────────────────────────────────────────
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Build agent Lambda zip
+        run: |
+          cd services/agent
+          uv export --frozen --no-dev > /tmp/agent-requirements.txt
+          pip install --target ../../build/agent-lambda -r /tmp/agent-requirements.txt --quiet
+          cp -r src/* ../../build/agent-lambda/
+          cd ../../build/agent-lambda
+          zip -qr ../../infra/build/agent-lambda.zip .
+
+      - name: Update agent Lambda code
+        run: |
+          aws lambda update-function-code \
+            --function-name deploy-baba-prod-agent \
+            --zip-file fileb://infra/build/agent-lambda.zip \
+            --region us-east-1
+
+      - name: Wait for agent Lambda update
+        run: |
+          aws lambda wait function-updated \
+            --function-name deploy-baba-prod-agent \
+            --region us-east-1
+
       # ── Build + deploy SPA ────────────────────────────────────────────────────
 
       - uses: pnpm/action-setup@v5

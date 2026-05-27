@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS legal_documents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug TEXT NOT NULL UNIQUE,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);

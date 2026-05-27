@@ -6,6 +6,7 @@ members = [
     "crates/llm-openai",
     "crates/rag-core",
     "crates/rag-sqlite",
+    "crates/mcp-rs",
     "crates/config-core",
     "crates/config-toml",
     "crates/config-yaml",
@@ -17,9 +18,16 @@ members = [
     "crates/api-merger",
     "crates/infra-types",
     "crates/portfolio-rag-mcp",
+    "crates/service-protocol",
     "services/ui",
+    "services/auth",
+    "services/portfolio",
+    "services/rag",
+    "services/admin",
+    "services/contact",
     "services/email",
     "services/llm-proxy",
+    "services/mcp-gateway",
     "xtask",
     "examples/01_multi_format_config",
     "examples/02_api_spec_generation",
@@ -82,6 +90,7 @@ aws-sdk-efs = { version = "1", default-features = false, features = ["default-ht
 aws-sdk-dynamodb = { version = "1", default-features = false, features = ["default-https-client", "rt-tokio"] }
 aws-sdk-sesv2 = { version = "1", default-features = false, features = ["behavior-version-latest", "sigv4a", "default-https-client", "rt-tokio"] }
 aws-sdk-secretsmanager = { version = "1", default-features = false, features = ["default-https-client", "rt-tokio"] }
+aws-sdk-cognitoidentityprovider = { version = "1", default-features = false, features = ["default-https-client", "rt-tokio"] }
 
 # CLI
 clap = { version = "4", features = ["derive"] }
@@ -90,7 +99,7 @@ clap = { version = "4", features = ["derive"] }
 flate2 = "1"
 
 # Database
-rusqlite = { version = "0.32", features = ["bundled"] }
+rusqlite = { version = "0.32", features = ["bundled", "backup"] }
 
 # Auth
 jsonwebtoken = "9"
@@ -119,6 +128,7 @@ llm-anthropic = { path = "crates/llm-anthropic" }
 llm-openai = { path = "crates/llm-openai" }
 rag-core = { path = "crates/rag-core" }
 rag-sqlite = { path = "crates/rag-sqlite" }
+mcp-rs = { path = "crates/mcp-rs" }
 
 [profile.release]
 lto = true

@@ -87,6 +87,22 @@ export const handlers = [
     })
   }),
 
+  http.post('/api/auth/signin', () => {
+    return HttpResponse.json({ success: true })
+  }),
+
+  http.post('/api/auth/forgot-password', () => {
+    return HttpResponse.json({ success: true })
+  }),
+
+  http.post('/api/auth/confirm-forgot-password', () => {
+    return HttpResponse.json({ success: true })
+  }),
+
+  http.post('/api/auth/respond-to-challenge', () => {
+    return HttpResponse.json({ success: true })
+  }),
+
   // Resume endpoint
   http.get('/api/resume', () => {
     return HttpResponse.json({
@@ -192,6 +208,109 @@ export const handlers = [
       success: true,
       message: 'Message sent successfully',
     })
+  }),
+
+  // LinkedIn sync (admin)
+  http.get('/api/v1/admin/linkedin/positions', () => {
+    return HttpResponse.json([])
+  }),
+
+  http.get('/api/v1/admin/linkedin/projects', () => {
+    return HttpResponse.json([])
+  }),
+
+  http.get('/api/v1/admin/linkedin/sync-log', () => {
+    return HttpResponse.json([])
+  }),
+
+  // LinkedIn admin endpoints
+  http.post('/api/v1/admin/linkedin/import', () => {
+    return HttpResponse.json({
+      positions_imported: 2,
+      projects_imported: 1,
+      positions_matched: 1,
+      projects_matched: 0,
+    })
+  }),
+
+  http.get('/api/v1/admin/linkedin/positions/:id/diff', () => {
+    return HttpResponse.json({
+      position: {
+        id: 1,
+        company: 'Tech Corp',
+        title: 'Senior Engineer',
+        location: 'SF',
+        start_date: '2020-01',
+        end_date: null,
+        description: 'Backend work',
+        mapped_job_id: 1,
+        sync_status: 'diverged',
+      },
+      job_title: 'Sr. Engineer',
+      job_company: 'Tech Corp',
+      fields: [
+        { field: 'title', linkedin_value: 'Senior Engineer', db_value: 'Sr. Engineer', differs: true },
+        { field: 'company', linkedin_value: 'Tech Corp', db_value: 'Tech Corp', differs: false },
+      ],
+    })
+  }),
+
+  http.get('/api/v1/admin/linkedin/projects/:id/diff', () => {
+    return HttpResponse.json({
+      project: {
+        id: 1,
+        title: 'Portfolio RAG',
+        description: 'Built a RAG system',
+        url: null,
+        start_date: '2026-01',
+        end_date: null,
+        associated_position: 'Tech Corp',
+        mapped_challenge_id: 1,
+        sync_status: 'diverged',
+      },
+      challenge_title: 'Portfolio RAG System',
+      fields: [
+        { field: 'title', linkedin_value: 'Portfolio RAG', db_value: 'Portfolio RAG System', differs: true },
+      ],
+    })
+  }),
+
+  http.put('/api/v1/admin/linkedin/positions/:id/map', () => {
+    return new HttpResponse(null, { status: 200 })
+  }),
+
+  http.put('/api/v1/admin/linkedin/projects/:id/map', () => {
+    return new HttpResponse(null, { status: 200 })
+  }),
+
+  http.put('/api/v1/admin/linkedin/positions/:id/status', () => {
+    return new HttpResponse(null, { status: 200 })
+  }),
+
+  http.put('/api/v1/admin/linkedin/projects/:id/status', () => {
+    return new HttpResponse(null, { status: 200 })
+  }),
+
+  // LinkedIn OAuth (agent service)
+  http.get('/api/v1/agent/linkedin/status', () => {
+    return HttpResponse.json({
+      connected: false,
+      name: null,
+      email: null,
+      picture_url: null,
+      token_expires_at: null,
+    })
+  }),
+
+  http.get('/api/v1/agent/linkedin/auth-url', () => {
+    return HttpResponse.json({
+      url: 'https://www.linkedin.com/oauth/v2/authorization?client_id=test&state=abc123',
+      state: 'abc123',
+    })
+  }),
+
+  http.post('/api/v1/agent/linkedin/disconnect', () => {
+    return HttpResponse.json({ status: 'disconnected' })
   }),
 
   // Ask endpoint

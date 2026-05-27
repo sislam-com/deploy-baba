@@ -134,7 +134,7 @@ async fn handle_request(rag: &PortfolioRAG, request: &str) -> Result<String> {
     // Validate method name (prevent injection)
     if !method
         .chars()
-        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.')
+        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.' || c == '/')
     {
         return Err(anyhow::anyhow!(
             "{}: Invalid method name: {}",
@@ -210,21 +210,22 @@ async fn handle_request(rag: &PortfolioRAG, request: &str) -> Result<String> {
             }
 
             let result = match name {
+                "context_brief" => {
+                    let args = arguments
+                        .ok_or_else(|| anyhow::anyhow!("{}: Missing arguments", INVALID_PARAMS))?;
+                    tools::context_brief(rag, args).await?
+                }
                 "query_rag" => {
                     let args = arguments
                         .ok_or_else(|| anyhow::anyhow!("{}: Missing arguments", INVALID_PARAMS))?;
                     tools::query_rag(rag, args).await?
                 }
                 "list_corpora" => tools::list_corpora(rag)?,
+                "project_health" => tools::project_health(rag)?,
                 "get_corpus_stats" => {
                     let args = arguments
                         .ok_or_else(|| anyhow::anyhow!("{}: Missing arguments", INVALID_PARAMS))?;
                     tools::get_corpus_stats(rag, args)?
-                }
-                "search_portfolio" => {
-                    let args = arguments
-                        .ok_or_else(|| anyhow::anyhow!("{}: Missing arguments", INVALID_PARAMS))?;
-                    tools::search_portfolio(rag, args).await?
                 }
                 _ => {
                     return Err(anyhow::anyhow!(

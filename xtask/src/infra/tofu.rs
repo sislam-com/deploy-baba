@@ -1,12 +1,13 @@
 //! OpenTofu command wrappers
 //!
 //! All commands default to running in the "infra/" subdirectory via tofu's
-//! `-chdir=<dir>` flag. Pass `AWS_PROFILE` via the profile argument so tofu
-//! inherits the correct credentials.
+//! `-chdir=<dir>` flag.
+//!
+//! `workspace` selects the OpenTofu workspace (default → prod, dev → dev).
+//! `aws_profile` sets `AWS_PROFILE` for credentials (independent of workspace).
 
 use std::process::Command;
 
-/// Verify the `tofu` binary is available before running any infrastructure command.
 pub fn check_tofu_binary() -> anyhow::Result<()> {
     let output = Command::new("tofu").arg("version").output();
     match output {
@@ -17,19 +18,57 @@ pub fn check_tofu_binary() -> anyhow::Result<()> {
     }
 }
 
-fn make_cmd(dir: Option<String>, profile: Option<String>) -> (Command, String) {
-    let dir = dir.unwrap_or_else(|| "infra".to_string());
+fn make_cmd(dir: &str, aws_profile: Option<&str>) -> Command {
     let mut cmd = Command::new("tofu");
     cmd.arg(format!("-chdir={}", dir));
-    if let Some(p) = profile {
+    if let Some(p) = aws_profile {
         cmd.env("AWS_PROFILE", p);
     }
-    (cmd, dir)
+    cmd
 }
 
-pub async fn run_tofu_init(dir: Option<String>, profile: Option<String>) -> anyhow::Result<()> {
+fn select_workspace(dir: &str, workspace: &str, aws_profile: Option<&str>) -> anyhow::Result<()> {
+    let mut cmd = make_cmd(dir, aws_profile);
+    cmd.args(["workspace", "select", workspace]);
+    let status = cmd.status()?;
+    if status.success() {
+        return Ok(());
+    }
+    let mut cmd = make_cmd(dir, aws_profile);
+    cmd.args(["workspace", "new", workspace]);
+    let status = cmd.status()?;
+    if !status.success() {
+        return Err(anyhow::anyhow!(
+            "Failed to select or create workspace '{}'",
+            workspace
+        ));
+    }
+    Ok(())
+}
+
+fn resolve_dir(dir: Option<&str>) -> String {
+    dir.unwrap_or("infra").to_string()
+}
+
+/// Select workspace and return extra `-var` args to append after the subcommand.
+fn prepare_workspace(
+    dir: &str,
+    workspace: Option<&str>,
+    aws_profile: Option<&str>,
+) -> anyhow::Result<Vec<String>> {
+    if let Some(ws) = workspace {
+        select_workspace(dir, ws, aws_profile)?;
+        if ws != "default" {
+            return Ok(vec!["-var".into(), format!("environment={}", ws)]);
+        }
+    }
+    Ok(vec![])
+}
+
+pub async fn run_tofu_init(dir: Option<String>, aws_profile: Option<String>) -> anyhow::Result<()> {
     check_tofu_binary()?;
-    let (mut cmd, dir) = make_cmd(dir, profile);
+    let dir = resolve_dir(dir.as_deref());
+    let mut cmd = make_cmd(&dir, aws_profile.as_deref());
     println!("Initializing OpenTofu ({})...", dir);
     cmd.arg("init");
 
@@ -42,11 +81,22 @@ pub async fn run_tofu_init(dir: Option<String>, profile: Option<String>) -> anyh
     Ok(())
 }
 
-pub async fn run_tofu_plan(dir: Option<String>, profile: Option<String>) -> anyhow::Result<()> {
+pub async fn run_tofu_plan(
+    dir: Option<String>,
+    workspace: Option<String>,
+    aws_profile: Option<String>,
+) -> anyhow::Result<()> {
     check_tofu_binary()?;
-    let (mut cmd, dir) = make_cmd(dir, profile);
-    println!("Planning OpenTofu ({})...", dir);
+    let dir = resolve_dir(dir.as_deref());
+    let extra = prepare_workspace(&dir, workspace.as_deref(), aws_profile.as_deref())?;
+    println!(
+        "Planning OpenTofu ({}, workspace={})...",
+        dir,
+        workspace.as_deref().unwrap_or("default")
+    );
+    let mut cmd = make_cmd(&dir, aws_profile.as_deref());
     cmd.arg("plan");
+    cmd.args(&extra);
 
     let status = cmd.status()?;
     if !status.success() {
@@ -60,12 +110,20 @@ pub async fn run_tofu_plan(dir: Option<String>, profile: Option<String>) -> anyh
 pub async fn run_tofu_apply(
     dir: Option<String>,
     auto_approve: bool,
-    profile: Option<String>,
+    workspace: Option<String>,
+    aws_profile: Option<String>,
 ) -> anyhow::Result<()> {
     check_tofu_binary()?;
-    let (mut cmd, dir) = make_cmd(dir, profile);
-    println!("Applying OpenTofu ({})...", dir);
+    let dir = resolve_dir(dir.as_deref());
+    let extra = prepare_workspace(&dir, workspace.as_deref(), aws_profile.as_deref())?;
+    println!(
+        "Applying OpenTofu ({}, workspace={})...",
+        dir,
+        workspace.as_deref().unwrap_or("default")
+    );
+    let mut cmd = make_cmd(&dir, aws_profile.as_deref());
     cmd.arg("apply");
+    cmd.args(&extra);
 
     if auto_approve {
         cmd.arg("-auto-approve");
@@ -83,12 +141,20 @@ pub async fn run_tofu_apply(
 pub async fn run_tofu_destroy(
     dir: Option<String>,
     auto_approve: bool,
-    profile: Option<String>,
+    workspace: Option<String>,
+    aws_profile: Option<String>,
 ) -> anyhow::Result<()> {
     check_tofu_binary()?;
-    let (mut cmd, dir) = make_cmd(dir, profile);
-    println!("Destroying OpenTofu ({})...", dir);
+    let dir = resolve_dir(dir.as_deref());
+    let extra = prepare_workspace(&dir, workspace.as_deref(), aws_profile.as_deref())?;
+    println!(
+        "Destroying OpenTofu ({}, workspace={})...",
+        dir,
+        workspace.as_deref().unwrap_or("default")
+    );
+    let mut cmd = make_cmd(&dir, aws_profile.as_deref());
     cmd.arg("destroy");
+    cmd.args(&extra);
 
     if auto_approve {
         cmd.arg("-auto-approve");
@@ -106,10 +172,12 @@ pub async fn run_tofu_destroy(
 pub async fn run_tofu_output(
     name: Option<String>,
     dir: Option<String>,
-    profile: Option<String>,
+    workspace: Option<String>,
+    aws_profile: Option<String>,
 ) -> anyhow::Result<()> {
     check_tofu_binary()?;
-    let (mut cmd, dir) = make_cmd(dir, profile);
+    let dir = resolve_dir(dir.as_deref());
+    let extra = prepare_workspace(&dir, workspace.as_deref(), aws_profile.as_deref())?;
     println!(
         "Getting OpenTofu output{} ({})...",
         name.as_ref()
@@ -117,8 +185,10 @@ pub async fn run_tofu_output(
             .unwrap_or_default(),
         dir,
     );
+    let mut cmd = make_cmd(&dir, aws_profile.as_deref());
     cmd.arg("output");
     cmd.arg("-json");
+    cmd.args(&extra);
 
     if let Some(n) = name {
         cmd.arg(n);

@@ -1,6 +1,6 @@
 # deploy-baba — Plan Index
-**GitHub:** `sislam-com/deploy-baba` | **Last updated:** 2026-05-14
-**Source repo:** `~/shanto` (Baba Toolchain, ~85K LOC) | **Status:** ~95% complete
+**GitHub:** `sislam-com/deploy-baba` | **Last updated:** 2026-05-24
+**Source repo:** `~/shanto` (Baba Toolchain, ~85K LOC) | **Status:** ~90% complete (microservices transformation in progress)
 
 See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming rules.
 
@@ -26,7 +26,9 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | terraform | W-TF | `infra/` | SUPERSEDED | Replaced by W-OTF (OpenTofu). W-TF.4.1 and W-TF.4.2 already fixed in code. |
 | opentofu | W-OTF | `infra/` + `xtask/src/infra/` | DONE | `tofu` v1.11.5 installed; plan runs clean (W-OTF.4.7 DONE 2026-05-01). `acm.tf` added; `cdn.tf` updated for `dev.sislam.com` + wildcard cert. |
 | dx-justfile | W-DX | `justfile`, `docs/`, `examples/` | WIP | Per-crate READMEs DONE (10 crates, MIT license); examples TODO, integration tests TODO
-| auth | W-AUTH | `services/ui/src/auth.rs`, `routes/auth.rs`, `routes/api/admin.rs`, `infra/cognito.tf` | DONE | W-AUTH.POST-FIX (CloudFront OAC body hash); dashboard now React (W-WEB) |
+| auth | W-AUTH | `services/auth/` (extracted Lambda) | DONE | Standalone Cognito Lambda on :3002; W-AGW routes `/auth/*` to it |
+| service-protocol | W-SVP | `crates/service-protocol/` | DONE | ServiceRequest/ServiceResponse types; TargetService routing; Lambda name generation |
+| api-gateway | W-AGW | `services/ui/` (routing layer) | WIP | Routing middleware with Lambda SDK invoke; per-service circuit breakers; correlation IDs |
 | about | W-ABT | `services/ui/src/routes/api/about.rs`, `services/ui/migrations/008-009` | DONE | Templates deleted (D.5); data served via JSON API to SPA |
 | social-links | W-SL | `services/ui/src/db.rs`, `services/ui/src/routes/api/admin.rs`, `services/ui/migrations/010-011` | DONE | Templates deleted (D.5); nav loop now in React Layout.tsx |
 | contact-form | W-CTF | `services/email/`, `services/ui/src/routes/contact.rs`, `infra/ses.tf`, `infra/email-lambda.tf`, `infra/apigateway.tf` | DONE | e2e test (W-CTF.4.12) — smoke tests created in services/ui/tests/contact_smoke.rs |
@@ -45,6 +47,11 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | observability | W-OBS | `services/ui/src/telemetry.rs`, `services/ui/migrations/` | DONE | `metrics_middleware` (fire-and-forget SQLite writes); `GET /api/v1/metrics` (p50/p95/p99 + error rate); admin-gated |
 | resilience | W-RES | `services/ui/src/middleware/` | DONE | `rate_limit_middleware` (100 req/60s per IP+endpoint); `CircuitBreaker` around LLM calls (5 failures → 60s open); `validate_request_middleware` (1 MB body guard); `RetryPolicy` available for handler retry |
 | module-decomposition | W-MOD | `services/ui/src/modules/` | TODO | Logical module separation (portfolio, rag, admin, auth); independent testing per module; module-specific metrics |
+| mcp-cloud | W-MCP | `crates/mcp-rs/`, `services/mcp-gateway/` | WIP | Private MCP gateway; local mcp-rs + cloud Cognito-authenticated Lambda gateway (ADR-028) |
+| env-promote | W-PROM | `xtask/src/deploy/promote.rs`, `infra/*.tf`, `.github/workflows/` | TODO | Dev/prod separation via OT workspaces; `just promote` artifact promotion; xtask workspace refactoring (ADR-029) |
+| saas-onboard | W-SAAS | `xtask/src/onboard.rs`, `crates/portfolio-rag-mcp/`, `services/ui/src/routes/api/eval.rs` | WIP | Project onboarding for external repos; eval dashboard; project_health MCP tool (ADR-030) |
+| agent | W-AGT | `services/agent/` (Python/LangGraph) | TODO | Cover letter generation agent; first Python Lambda; LangGraph ReAct with 4 tools (ADR-032/033/034) |
+| linkedin-sync | W-LINK | `services/ui/src/routes/api/linkedin.rs`, `web/src/routes/dashboard/LinkedInSync.tsx` | WIP | LinkedIn data import (CSV export); admin diff UI; sync status badges on Jobs/Challenges; secret pre-wired |
 
 ---
 
@@ -67,12 +74,18 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 
 ---
 
-### P0 — New Feature (in progress on `cognito-login` branch)
+### P0 — New Feature (in progress on `custom-auth` branch)
 1. ~~**W-AUTH.4.1–4.15**~~ — Cognito auth + admin dashboard — **DONE** (code compiles clean, Cognito infra deployed to `us-east-1_I7c15vLHE`)
 2. ~~**W-AUTH.4.20**~~ — Fix Lambda 504: lazy JWKS fetch — **SUPERSEDED** by W-AUTH.4.21
 3. ~~**W-AUTH.4.21**~~ — Fix callback 504: implicit grant + JWKS from env — **DONE** (`allowed_oauth_flows=["implicit"]`; `data "http" cognito_jwks`; `COGNITO_JWKS` env var; HTML callback + `/auth/set-session`; self-sign-up disabled)
 4. ~~**W-AUTH.4.19**~~ — OpenAPI security scheme + admin endpoint docs — **DONE** (`cookieAuth`/`bearerAuth`, 12 admin paths, `ToSchema` on input types)
 5. ~~**W-AUTH.4.22–4.28**~~ — Dashboard master/detail refactoring — **DONE** (6 routes, 5 templates, type-ahead nav, dashboard.html monolith deleted)
+6. **W-AUTH.4.30–4.35** — Custom Cognito auth service (`services/auth/`) — **IN PROGRESS**:
+   - Public Lambda (no VPC) proxying Cognito IDP via AWS SDK
+   - SPA login page (`/auth/login`) replaces Cognito hosted-UI redirect
+   - Sign-in, forgot password, force-change-password, MFA challenge flows
+   - Token exchange: auth service → UI Lambda `/auth/set-session` for HttpOnly cookie
+   - Dev-mode bypass preserved for `just ui`
 
 ### P0.5 — Live Site Post-Incident
 1. ~~**W-AUTH.POST-FIX**~~ — **RESOLVED** for `POST /api/contact` via API Gateway HTTP API (ADR-009). Dashboard edit forms (PUT/PATCH via OAC path) remain broken — out of scope for now. See `DRL-2026-03-27-function-url-auth`.
@@ -84,6 +97,16 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 3. ~~**W-TF.4.2**~~ — `infra/s3.tf`: `filter {}` already present — **RESOLVED** (see DRL-2026-03-25-opentofu)
 4. ~~**W-XT.4.2**~~ — Remove or wire up `EnvironmentInterpolator` — **DEFERRED** (kept as intentional placeholder in config-core; location corrected from xtask)
 5. ~~**W-OTF.4.1–4.7**~~ — **DONE 2026-05-01** — `tofu` v1.11.5 installed; `just infra-plan deploy-baba` clean. HCL fixes: duplicate `aws_caller_identity`, duplicate `file_system_config`, lifecycle `filter {}`. See DRL-2026-05-01-infra-plan-blockers.
+
+### P1.5 — Agentic Cover Letter (ADR-032/033/034)
+1. **W-AGT.4.1** — Scaffold `services/agent/` with pyproject.toml, LangGraph graph, Mangum handler — **DONE** (2026-05-24)
+2. **W-AGT.4.2–4.6** — Implement 4 LangGraph tools (resume retrieval, JD matcher, cover letter generator, S3 artifact)
+3. **W-AGT.4.3** — Add `POST /api/v1/tailor/match` thin Rust endpoint exposing `matcher.rs`
+4. **W-AGT.4.7–4.8** — Wire full LangGraph graph + FastAPI endpoint
+5. **W-AGT.4.9–4.11** — OpenTofu: `agent-lambda.tf`, IAM updates, S3 lifecycle rule
+6. **W-AGT.4.12** — Service-protocol routing from UI Lambda to agent Lambda
+7. **W-AGT.4.13** — Ask.tsx: intent detection, cover letter preview, PDF download
+8. **W-AGT.4.14–4.16** — Rate limiting, `just agent-build/deploy`, CI workflow
 
 ### P2 — Quality Gate
 5. ~~**W-DX.3**~~ — Per-crate README files (10 library crates) — **DONE** (MIT license for all 10 crates: config-core, config-toml, config-yaml, config-json, api-core, api-openapi, api-graphql, api-grpc, api-merger, infra-types)
@@ -103,13 +126,19 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 19. **W-LLM.4.1–4.4** — LLM provider abstraction + Claude reference adapter (see `plans/modules/llm-core.md`) — TODO
 18. **W-RST.4.1–4.10** — AI Resume Tailor pipeline on W-LLM (see `plans/modules/resume-tailor.md`) — TODO; BLOCKED-on-deploy for items 4.3/4.4/4.5 until W-SEC deployed + `anthropic-api-key` in SM
 
+### P2.7 — SaaS AI-DLC (ADR-030)
+26. **W-SAAS.4.3** — `project_health` MCP tool — **DONE** (combines plan coverage + drift + cache age + eval score)
+27. **W-SAAS.4.4–4.6** — Eval dashboard: `rag_eval_results` table exists (migration 023); `just rag-eval` persistence + `GET /api/v1/eval/dashboard` endpoint — TODO
+28. **W-SAAS.4.7–4.9** — `xtask onboard <repo-url>` external repo onboarding: language detection, artifact generation, RAG indexing — TODO
+29. **W-SAAS.4.10–4.11** — `onboard_project` MCP tool + justfile recipes — TODO
+
 ### P3 — Polish & Publish
 9. **W-GDR.4.1–4.4** — Google Drive MCP setup + `plan-export`/`plan-import` justfile recipes + `Stop` hook quality gate (see `plans/modules/gdrive-planning.md`)
 10. **W-PUB.1** — `just publish-dry` passes for all 10 library crates
 11. **W-PUB.2** — Tag `v0.1.0` + `just publish`
 11. ~~**W-UI.4.1**~~ — Wire utoipa-rapidoc properly — **DONE** (inline HTML approach works fine; loads RapiDoc from CDN)
 
-### P2.6 — Zero-Cost Microservices Enhancements
+### P2.6 — Zero-Cost Microservices Transformation (ADR-031)
 22. ~~**W-VER.4.1–4.4**~~ **DONE** — API versioning strategy (ADR-024) — URL-based /api/v1/ routing, version extraction middleware, deprecation headers, OpenAPI version metadata
 23. ~~**W-OBS.4.1–4.4**~~ **DONE** — SQLite-based observability (ADR-025) — `metrics_middleware` fire-and-forget writes; `GET /api/v1/metrics` p50/p95/p99 + error rate; admin-gated
 24. ~~**W-RES.4.1–4.4**~~ **DONE** — Code-level resilience patterns (ADR-026) — `rate_limit_middleware` (100 req/60s); `CircuitBreaker` around LLM calls; `validate_request_middleware` (1 MB guard); `RetryPolicy` available for handler use
@@ -164,6 +193,13 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | ADR-025 | SQLite-Based Metrics Collection — Zero-cost observability via SQLite metrics tables; structured logging with tracing; p50/p95/p99 latency calculation; no CloudWatch Metrics cost | W-OBS, W-UI, W-RAG |
 | ADR-026 | Code-Level Resilience Patterns — In-memory rate limiting; retry with exponential backoff; circuit breaker for LLM calls; request validation middleware; zero infra cost | W-RES, W-UI, W-LLM |
 | ADR-027 | Module-Based Service Decomposition — Logical separation within single Lambda (portfolio, rag, admin, auth modules); independent testing per module; future extraction path to separate Lambdas if needed | W-MOD, W-UI, W-RAG, W-AUTH |
+| ADR-028 | Private Cloud MCP Gateway — Cognito-authenticated MCP server on Lambda; API Gateway routing for POST /mcp + GET /mcp/health | W-MCP, W-CI, W-OTF |
+| ADR-029 | Dev/Prod Environment Separation with Artifact Promotion — OT workspaces for dev/prod; `just promote` copies artifacts instead of rebuilding; singleton resource sharing (VPC endpoints, OIDC, ACM) | W-PROM, W-CI, W-OTF, W-XT |
+| ADR-030 | SaaS AI-DLC Pattern — Six-pillar replicable AI-DLC (onboarding, session lifecycle, anti-rot, RAG, agentic tools, health dashboard); external repo onboarding; eval-driven accuracy loop | W-SAAS, W-RAG, W-MCP, W-AIL, W-LLM |
+| ADR-031 | Lambda Microservices Architecture — api-gateway routing Lambda; service-protocol crate; Lambda SDK invoke; shared EFS SQLite; per-service write conventions; incremental extraction | W-MOD, W-UI, W-RAG, W-AUTH, W-CTF, W-OBS, W-RES |
+| ADR-032 | Monorepo Consolidation (agentic-workflow → portfolio) — absorb Python/LangGraph agent into portfolio; archive agentic-workflow repo | W-AGT, W-WEB, W-DX, W-OTF, W-CI |
+| ADR-033 | Cover Letter Agent Architecture — LangGraph ReAct agent with 4 tools; public-facing with rate limiting; HTML preview + PDF download | W-AGT, W-RST, W-RAG, W-LLM, W-WEB, W-UI |
+| ADR-034 | Agent Lambda Deployment Pattern — Python Lambda (arm64, no VPC); Mangum handler; uv build; service-protocol invoke from UI Lambda | W-AGT, W-OTF, W-CI, W-DX |
 
 ---
 
@@ -252,6 +288,7 @@ shantopagla/deploy-baba/
 │   ├── api-merger/
 │   └── infra-types/
 ├── services/ui/            # Portfolio site + deployed Lambda binary (with modular structure: modules/, middleware/, telemetry/)
+├── services/auth/          # Cognito auth proxy Lambda (public, no VPC) — custom login flow for SPA
 ├── services/email/         # Email Lambda (SES sender, no VPC)
 ├── xtask/                  # Internal tooling (called by justfile)
 ├── infra/                  # OpenTofu (Lambda + EFS + S3 + EventBridge)

@@ -60,6 +60,27 @@ jobs:
       - run: tofu -chdir=infra init -backend=false
       - run: tofu -chdir=infra validate
 
+  agent:
+    name: Agent (Python)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Install dependencies
+        run: cd services/agent && uv sync --dev
+      - name: Lint (ruff check)
+        run: cd services/agent && uv run ruff check src/ tests/
+      - name: Format check (ruff format)
+        run: cd services/agent && uv run ruff format --check src/ tests/
+      - name: Type check (mypy)
+        run: cd services/agent && uv run mypy src/
+      - name: Tests (pytest)
+        run: cd services/agent && uv run pytest tests/ -v
+
   web:
     name: Web / SPA
     runs-on: ubuntu-latest

@@ -1,0 +1,27 @@
+[package]
+name = "mcp-rs"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+chrono = { version = "0.4", features = ["serde"] }
+glob = "0.3"
+num_cpus = "1.16"
+regex = "1.10"
+rusqlite = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+toml = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter", "json"] }
+walkdir = "2.4"
+which = "6.0"
+
+[dev-dependencies]
+tempfile = "3.10"

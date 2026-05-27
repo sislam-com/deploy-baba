@@ -1,0 +1,22 @@
+[mcp_servers.mcp-rs]
+command = "/Users/shantopagla/mcp-rs/target/release/mcp-rs"
+cwd = "/Users/shantopagla/mcp-rs"
+
+[mcp_servers.mcp-rs.env]
+MCP_RS_CONFIG = "/Users/shantopagla/mcp-rs/mcp-rs.toml"
+RUST_LOG = "mcp_rs=warn"
+
+[mcp_servers.portfolio-rag]
+args = [
+    "run",
+    "-q",
+    "-p",
+    "portfolio-rag-mcp",
+]
+command = "cargo"
+cwd = "/Users/shantopagla/portfolio"
+
+[mcp_servers.portfolio-rag.env]
+DATABASE_PATH = "/Users/shantopagla/portfolio/deploy-baba.db"
+RAG_CORPORA_PATH = "/Users/shantopagla/portfolio"
+RUST_LOG = "portfolio_rag_mcp=warn"

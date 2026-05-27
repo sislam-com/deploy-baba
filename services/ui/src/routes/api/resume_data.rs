@@ -104,7 +104,8 @@ pub async fn get_resume_data(State(db): State<Arc<Db>>) -> Result<Json<ResumeDat
     let mut stmt3 = conn
         .prepare(
             "SELECT id, slug, title, job_id, description, short_description, tech_stack, \
-             category, url, image_url, featured, sort_order \
+             category, url, image_url, problem, constraints, decisions, implementation, \
+             outcomes, metrics, related_job_slug, related_plan_module, related_adr, featured, sort_order \
              FROM challenges WHERE featured = 1 ORDER BY sort_order ASC",
         )
         .map_err(db_err)?;

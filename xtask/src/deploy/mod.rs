@@ -85,11 +85,7 @@ pub async fn execute(action: DeployAction) -> anyhow::Result<()> {
         DeployAction::Wait { profile, function } => {
             let fn_name = function
                 .or_else(|| std::env::var("UI_FN_NAME").ok())
-                .ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "Lambda function name required: pass --function or set UI_FN_NAME"
-                    )
-                })?;
+                .unwrap_or_else(|| "deploy-baba-prod".to_string());
             let aws_config = crate::aws::create_aws_config(profile).await?;
             let client = aws_sdk_lambda::Client::new(&aws_config);
             spa::wait_lambda_active(&client, &fn_name).await

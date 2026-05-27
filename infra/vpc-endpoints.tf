@@ -1,14 +1,19 @@
-# ─── VPC Interface Endpoint: Lambda ───────────────────────────────────────────
+# ─── VPC Interface Endpoints (prod-only singletons) ──────────────────────────
 #
-# Allows the VPC-bound UI Lambda to invoke the email Lambda via SDK without
-# a NAT Gateway. The Lambda API endpoint (lambda.region.amazonaws.com) resolves
-# to the endpoint's private IP when private_dns_enabled = true.
+# Allows the VPC-bound UI Lambda to invoke helper Lambdas and Secrets Manager
+# without a NAT Gateway. Shared per-VPC — managed in the prod workspace only.
+# Dev Lambda reuses the same VPC endpoints (same VPC, same account).
 #
-# Cost: ~$7.30/month for 1 AZ.
+# Cost: ~$7.30/month per interface endpoint (1 AZ).
+
+locals {
+  is_prod_vpc = var.environment == "prod"
+}
 
 # Security group: accepts HTTPS from the Lambda's security group
 resource "aws_security_group" "vpc_endpoints" {
-  name        = "${local.lambda_function_name}-vpc-endpoints-sg"
+  count       = local.is_prod_vpc ? 1 : 0
+  name        = "${var.project_name}-vpc-endpoints-sg"
   description = "Security group for VPC Interface endpoints"
   vpc_id      = data.aws_vpc.default.id
 
@@ -21,54 +26,54 @@ resource "aws_security_group" "vpc_endpoints" {
   }
 
   tags = {
-    Name = "${local.lambda_function_name}-vpc-endpoints-sg"
+    Name = "${var.project_name}-vpc-endpoints-sg"
   }
 }
 
 # One subnet only (1 AZ) to minimise hourly cost
 data "aws_subnet" "endpoint" {
+  count             = local.is_prod_vpc ? 1 : 0
   vpc_id            = data.aws_vpc.default.id
   availability_zone = data.aws_availability_zones.available.names[0]
   default_for_az    = true
 }
 
 resource "aws_vpc_endpoint" "lambda" {
+  count               = local.is_prod_vpc ? 1 : 0
   vpc_id              = data.aws_vpc.default.id
   service_name        = "com.amazonaws.${var.region}.lambda"
   vpc_endpoint_type   = "Interface"
-  subnet_ids          = [data.aws_subnet.endpoint.id]
-  security_group_ids  = [aws_security_group.vpc_endpoints.id]
+  subnet_ids          = [data.aws_subnet.endpoint[0].id]
+  security_group_ids  = [aws_security_group.vpc_endpoints[0].id]
   private_dns_enabled = true
 
   tags = {
-    Name = "${local.lambda_function_name}-lambda-endpoint"
+    Name = "${var.project_name}-lambda-endpoint"
   }
 }
 
 # ─── VPC Interface Endpoint: Secrets Manager ───────────────────────────────────
-#
-# Allows the VPC-bound UI Lambda to call Secrets Manager at cold start without
-# a NAT Gateway. Cost: ~$7.30/month for 1 AZ.
 
 resource "aws_vpc_endpoint" "secretsmanager" {
+  count               = local.is_prod_vpc ? 1 : 0
   vpc_id              = data.aws_vpc.default.id
   service_name        = "com.amazonaws.${var.region}.secretsmanager"
   vpc_endpoint_type   = "Interface"
-  subnet_ids          = [data.aws_subnet.endpoint.id]
-  security_group_ids  = [aws_security_group.vpc_endpoints.id]
+  subnet_ids          = [data.aws_subnet.endpoint[0].id]
+  security_group_ids  = [aws_security_group.vpc_endpoints[0].id]
   private_dns_enabled = true
 
   tags = {
-    Name = "${local.lambda_function_name}-secretsmanager-endpoint"
+    Name = "${var.project_name}-secretsmanager-endpoint"
   }
 }
 
 # ─── VPC Gateway Endpoint: S3 ─────────────────────────────────────────────────
 #
-# Free Gateway endpoint that routes S3 traffic through the AWS backbone so the
-# VPC-bound Lambda (no NAT Gateway) can reach S3 for backup and RAG ingest.
+# Free Gateway endpoint — S3 traffic through the AWS backbone.
 
 data "aws_route_tables" "main" {
+  count  = local.is_prod_vpc ? 1 : 0
   vpc_id = data.aws_vpc.default.id
 
   filter {
@@ -78,12 +83,13 @@ data "aws_route_tables" "main" {
 }
 
 resource "aws_vpc_endpoint" "s3" {
+  count             = local.is_prod_vpc ? 1 : 0
   vpc_id            = data.aws_vpc.default.id
   service_name      = "com.amazonaws.${var.region}.s3"
   vpc_endpoint_type = "Gateway"
-  route_table_ids   = data.aws_route_tables.main.ids
+  route_table_ids   = data.aws_route_tables.main[0].ids
 
   tags = {
-    Name = "${local.lambda_function_name}-s3-endpoint"
+    Name = "${var.project_name}-s3-endpoint"
   }
 }
