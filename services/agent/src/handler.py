@@ -14,6 +14,8 @@ from langchain_core.messages import HumanMessage
 from mangum import Mangum
 
 from agent.graph import graph
+from linkedin_oauth import load_linkedin_credentials
+from linkedin_oauth import router as linkedin_router
 from models import CoverLetterRequest, CoverLetterResponse
 
 app = FastAPI(
@@ -21,6 +23,7 @@ app = FastAPI(
     description="LangGraph agentic service for sislam.com",
     version="0.1.0",
 )
+app.include_router(linkedin_router)
 
 
 def _load_anthropic_key() -> None:
@@ -41,6 +44,7 @@ def _load_anthropic_key() -> None:
 @app.on_event("startup")
 async def startup() -> None:
     _load_anthropic_key()
+    load_linkedin_credentials()
 
 
 @app.get("/health")

@@ -134,6 +134,14 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "032_create_linkedin_sync",
         include_str!("../migrations/032_create_linkedin_sync.sql"),
     ),
+    (
+        "033_create_legal_documents",
+        include_str!("../migrations/033_create_legal_documents.sql"),
+    ),
+    (
+        "034_seed_legal_documents",
+        include_str!("../migrations/034_seed_legal_documents.sql"),
+    ),
 ];
 
 /// Re-exported from `api_openapi::models::social` — the canonical SSOT.

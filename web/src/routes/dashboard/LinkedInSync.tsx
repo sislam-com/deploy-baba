@@ -1,5 +1,13 @@
 import { useEffect, useState, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
+
+interface LinkedInConnectionStatus {
+  connected: boolean
+  name: string | null
+  email: string | null
+  picture_url: string | null
+  token_expires_at: string | null
+}
 
 interface LinkedInPosition {
   id: number
@@ -59,6 +67,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function LinkedInSync() {
+  const [searchParams] = useSearchParams()
   const [tab, setTab] = useState<'positions' | 'projects'>('positions')
   const [positions, setPositions] = useState<LinkedInPosition[]>([])
   const [projects, setProjects] = useState<LinkedInProject[]>([])
@@ -69,6 +78,33 @@ export default function LinkedInSync() {
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
   const [jsonInput, setJsonInput] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [connectionStatus, setConnectionStatus] = useState<LinkedInConnectionStatus | null>(null)
+  const [connecting, setConnecting] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/v1/agent/linkedin/status')
+      .then(r => r.json())
+      .then(setConnectionStatus)
+      .catch(() => setConnectionStatus({ connected: false, name: null, email: null, picture_url: null, token_expires_at: null }))
+  }, [searchParams.get('connected')])
+
+  const handleConnect = async () => {
+    setConnecting(true)
+    try {
+      const res = await fetch('/api/v1/agent/linkedin/auth-url')
+      if (!res.ok) throw new Error(await res.text())
+      const data = await res.json()
+      window.location.href = data.url
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to start LinkedIn auth')
+      setConnecting(false)
+    }
+  }
+
+  const handleDisconnect = async () => {
+    await fetch('/api/v1/agent/linkedin/disconnect', { method: 'POST' })
+    setConnectionStatus({ connected: false, name: null, email: null, picture_url: null, token_expires_at: null })
+  }
 
   const fetchData = () => {
     setLoading(true)
@@ -141,6 +177,54 @@ export default function LinkedInSync() {
   return (
     <div className="p-8">
       <h1 className="text-2xl font-bold text-white mb-6">LinkedIn Sync</h1>
+
+      {/* Connection Status */}
+      <div className="bg-gray-800 border border-gray-700 rounded-xl p-5 mb-6">
+        <h2 className="text-sm font-semibold text-gray-300 mb-3">LinkedIn Connection</h2>
+        {connectionStatus?.connected ? (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {connectionStatus.picture_url && (
+                <img
+                  src={connectionStatus.picture_url}
+                  alt=""
+                  className="w-10 h-10 rounded-full"
+                />
+              )}
+              <div>
+                <p className="text-white font-medium">
+                  {connectionStatus.name ?? 'Connected'}
+                </p>
+                {connectionStatus.email && (
+                  <p className="text-sm text-gray-400">{connectionStatus.email}</p>
+                )}
+              </div>
+              <span className="bg-green-900 text-green-300 text-[10px] font-semibold px-2 py-0.5 rounded ml-2">
+                Connected
+              </span>
+            </div>
+            <button
+              onClick={handleDisconnect}
+              className="text-sm text-gray-400 hover:text-red-400 transition"
+            >
+              Disconnect
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-4">
+            <button
+              onClick={handleConnect}
+              disabled={connecting}
+              className="bg-[#0A66C2] hover:bg-[#004182] disabled:bg-gray-600 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition flex items-center gap-2"
+            >
+              {connecting ? 'Redirecting...' : 'Connect LinkedIn'}
+            </button>
+            <p className="text-xs text-gray-500">
+              Sign in with LinkedIn to enable API-driven data sync.
+            </p>
+          </div>
+        )}
+      </div>
 
       {/* Import Section */}
       <div className="bg-gray-800 border border-gray-700 rounded-xl p-5 mb-6">
