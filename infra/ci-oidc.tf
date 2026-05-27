@@ -75,13 +75,13 @@ resource "aws_iam_role_policy" "ci_deploy_dev" {
           "lambda:GetFunctionConfiguration",
           "lambda:WaitFunctionActive"
         ]
-        Resource = "arn:aws:lambda:${var.region}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-prod*"
+        Resource = "arn:aws:lambda:${var.region}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-dev*"
       },
       {
         Sid      = "ReadDeployConfig"
         Effect   = "Allow"
         Action   = "secretsmanager:GetSecretValue"
-        Resource = "arn:aws:secretsmanager:${var.region}:${data.aws_caller_identity.current.account_id}:secret:${var.project_name}/prod/deploy-config*"
+        Resource = "arn:aws:secretsmanager:${var.region}:${data.aws_caller_identity.current.account_id}:secret:${var.project_name}/dev/deploy-config*"
       },
       {
         Sid      = "InvalidateCDN"
@@ -94,8 +94,8 @@ resource "aws_iam_role_policy" "ci_deploy_dev" {
         Effect = "Allow"
         Action = ["s3:PutObject", "s3:DeleteObject", "s3:ListBucket"]
         Resource = [
-          "arn:aws:s3:::${var.project_name}-prod-spa-*",
-          "arn:aws:s3:::${var.project_name}-prod-spa-*/*"
+          "arn:aws:s3:::${var.project_name}-dev-spa-*",
+          "arn:aws:s3:::${var.project_name}-dev-spa-*/*"
         ]
       }
     ]

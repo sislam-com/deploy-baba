@@ -7,6 +7,7 @@ pub mod competencies;
 pub mod crates;
 pub mod demo;
 pub mod jobs;
+pub mod legal;
 pub mod linkedin;
 pub mod metrics;
 pub mod resume_data;
@@ -26,6 +27,7 @@ pub fn router() -> Router<AppState> {
         .nest("/challenges", challenges::router())
         .nest("/competencies", competencies::router())
         .nest("/about", about::router())
+        .nest("/legal", legal::router())
         .nest("/social-links", social_links::router())
         .nest("/resume", resume_data::router())
         .nest("/auth", auth_me::router())

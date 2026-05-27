@@ -269,6 +269,27 @@ async fn handle_ingest_rag(_state: &state::AppState) -> Result<Value, lambda_run
     conn.execute_batch(&format!("ATTACH DATABASE '{tmp}' AS rag_src;"))
         .map_err(|e| format!("ATTACH: {e}"))?;
 
+    // Recover a broken FTS5 vtable before bulk import.
+    if conn
+        .prepare("SELECT rowid FROM rag_chunks_fts LIMIT 0")
+        .is_err()
+    {
+        tracing::warn!("FTS5 vtable broken, dropping and recreating before ingest");
+        let _ = conn.execute_batch(
+            "DROP TABLE IF EXISTS rag_chunks_fts;
+             DROP TABLE IF EXISTS rag_chunks_fts_data;
+             DROP TABLE IF EXISTS rag_chunks_fts_idx;
+             DROP TABLE IF EXISTS rag_chunks_fts_content;
+             DROP TABLE IF EXISTS rag_chunks_fts_docsize;
+             DROP TABLE IF EXISTS rag_chunks_fts_config;",
+        );
+        conn.execute_batch(
+            "CREATE VIRTUAL TABLE IF NOT EXISTS rag_chunks_fts
+                 USING fts5(content, content=rag_chunks, content_rowid=id);",
+        )
+        .map_err(|e| format!("FTS5 recovery: {e}"))?;
+    }
+
     // Clean-slate replace: DELETE first so plain INSERT...SELECT works on any SQLite version.
     // FTS5 rebuild at the end re-syncs rag_chunks_fts from rag_chunks.
     conn.execute_batch("DELETE FROM rag_chunks; DELETE FROM rag_documents;")

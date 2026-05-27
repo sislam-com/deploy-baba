@@ -119,6 +119,7 @@ resource "aws_secretsmanager_secret_version" "deploy_config" {
     spa_bucket    = aws_s3_bucket.spa.id
     cloudfront_id = local.is_prod_cdn ? aws_cloudfront_distribution.main[0].id : ""
     ui_fn_name    = aws_lambda_function.baba.function_name
+    agent_fn_name = aws_lambda_function.agent.function_name
     fn_url        = "https://${local.effective_domain}"
   })
 }
