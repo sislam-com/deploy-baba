@@ -25,9 +25,9 @@ Release tagging is handled by `xtask/src/release/` (W-XT addition — see W-CI.4
 
 ## W-CI.3 Implementation Notes
 
-**OIDC roles** (`infra/ci-oidc.tf`):
-- `deploy-baba-ci-deploy-dev` — trust: `refs/heads/main`; permissions: `lambda:UpdateFunctionCode`, `lambda:InvokeFunction`, `s3:PutObject`/`s3:DeleteObject` on the dev SPA bucket prefix.
-- `deploy-baba-ci-deploy-prod` — trust: `refs/tags/v*`; same permissions scoped to prod Lambda + prod SPA bucket.
+**OIDC roles** (`infra/ci-oidc.tf`, created only in prod workspace — account singletons):
+- `deploy-baba-ci-deploy-dev` — trust: `refs/heads/main`; permissions: `lambda:UpdateFunctionCode`/`InvokeFunction` on `deploy-baba-dev*`, `secretsmanager:GetSecretValue` on `deploy-baba/dev/deploy-config`, `s3:PutObject`/`s3:DeleteObject` on `deploy-baba-dev-spa-*`, `cloudfront:CreateInvalidation`.
+- `deploy-baba-ci-deploy-prod` — trust: `refs/tags/v*`; same permissions scoped to prod Lambda + prod SPA bucket + prod deploy-config.
 
 **Web job conditional:** The `web` job in `ci.yml` has:
 ```yaml
@@ -65,15 +65,22 @@ This makes the job a no-op until Phase D.1 lands `web/`.
 ```
 Requires `permissions: contents: write` and `fetch-depth: 0` checkout.
 
-**GitHub variables used** (set in repo Settings → Variables):
+**GitHub variables** (repo Settings → Variables — only role ARNs):
 - `CI_DEPLOY_DEV_ROLE_ARN` — ARN of `deploy-baba-ci-deploy-dev`
 - `CI_DEPLOY_PROD_ROLE_ARN` — ARN of `deploy-baba-ci-deploy-prod`
-- `DEV_UI_FN_NAME` — Lambda function name for dev environment
-- `PROD_UI_FN_NAME` — Lambda function name for prod environment
-- `DEV_SPA_BUCKET` — SPA bucket name for dev
-- `PROD_SPA_BUCKET` — SPA bucket name for prod
-- `DEV_FN_URL` — Lambda Function URL for dev health check
-- `PROD_FN_URL` — Lambda Function URL for prod health check
+
+All other deploy identifiers (`SPA_BUCKET`, `CLOUDFRONT_ID`, `UI_FN_NAME`, `AGENT_FN_NAME`, `FN_URL`) are loaded at runtime from Secrets Manager `deploy-baba/{env}/deploy-config` (auto-populated by `tofu apply`). This avoids storing infrastructure details in GitHub Variables (W-SEC alignment).
+
+**Deploy-config secret** (`infra/secrets.tf`):
+```json
+{"spa_bucket":"...","cloudfront_id":"...","ui_fn_name":"...","agent_fn_name":"...","fn_url":"..."}
+```
+
+**Two tofu workspaces:**
+- `default` (prod) — creates prod Lambda, prod deploy-config, OIDC roles (account singletons)
+- `dev` — creates dev Lambda, dev deploy-config, dev SPA bucket
+
+Both must be applied: `just infra-apply` (prod) + `just infra-apply dev` (dev).
 
 ## W-CI.4 Work Items
 
@@ -92,6 +99,10 @@ Requires `permissions: contents: write` and `fetch-depth: 0` checkout.
 | W-CI.4.11 | Extend deploy-dev.yml with SPA sync (C.2) | DONE | pnpm build → s3 sync → lambda invoke sync-spa → assert ok; worktree-clean guard before tag |
 | W-CI.4.12 | Extend deploy-prod.yml with SPA sync (C.2) | DONE | Same as dev; no tag step (prod triggered by tag push) |
 | W-CI.4.13 | Local deploy pipeline: `xtask deploy spa`, `just deploy-full/spa-deploy/lambda-wait`, `/deploy --full` skill | DONE | Steps 2–6 in Rust; opt-in `--tag`; prod confirmation gate in skill |
+| W-CI.4.14 | Fix deploy-dev.yml: target dev environment, not prod | DONE | Secret-id → `deploy-baba/dev/deploy-config`; agent fn name from SM not hardcoded |
+| W-CI.4.15 | Revert ci-oidc.tf dev role IAM to dev resource ARNs | DONE | Was changed to prod in error; reverted to `deploy-baba-dev*` patterns |
+| W-CI.4.16 | Add `agent_fn_name` to deploy-config secret | DONE | Both workspaces get it via `tofu apply` |
+| W-CI.4.17 | Add agent Lambda deploy to deploy-prod.yml | DONE | Same build+deploy pattern as dev, reads `$AGENT_FN_NAME` from SM |
 
 ## W-CI.5 Test Strategy
 

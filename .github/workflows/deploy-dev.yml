@@ -33,11 +33,12 @@ jobs:
       - name: Load deploy config from Secrets Manager
         run: |
           SECRET=$(aws secretsmanager get-secret-value \
-            --secret-id deploy-baba/prod/deploy-config \
+            --secret-id deploy-baba/dev/deploy-config \
             --query SecretString --output text)
           echo "SPA_BUCKET=$(echo "$SECRET" | jq -r .spa_bucket)" >> "$GITHUB_ENV"
           echo "CLOUDFRONT_ID=$(echo "$SECRET" | jq -r .cloudfront_id)" >> "$GITHUB_ENV"
           echo "UI_FN_NAME=$(echo "$SECRET" | jq -r .ui_fn_name)" >> "$GITHUB_ENV"
+          echo "AGENT_FN_NAME=$(echo "$SECRET" | jq -r .agent_fn_name)" >> "$GITHUB_ENV"
           echo "FN_URL=$(echo "$SECRET" | jq -r .fn_url)" >> "$GITHUB_ENV"
 
       # ── Build Lambda ──────────────────────────────────────────────────────────
@@ -90,14 +91,14 @@ jobs:
       - name: Update agent Lambda code
         run: |
           aws lambda update-function-code \
-            --function-name deploy-baba-prod-agent \
+            --function-name "$AGENT_FN_NAME" \
             --zip-file fileb://infra/build/agent-lambda.zip \
             --region us-east-1
 
       - name: Wait for agent Lambda update
         run: |
           aws lambda wait function-updated \
-            --function-name deploy-baba-prod-agent \
+            --function-name "$AGENT_FN_NAME" \
             --region us-east-1
 
       # ── Build + deploy SPA ────────────────────────────────────────────────────

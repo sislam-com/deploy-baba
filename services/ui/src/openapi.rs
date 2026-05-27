@@ -107,6 +107,7 @@ impl Modify for ApiVersionModifier {
         crate::routes::api::competencies::get_competency,
         crate::routes::api::resume_data::get_resume_data,
         crate::routes::api::about::list_about_sections,
+        crate::routes::api::legal::get_legal_document,
         crate::routes::api::social_links::list_social_links,
         // ── Challenges (public read) ─────────────────────────────────────────
         crate::routes::api::challenges::list_challenges,
@@ -158,6 +159,7 @@ impl Modify for ApiVersionModifier {
         api_openapi::models::EvidenceItem,
         api_openapi::models::CompetencyWithEvidence,
         api_openapi::models::AboutSectionResponse,
+        api_openapi::models::LegalDocumentResponse,
         api_openapi::models::SocialLink,
         api_openapi::models::Challenge,
         api_openapi::models::ChallengeResponse,

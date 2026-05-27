@@ -165,6 +165,27 @@ export const handlers = [
     return HttpResponse.json(null, { status: 404 })
   }),
 
+  // Legal documents
+  http.get('/api/legal/terms', () => {
+    return HttpResponse.json({
+      id: 1,
+      slug: 'terms',
+      title: 'Terms of Service',
+      content: 'Welcome to deploy-baba. By accessing or using this website, you agree to be bound by these Terms of Service.',
+      updated_at: '2026-01-01T00:00:00Z',
+    })
+  }),
+
+  http.get('/api/legal/privacy', () => {
+    return HttpResponse.json({
+      id: 2,
+      slug: 'privacy',
+      title: 'Privacy Policy',
+      content: 'This Privacy Policy describes how deploy-baba collects, uses, and protects your information.',
+      updated_at: '2026-01-01T00:00:00Z',
+    })
+  }),
+
   // About sections
   http.get('/api/about/sections', ({ request }) => {
     const url = new URL(request.url)

@@ -41,6 +41,20 @@ describe('Layout', () => {
     expect(githubLink).toHaveAttribute('href', 'https://github.com/shantopagla/deploy-baba')
   })
 
+  it('renders footer with Terms link', () => {
+    render(<Layout />, { router: 'memory', route: '/' })
+    const termsLink = screen.getByText('Terms of Service')
+    expect(termsLink).toBeInTheDocument()
+    expect(termsLink).toHaveAttribute('href', '/terms')
+  })
+
+  it('renders footer with Privacy link', () => {
+    render(<Layout />, { router: 'memory', route: '/' })
+    const privacyLink = screen.getByText('Privacy Policy')
+    expect(privacyLink).toBeInTheDocument()
+    expect(privacyLink).toHaveAttribute('href', '/privacy')
+  })
+
   it('renders mobile menu button', () => {
     render(<Layout />, { router: 'memory', route: '/' })
     const menuButton = screen.getByLabelText('Open menu')

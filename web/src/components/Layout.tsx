@@ -213,6 +213,22 @@ export default function Layout() {
                     OpenAPI Spec
                   </a>
                 </li>
+                <li>
+                  <Link
+                    to="/terms"
+                    className="text-gray-400 hover:text-white transition"
+                  >
+                    Terms of Service
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/privacy"
+                    className="text-gray-400 hover:text-white transition"
+                  >
+                    Privacy Policy
+                  </Link>
+                </li>
               </ul>
             </div>
             <div>

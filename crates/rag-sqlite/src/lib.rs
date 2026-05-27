@@ -64,6 +64,28 @@ impl RagStore {
     pub fn new(conn: Connection) -> Result<Self, RagError> {
         conn.execute_batch(MIGRATION_SQL)
             .map_err(|e| RagError::Database(e.to_string()))?;
+
+        // Validate that FTS5 xConnect works. If the shadow tables are
+        // corrupted or missing, drop + recreate the virtual table.
+        if let Err(e) = conn.prepare("SELECT rowid FROM rag_chunks_fts LIMIT 0") {
+            tracing::warn!("FTS5 vtable broken ({e}), dropping and recreating");
+            let _ = conn.execute_batch(
+                "DROP TABLE IF EXISTS rag_chunks_fts;
+                 DROP TABLE IF EXISTS rag_chunks_fts_data;
+                 DROP TABLE IF EXISTS rag_chunks_fts_idx;
+                 DROP TABLE IF EXISTS rag_chunks_fts_content;
+                 DROP TABLE IF EXISTS rag_chunks_fts_docsize;
+                 DROP TABLE IF EXISTS rag_chunks_fts_config;",
+            );
+            conn.execute_batch(
+                "CREATE VIRTUAL TABLE IF NOT EXISTS rag_chunks_fts
+                     USING fts5(content, content=rag_chunks, content_rowid=id);
+                 INSERT INTO rag_chunks_fts(rag_chunks_fts) VALUES('rebuild');",
+            )
+            .map_err(|e| RagError::Database(format!("FTS5 recovery failed: {e}")))?;
+            tracing::info!("FTS5 vtable recovered successfully");
+        }
+
         Ok(Self {
             conn: Mutex::new(conn),
         })
