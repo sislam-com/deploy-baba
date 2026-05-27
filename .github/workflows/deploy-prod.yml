@@ -77,7 +77,7 @@ jobs:
       - name: Build agent Lambda zip
         run: |
           cd services/agent
-          uv export --frozen --no-dev > /tmp/agent-requirements.txt
+          uv export --frozen --no-dev --no-emit-project > /tmp/agent-requirements.txt
           pip install --target ../../build/agent-lambda -r /tmp/agent-requirements.txt --quiet
           cp -r src/* ../../build/agent-lambda/
           cd ../../build/agent-lambda
