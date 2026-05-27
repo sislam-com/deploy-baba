@@ -647,6 +647,42 @@ rag-eval-full DB="deploy-baba.db" PROFILE="default":
 rag-eval-category CATEGORY DB="deploy-baba.db":
     cargo xtask rag eval --db-path {{ DB }} --retrieval-only --category {{ CATEGORY }}
 
+# Upload local RAG index to S3 for a given environment (dev or prod)
+rag-push ENV PROFILE="default" DB="deploy-baba.db":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    just aws-check {{ PROFILE }}
+    ACCOUNT_ID=$(aws sts get-caller-identity --profile {{ PROFILE }} --query Account --output text)
+    BUCKET="deploy-baba-{{ ENV }}-backups-${ACCOUNT_ID}"
+    gzip -c {{ DB }} > /tmp/rag-index.db.gz
+    echo "Uploading RAG index to s3://${BUCKET}/rag-index.db.gz"
+    aws s3 cp /tmp/rag-index.db.gz "s3://${BUCKET}/rag-index.db.gz" --profile {{ PROFILE }}
+    rm -f /tmp/rag-index.db.gz
+    echo "done: RAG index uploaded to ${BUCKET}"
+
+# Trigger Lambda to ingest RAG index from S3
+rag-ingest ENV PROFILE="default":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    just aws-check {{ PROFILE }}
+    FN="deploy-baba-{{ ENV }}"
+    echo "Invoking ${FN} with action=ingest-rag"
+    RESP=$(aws lambda invoke --function-name "${FN}" \
+      --payload '{"action":"ingest-rag"}' \
+      --cli-binary-format raw-in-base64-out \
+      --profile {{ PROFILE }} \
+      /tmp/rag-ingest-resp.json 2>&1)
+    cat /tmp/rag-ingest-resp.json
+    rm -f /tmp/rag-ingest-resp.json
+    echo ""
+    echo "done: RAG ingest triggered on ${FN}"
+
+# Full RAG sync: rebuild index locally, upload to S3, trigger Lambda ingest
+rag-sync ENV PROFILE="default":
+    just rag-index-full
+    just rag-push {{ ENV }} {{ PROFILE }}
+    just rag-ingest {{ ENV }} {{ PROFILE }}
+
 # ── Local MCP ────────────────────────────────────────────────────────────────
 
 # Build the local mcp-rs server binary
