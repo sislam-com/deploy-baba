@@ -62,6 +62,9 @@ quality:
 # Build everything: all Rust Lambda zips + SPA + agent package + MCP gateway bundle
 build: lambda-build-all web-build agent-build mcp-cloud-build
 
+# Build all assets: Lambda zips + SPA + agent + MCP gateway + resume + RAG index
+build-all: build resume-generate rag-index
+
 # ── Documentation ────────────────────────────────────────────────────────────
 
 # Build and open rustdoc
@@ -87,108 +90,66 @@ example NAME:
 lambda-build:
     PATH="$HOME/.cargo/bin:$PATH" cargo lambda build --release --package deploy-baba-ui --target aarch64-unknown-linux-gnu
 
-lambda-deploy PROFILE="default":
-    just aws-check {{ PROFILE }} && just lambda-build && cargo xtask deploy lambda --profile {{ PROFILE }}
+lambda-deploy ENV="prod":
+    just aws-check {{ PROFILE }} && cargo xtask deploy lambda \
+        --profile {{ PROFILE }} --function deploy-baba-{{ ENV }}
 
 # Email (non-VPC, SES sends)
-email-build:
-    PATH="$HOME/.cargo/bin:$PATH" cargo lambda build --release --package email-lambda --target aarch64-unknown-linux-gnu
-    mkdir -p infra/build
-    zip -j infra/build/email-lambda.zip target/lambda/email-lambda/bootstrap
-
-email-deploy PROFILE="default":
-    just aws-check {{ PROFILE }} && just email-build && aws lambda update-function-code \
-        --function-name deploy-baba-email \
-        --zip-file fileb://infra/build/email-lambda.zip \
-        --profile {{ PROFILE }}
+email-deploy ENV="prod":
+    just aws-check {{ PROFILE }} && cargo xtask deploy lambda \
+        --profile {{ PROFILE }} --function deploy-baba-{{ ENV }}-email --package email-lambda
 
 # LLM Proxy (non-VPC, reaches api.anthropic.com)
-llm-proxy-build:
-    PATH="$HOME/.cargo/bin:$PATH" cargo lambda build --release --package llm-proxy --target aarch64-unknown-linux-gnu
-    mkdir -p infra/build
-    zip -j infra/build/llm-proxy-lambda.zip target/lambda/llm-proxy/bootstrap
-
-llm-proxy-deploy PROFILE="default":
-    just aws-check {{ PROFILE }} && just llm-proxy-build && aws lambda update-function-code \
-        --function-name deploy-baba-llm-proxy \
-        --zip-file fileb://infra/build/llm-proxy-lambda.zip \
-        --profile {{ PROFILE }}
+llm-proxy-deploy ENV="prod":
+    just aws-check {{ PROFILE }} && cargo xtask deploy lambda \
+        --profile {{ PROFILE }} --function deploy-baba-{{ ENV }}-llm-proxy --package llm-proxy
 
 # Auth (non-VPC, reaches Cognito IDP)
-auth-build:
-    PATH="$HOME/.cargo/bin:$PATH" cargo lambda build --release --package auth-lambda --target aarch64-unknown-linux-gnu
-    mkdir -p infra/build
-    zip -j infra/build/auth-lambda.zip target/lambda/auth-lambda/bootstrap
-
-auth-deploy PROFILE="default":
-    just aws-check {{ PROFILE }} && just auth-build && aws lambda update-function-code \
-        --function-name deploy-baba-auth \
-        --zip-file fileb://infra/build/auth-lambda.zip \
-        --profile {{ PROFILE }}
+auth-deploy ENV="prod":
+    just aws-check {{ PROFILE }} && cargo xtask deploy lambda \
+        --profile {{ PROFILE }} --function deploy-baba-{{ ENV }}-auth --package auth-lambda
 
 # Portfolio (VPC, read-only data — jobs, competencies, about, social-links, resume, challenges)
-portfolio-build:
-    PATH="$HOME/.cargo/bin:$PATH" cargo lambda build --release --package portfolio-lambda --target aarch64-unknown-linux-gnu
-    mkdir -p infra/build
-    zip -j infra/build/portfolio-lambda.zip target/lambda/portfolio-lambda/bootstrap
-
-portfolio-deploy PROFILE="default":
-    just aws-check {{ PROFILE }} && just portfolio-build && aws lambda update-function-code \
-        --function-name deploy-baba-portfolio \
-        --zip-file fileb://infra/build/portfolio-lambda.zip \
-        --profile {{ PROFILE }}
+portfolio-deploy ENV="prod":
+    just aws-check {{ PROFILE }} && cargo xtask deploy lambda \
+        --profile {{ PROFILE }} --function deploy-baba-{{ ENV }}-portfolio --package portfolio-lambda
 
 # Admin (VPC, dashboard CRUD — migration owner)
-admin-build:
-    PATH="$HOME/.cargo/bin:$PATH" cargo lambda build --release --package admin-lambda --target aarch64-unknown-linux-gnu
-    mkdir -p infra/build
-    zip -j infra/build/admin-lambda.zip target/lambda/admin-lambda/bootstrap
-
-admin-deploy PROFILE="default":
-    just aws-check {{ PROFILE }} && just admin-build && aws lambda update-function-code \
-        --function-name deploy-baba-admin \
-        --zip-file fileb://infra/build/admin-lambda.zip \
-        --profile {{ PROFILE }}
+admin-deploy ENV="prod":
+    just aws-check {{ PROFILE }} && cargo xtask deploy lambda \
+        --profile {{ PROFILE }} --function deploy-baba-{{ ENV }}-admin --package admin-lambda
 
 # Contact (non-VPC, PoW validation + email Lambda delegation)
-contact-build:
-    PATH="$HOME/.cargo/bin:$PATH" cargo lambda build --release --package contact-lambda --target aarch64-unknown-linux-gnu
-    mkdir -p infra/build
-    zip -j infra/build/contact-lambda.zip target/lambda/contact-lambda/bootstrap
-
-contact-deploy PROFILE="default":
-    just aws-check {{ PROFILE }} && just contact-build && aws lambda update-function-code \
-        --function-name deploy-baba-contact \
-        --zip-file fileb://infra/build/contact-lambda.zip \
-        --profile {{ PROFILE }}
+contact-deploy ENV="prod":
+    just aws-check {{ PROFILE }} && cargo xtask deploy lambda \
+        --profile {{ PROFILE }} --function deploy-baba-{{ ENV }}-contact --package contact-lambda
 
 # RAG (VPC, FTS5 retrieval + grounded generation)
-rag-build:
-    PATH="$HOME/.cargo/bin:$PATH" cargo lambda build --release --package rag-lambda --target aarch64-unknown-linux-gnu
-    mkdir -p infra/build
-    zip -j infra/build/rag-lambda.zip target/lambda/rag-lambda/bootstrap
-
-rag-deploy PROFILE="default":
-    just aws-check {{ PROFILE }} && just rag-build && aws lambda update-function-code \
-        --function-name deploy-baba-rag \
-        --zip-file fileb://infra/build/rag-lambda.zip \
-        --profile {{ PROFILE }}
+rag-deploy ENV="prod":
+    just aws-check {{ PROFILE }} && cargo xtask deploy lambda \
+        --profile {{ PROFILE }} --function deploy-baba-{{ ENV }}-rag --package rag-lambda
 
 # ── Consolidated Lambda Builds ───────────────────────────────────────────────
 
 # Build all Rust Lambda zips (excludes Python agent and MCP gateway which have extra bundling steps)
-lambda-build-all: lambda-build email-build llm-proxy-build auth-build portfolio-build admin-build contact-build rag-build
+lambda-build-all:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for pkg in deploy-baba-ui email-lambda llm-proxy auth-lambda portfolio-lambda admin-lambda contact-lambda rag-lambda; do
+        echo "Building ${pkg}..."
+        PATH="$HOME/.cargo/bin:$PATH" cargo lambda build --release --package "$pkg" --target aarch64-unknown-linux-gnu
+    done
 
-# Deploy all Rust Lambdas
-lambda-deploy-all PROFILE="default":
-    just lambda-deploy {{ PROFILE }}
-    just email-deploy {{ PROFILE }}
-    just llm-proxy-deploy {{ PROFILE }}
-    just auth-deploy {{ PROFILE }}
-    just portfolio-deploy {{ PROFILE }}
-    just admin-deploy {{ PROFILE }}
-    just contact-deploy {{ PROFILE }}
-    just rag-deploy {{ PROFILE }}
+# Deploy all Rust Lambdas (ENV: prod or dev)
+lambda-deploy-all ENV="prod":
+    just lambda-deploy {{ ENV }}
+    just email-deploy {{ ENV }}
+    just llm-proxy-deploy {{ ENV }}
+    just auth-deploy {{ ENV }}
+    just portfolio-deploy {{ ENV }}
+    just admin-deploy {{ ENV }}
+    just contact-deploy {{ ENV }}
+    just rag-deploy {{ ENV }}
 
 # Build the read-only context bundle consumed by the private cloud MCP gateway
 mcp-context-build:
@@ -221,11 +182,10 @@ mcp-cloud-build: mcp-context-build
     cd build/mcp-gateway && zip -qr ../../infra/build/mcp-gateway-lambda.zip bootstrap mcp-rs.toml ../mcp-context
 
 # Build + upload the private MCP gateway Lambda
-mcp-cloud-deploy PROFILE="default":
-    just aws-check {{ PROFILE }} && just mcp-cloud-build && aws lambda update-function-code \
-        --function-name deploy-baba-mcp-gateway \
-        --zip-file fileb://infra/build/mcp-gateway-lambda.zip \
-        --profile {{ PROFILE }}
+mcp-cloud-deploy ENV="prod":
+    just aws-check {{ PROFILE }} && just mcp-cloud-build && cargo xtask deploy lambda \
+        --profile {{ PROFILE }} --function deploy-baba-{{ ENV }}-mcp-gateway \
+        --zip-path infra/build/mcp-gateway-lambda.zip
 
 # Smoke the deployed private MCP gateway. Requires MCP_BEARER_TOKEN with a valid Cognito ID token.
 mcp-cloud-smoke PROFILE="default" BASE_URL="https://sislam.com":
@@ -267,11 +227,10 @@ agent-build:
     zip -qr ../../infra/build/agent-lambda.zip .
 
 # Build agent Lambda zip + update the deployed function
-agent-deploy PROFILE="default":
-    just aws-check {{ PROFILE }} && just agent-build && aws lambda update-function-code \
-        --function-name deploy-baba-agent \
-        --zip-file fileb://infra/build/agent-lambda.zip \
-        --profile {{ PROFILE }}
+agent-deploy ENV="prod":
+    just aws-check {{ PROFILE }} && just agent-build && cargo xtask deploy lambda \
+        --profile {{ PROFILE }} --function deploy-baba-{{ ENV }}-agent \
+        --zip-path infra/build/agent-lambda.zip
 
 # Verify the live deployment (curl apex + www health checks)
 infra-verify DOMAIN="sislam.com":
@@ -552,36 +511,47 @@ push-image PROFILE="default" IMAGE="deploy-baba-ui:latest":
     just aws-check {{ PROFILE }} && cargo xtask deploy push --image {{ IMAGE }} --profile {{ PROFILE }}
 
 # Full deploy: quality gate → zip build → Lambda update (zip-based Lambda, ADR-003)
-deploy PROFILE="default":
-    just quality && just lambda-deploy {{ PROFILE }}
+deploy ENV="prod":
+    just quality && just lambda-deploy {{ ENV }}
 
 # Deploy without quality gate (fast path)
-deploy-fast PROFILE="default":
-    just lambda-deploy {{ PROFILE }}
+deploy-fast ENV="prod":
+    just lambda-deploy {{ ENV }}
 
 # Dry run: build + validate, no push
-deploy-dry PROFILE="default":
+deploy-dry:
     just aws-check {{ PROFILE }} && cargo xtask deploy docker
 
 # Wait for Lambda to settle after a code update (step 2 of full pipeline)
-lambda-wait PROFILE="default":
-    just aws-check {{ PROFILE }} && cargo xtask deploy wait --profile {{ PROFILE }} --function deploy-baba-prod
+lambda-wait ENV="prod":
+    just aws-check {{ PROFILE }} && cargo xtask deploy wait --profile {{ PROFILE }} --function deploy-baba-{{ ENV }}
 
 # SPA-only deploy: build → S3 sync → sync-spa invoke → /health (steps 3–6)
 
 # Requires: SPA_BUCKET, UI_FN_NAME, FN_URL env vars (or set via infra outputs)
-spa-deploy PROFILE="default":
+spa-deploy:
     just aws-check {{ PROFILE }} && cargo xtask deploy spa --profile {{ PROFILE }} --sha "$(git rev-parse HEAD)"
 
 # Full pipeline: quality → Lambda → wait → SPA build → S3 sync → sync-spa → /health
 
 # Pass TAG=1 to also create a dev-vX.Y.Z git tag (mirrors deploy-dev.yml)
-deploy-full PROFILE="default" TAG="":
+deploy-full ENV="prod" TAG="":
     just quality
-    just lambda-deploy {{ PROFILE }}
-    just lambda-wait {{ PROFILE }}
-    just spa-deploy {{ PROFILE }}
+    just lambda-deploy {{ ENV }}
+    just lambda-wait {{ ENV }}
+    just spa-deploy
     {{ if TAG != "" { "just release-tag dev push" } else { "echo 'Skipping dev tag — pass TAG=1 to enable'" } }}
+
+# Deploy all services + SPA + resume + RAG (full production push)
+deploy-all ENV="prod":
+    just quality
+    just lambda-deploy-all {{ ENV }}
+    just agent-deploy {{ ENV }}
+    just mcp-cloud-deploy {{ ENV }}
+    just lambda-wait {{ ENV }}
+    just spa-deploy
+    just resume-upload
+    just rag-sync {{ ENV }}
 
 # ── Database (SQLite + S3) ───────────────────────────────────────────────────
 
