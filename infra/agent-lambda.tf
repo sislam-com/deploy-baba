@@ -30,6 +30,7 @@ resource "aws_lambda_function" "agent" {
   environment {
     variables = {
       ANTHROPIC_API_KEY_ARN = aws_secretsmanager_secret.anthropic_api_key.arn
+      LINKEDIN_SECRET_ARN   = aws_secretsmanager_secret.linkedin_api_key.arn
       UI_LAMBDA_NAME        = aws_lambda_function.baba.function_name
       ARTIFACTS_BUCKET      = aws_s3_bucket.assets.id
       AWS_REGION_OVERRIDE   = var.region
@@ -88,7 +89,10 @@ resource "aws_iam_role_policy" "agent_lambda_permissions" {
         Sid      = "ReadSecrets"
         Effect   = "Allow"
         Action   = ["secretsmanager:GetSecretValue"]
-        Resource = aws_secretsmanager_secret.anthropic_api_key.arn
+        Resource = [
+          aws_secretsmanager_secret.anthropic_api_key.arn,
+          aws_secretsmanager_secret.linkedin_api_key.arn,
+        ]
       },
       {
         Sid    = "S3Artifacts"
