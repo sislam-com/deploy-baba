@@ -82,6 +82,7 @@ jobs:
         run: cd services/agent && uv run pytest tests/ -v
       - name: Dry-run Lambda zip build
         run: |
+          mkdir -p build/agent-lambda infra/build
           cd services/agent
           uv export --frozen --no-dev --no-emit-project > /tmp/agent-requirements.txt
           pip install --target ../../build/agent-lambda -r /tmp/agent-requirements.txt --quiet
