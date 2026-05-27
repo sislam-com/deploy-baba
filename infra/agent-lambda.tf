@@ -86,9 +86,9 @@ resource "aws_iam_role_policy" "agent_lambda_permissions" {
         Resource = aws_lambda_function.baba.arn
       },
       {
-        Sid      = "ReadSecrets"
-        Effect   = "Allow"
-        Action   = ["secretsmanager:GetSecretValue"]
+        Sid    = "ReadSecrets"
+        Effect = "Allow"
+        Action = ["secretsmanager:GetSecretValue"]
         Resource = [
           aws_secretsmanager_secret.anthropic_api_key.arn,
           aws_secretsmanager_secret.linkedin_api_key.arn,
