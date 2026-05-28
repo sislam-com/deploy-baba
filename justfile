@@ -57,7 +57,7 @@ dev:
 
 # Full quality gate (fmt + lint + test + coverage floors + audit + HCL fmt check + agent)
 quality:
-    just web-types-offline && cargo xtask quality all && just web-coverage && just agent-lint && just agent-test && tofu fmt -check -recursive infra/
+    just web-types-offline && cargo xtask quality all && just web-coverage && just agent-lint && just agent-test && just agent-build && just mcp-build && just mcp-smoke && just mcp-rag-smoke && just mcp-cloud-build && just rag-index && tofu fmt -check -recursive infra/
 
 # Build everything: all Rust Lambda zips + SPA + agent package + MCP gateway bundle
 build: lambda-build-all web-build agent-build mcp-cloud-build

@@ -111,6 +111,70 @@ resource "aws_iam_role_policy" "lambda_invoke_llm_proxy" {
   })
 }
 
+# Inline policy: invoke portfolio Lambda
+resource "aws_iam_role_policy" "lambda_invoke_portfolio" {
+  name = "${local.lambda_function_name}-invoke-portfolio-policy"
+  role = aws_iam_role.lambda_execution.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid      = "InvokePortfolioLambda"
+      Effect   = "Allow"
+      Action   = "lambda:InvokeFunction"
+      Resource = aws_lambda_function.portfolio.arn
+    }]
+  })
+}
+
+# Inline policy: invoke admin Lambda
+resource "aws_iam_role_policy" "lambda_invoke_admin" {
+  name = "${local.lambda_function_name}-invoke-admin-policy"
+  role = aws_iam_role.lambda_execution.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid      = "InvokeAdminLambda"
+      Effect   = "Allow"
+      Action   = "lambda:InvokeFunction"
+      Resource = aws_lambda_function.admin.arn
+    }]
+  })
+}
+
+# Inline policy: invoke contact Lambda
+resource "aws_iam_role_policy" "lambda_invoke_contact" {
+  name = "${local.lambda_function_name}-invoke-contact-policy"
+  role = aws_iam_role.lambda_execution.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid      = "InvokeContactLambda"
+      Effect   = "Allow"
+      Action   = "lambda:InvokeFunction"
+      Resource = aws_lambda_function.contact.arn
+    }]
+  })
+}
+
+# Inline policy: invoke RAG Lambda
+resource "aws_iam_role_policy" "lambda_invoke_rag" {
+  name = "${local.lambda_function_name}-invoke-rag-policy"
+  role = aws_iam_role.lambda_execution.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid      = "InvokeRagLambda"
+      Effect   = "Allow"
+      Action   = "lambda:InvokeFunction"
+      Resource = aws_lambda_function.rag.arn
+    }]
+  })
+}
+
 # Inline policy: SSM parameter read access
 resource "aws_iam_role_policy" "lambda_ssm" {
   name = "${local.lambda_function_name}-ssm-policy"

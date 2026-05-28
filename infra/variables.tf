@@ -118,3 +118,27 @@ variable "agent_lambda_code_path" {
   type        = string
   default     = "./build/agent-lambda.zip"
 }
+
+variable "portfolio_lambda_code_path" {
+  description = "Path to the portfolio Lambda zip file"
+  type        = string
+  default     = "./build/portfolio-lambda.zip"
+}
+
+variable "admin_lambda_code_path" {
+  description = "Path to the admin Lambda zip file"
+  type        = string
+  default     = "./build/admin-lambda.zip"
+}
+
+variable "contact_lambda_code_path" {
+  description = "Path to the contact Lambda zip file"
+  type        = string
+  default     = "./build/contact-lambda.zip"
+}
+
+variable "rag_lambda_code_path" {
+  description = "Path to the RAG Lambda zip file"
+  type        = string
+  default     = "./build/rag-lambda.zip"
+}
