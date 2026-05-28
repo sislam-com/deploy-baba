@@ -1,5 +1,5 @@
 # deploy-baba — Plan Index
-**GitHub:** `sislam-com/deploy-baba` | **Last updated:** 2026-05-24
+**GitHub:** `sislam-com/deploy-baba` | **Last updated:** 2026-05-27
 **Source repo:** `~/shanto` (Baba Toolchain, ~85K LOC) | **Status:** ~90% complete (microservices transformation in progress)
 
 See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming rules.
@@ -22,7 +22,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | infra-types | W-INFR | `crates/infra-types/` | DONE | Per-crate README |
 | ui-service | W-UI | `services/ui/` (API + asset server; no templates) | DONE | utoipa-rapidoc wiring (using inline HTML); sync.rs EFS swap handler added (D.4) |
 | resume | W-RSM | `services/ui/migrations/`, `routes/api/jobs.rs`, `routes/api/competencies.rs`, `routes/api/resume.rs` | DONE | 7 migrations; xtask resume generate/upload done; Functional view grouping (W-RSM.8.1), print CSS (W-RSM.8.3) |
-| xtask | W-XT | `xtask/` | WIP | release subcommand DONE; deploy spa.rs DONE; `EnvironmentInterpolator` unused (W-XT.4.2) |
+| xtask | W-XT | `xtask/` | WIP | release subcommand DONE; deploy spa.rs DONE; `EnvironmentInterpolator` unused (W-XT.4.2); W-XT.4.9 TODO: generalize `deploy lambda` for all packages |
 | terraform | W-TF | `infra/` | SUPERSEDED | Replaced by W-OTF (OpenTofu). W-TF.4.1 and W-TF.4.2 already fixed in code. |
 | opentofu | W-OTF | `infra/` + `xtask/src/infra/` | DONE | `tofu` v1.11.5 installed; plan runs clean (W-OTF.4.7 DONE 2026-05-01). `acm.tf` added; `cdn.tf` updated for `dev.sislam.com` + wildcard cert. |
 | dx-justfile | W-DX | `justfile`, `docs/`, `examples/` | WIP | Per-crate READMEs DONE (10 crates, MIT license); examples TODO, integration tests TODO
@@ -48,7 +48,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | resilience | W-RES | `services/ui/src/middleware/` | DONE | `rate_limit_middleware` (100 req/60s per IP+endpoint); `CircuitBreaker` around LLM calls (5 failures → 60s open); `validate_request_middleware` (1 MB body guard); `RetryPolicy` available for handler retry |
 | module-decomposition | W-MOD | `services/ui/src/modules/` | TODO | Logical module separation (portfolio, rag, admin, auth); independent testing per module; module-specific metrics |
 | mcp-cloud | W-MCP | `crates/mcp-rs/`, `services/mcp-gateway/` | WIP | Private MCP gateway; local mcp-rs + cloud Cognito-authenticated Lambda gateway (ADR-028) |
-| env-promote | W-PROM | `xtask/src/deploy/promote.rs`, `infra/*.tf`, `.github/workflows/` | TODO | Dev/prod separation via OT workspaces; `just promote` artifact promotion; xtask workspace refactoring (ADR-029) |
+| env-promote | W-PROM | `xtask/src/deploy/promote.rs`, `infra/*.tf`, `.github/workflows/` | WIP | Phase 1 DONE (workspace refactoring); Phase 1.5 TODO (deploy recipe alignment — W-XT.4.9); Phase 2–5 TODO (infra param, dev workspace, promote cmd, CI) |
 | saas-onboard | W-SAAS | `xtask/src/onboard.rs`, `crates/portfolio-rag-mcp/`, `services/ui/src/routes/api/eval.rs` | WIP | Project onboarding for external repos; eval dashboard; project_health MCP tool (ADR-030) |
 | agent | W-AGT | `services/agent/` (Python/LangGraph) | TODO | Cover letter generation agent; first Python Lambda; LangGraph ReAct with 4 tools (ADR-032/033/034) |
 | linkedin-sync | W-LINK | `services/ui/src/routes/api/linkedin.rs`, `web/src/routes/dashboard/LinkedInSync.tsx` | WIP | LinkedIn data import (CSV export); admin diff UI; sync status badges on Jobs/Challenges; secret pre-wired |
@@ -96,7 +96,8 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 3. ~~**W-TF.4.1**~~ — `infra/eventbridge.tf`: already uses `state = "ENABLED"` — **RESOLVED** (see DRL-2026-03-25-opentofu)
 3. ~~**W-TF.4.2**~~ — `infra/s3.tf`: `filter {}` already present — **RESOLVED** (see DRL-2026-03-25-opentofu)
 4. ~~**W-XT.4.2**~~ — Remove or wire up `EnvironmentInterpolator` — **DEFERRED** (kept as intentional placeholder in config-core; location corrected from xtask)
-5. ~~**W-OTF.4.1–4.7**~~ — **DONE 2026-05-01** — `tofu` v1.11.5 installed; `just infra-plan deploy-baba` clean. HCL fixes: duplicate `aws_caller_identity`, duplicate `file_system_config`, lifecycle `filter {}`. See DRL-2026-05-01-infra-plan-blockers.
+5. **W-PROM Phase 1.5 + W-XT.4.9** — Align deploy recipes with workspace convention: generalize xtask `deploy lambda` for all packages; replace raw `aws` CLI; add `ENV` param; fix function naming to `deploy-baba-{env}[-{service}]` — **TODO**
+6. ~~**W-OTF.4.1–4.7**~~ — **DONE 2026-05-01** — `tofu` v1.11.5 installed; `just infra-plan deploy-baba` clean. HCL fixes: duplicate `aws_caller_identity`, duplicate `file_system_config`, lifecycle `filter {}`. See DRL-2026-05-01-infra-plan-blockers.
 
 ### P1.5 — Agentic Cover Letter (ADR-032/033/034)
 1. **W-AGT.4.1** — Scaffold `services/agent/` with pyproject.toml, LangGraph graph, Mangum handler — **DONE** (2026-05-24)

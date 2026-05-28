@@ -150,6 +150,7 @@ See `plans/drift/DRL-2026-05-03-coverage-floors.md` for full root-cause analysis
 | W-XT.4.6 | release subcommand | DONE | `xtask/src/release/{mod,git,version,changelog}.rs`; `just release-next/tag/promote`; 23 unit tests |
 | W-XT.4.7 | deploy spa subcommand | DONE | `xtask/src/deploy/spa.rs`; wait_lambda_active + build_spa + sync_to_s3 + invoke_sync_handler + smoke_test; `just deploy-full/spa-deploy/lambda-wait` |
 | W-XT.4.8 | Fix `get_crate_coverage` TOTAL line pollution | DONE | Per-file aggregation using `"{crate_name}/"` prefix filter; eliminates dependency code from measurement. See `DRL-2026-05-03-coverage-floors`. |
+| W-XT.4.9 | Generalize `deploy lambda` for all service packages | TODO | Add `--package` flag (default `deploy-baba-ui`); parameterize zip path + bootstrap path from package name; remove hardcoded `DEFAULT_FUNCTION` constant; require explicit `--function`. Enables all Lambda deploys to route through xtask instead of raw `aws` CLI. See W-PROM Phase 1.5. |
 
 ---
 
@@ -169,8 +170,10 @@ See `plans/drift/DRL-2026-05-03-coverage-floors.md` for full root-cause analysis
 - → ADR-007 (OpenTofu — xtask wraps `tofu` binary for infra commands)
 - → ADR-014 (Professional Summary sourced from DB — `generate.rs` reads `about_sections.me-bio`)
 - → ADR-021 (release pipeline — `xtask/src/release/` implements versioning and tagging)
+- → ADR-029 (dev/prod environment separation — W-XT.4.9 generalizes deploy lambda for all packages)
 - → W-INFR (StackConfig/SqliteConfig types)
 - → W-DX (justfile recipes that call xtask)
+- → W-PROM (Phase 1.5 — deploy recipe alignment depends on W-XT.4.9)
 - → `plans/drift/DRL-2026-03-18-xtask.md` — all fixed items and open issues
 - → `plans/cross-cutting/aws-setup-spec.md` — IAM policy for AWS SDK calls
 - → ADR-010 (upsert re-seed convention — xtask read-only loader pattern reused for future dump tooling)

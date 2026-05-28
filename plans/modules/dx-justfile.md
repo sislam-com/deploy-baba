@@ -85,22 +85,24 @@ infra-verify DOMAIN:
     curl -s https://{{DOMAIN}}/health
 
 # ── Deployment ────────────────────────────────────────────────────────────────
+# All deploy recipes use global PROFILE for AWS credentials and ENV for function naming.
+# ENV maps to infra naming convention: deploy-baba-{env}[-{service}]
 lambda-build:
     PATH="$HOME/.cargo/bin:$PATH" cargo lambda build --release --package deploy-baba-ui \
       --target aarch64-unknown-linux-gnu
-lambda-deploy PROFILE="default":
-    just aws-check {{PROFILE}} && just lambda-build && \
-      cargo xtask deploy lambda --profile {{PROFILE}}
-build-image:
-    cargo xtask deploy docker-build
-push-image PROFILE="default":
-    just aws-check {{PROFILE}} && cargo xtask deploy ecr-push --profile {{PROFILE}}
-deploy PROFILE="default":
-    just quality && just push-image {{PROFILE}} && cargo xtask deploy update --profile {{PROFILE}}
-deploy-fast PROFILE="default":
-    just push-image {{PROFILE}} && cargo xtask deploy update --profile {{PROFILE}}
-deploy-dry PROFILE="default":
-    just aws-check {{PROFILE}} && cargo xtask deploy docker-build --dry-run
+lambda-deploy ENV="prod":
+    just aws-check {{PROFILE}} && \
+      cargo xtask deploy lambda --profile {{PROFILE}} --function deploy-baba-{{ENV}}
+email-deploy ENV="prod":
+    just aws-check {{PROFILE}} && \
+      cargo xtask deploy lambda --profile {{PROFILE}} --function deploy-baba-{{ENV}}-email --package email-lambda
+# (similar pattern for llm-proxy, auth, portfolio, admin, contact, rag)
+lambda-deploy-all ENV="prod":
+    just lambda-deploy {{ENV}} && just email-deploy {{ENV}} && ...
+deploy ENV="prod":
+    just quality && just lambda-deploy {{ENV}}
+deploy-fast ENV="prod":
+    just lambda-deploy {{ENV}}
 
 # ── Database (SQLite + S3) ────────────────────────────────────────────────────
 db-backup PROFILE="default":
@@ -247,7 +249,10 @@ by the xtask quality gate and CI.
 
 ## W-DX.6 Cross-References
 - → ADR-001 (justfile philosophy)
+- → ADR-029 (dev/prod separation — deploy recipes gain `ENV` param to match infra workspace convention)
 - → W-XT (xtask implementation behind every recipe)
+- → W-XT.4.9 (generalized `deploy lambda` — enables all deploy recipes to route through xtask)
+- → W-PROM Phase 1.5 (deploy recipe alignment — deploy recipes match infra workspace convention)
 - → `plans/cross-cutting/aws-setup-spec.md` — IAM policy for docs
 - → `plans/drift/DRL-2026-03-18-xtask.md` — added lambda-build, lambda-deploy, infra-verify
 - → ADR-015 (LLM provider abstraction — `just test-llm PROFILE` recipe for live LLM integration tests)

@@ -6,73 +6,84 @@
 use aws_sdk_lambda::Client as LambdaClient;
 use std::process::Command;
 
-const PACKAGE: &str = "deploy-baba-ui";
+const DEFAULT_PACKAGE: &str = "deploy-baba-ui";
 const TARGET: &str = "aarch64-unknown-linux-gnu";
-const ZIP_PATH: &str = "infra/build/lambda.zip";
-const DEFAULT_FUNCTION: &str = "deploy-baba-prod";
 
-pub async fn deploy(function: Option<String>, profile: Option<String>) -> anyhow::Result<()> {
-    let func_name = function.unwrap_or_else(|| DEFAULT_FUNCTION.to_string());
-    println!("🚀 Deploying to AWS Lambda: {}", func_name);
+pub async fn deploy(
+    function: String,
+    package: Option<String>,
+    zip_path_override: Option<String>,
+    profile: Option<String>,
+) -> anyhow::Result<()> {
+    println!("🚀 Deploying to AWS Lambda: {}", function);
 
-    // Build release binary for aarch64 using cargo-lambda
-    println!("   Building {} ({})...", PACKAGE, TARGET);
-    let status = Command::new("cargo")
-        .args([
-            "lambda",
-            "build",
-            "--release",
-            "--package",
-            PACKAGE,
-            "--target",
-            TARGET,
-        ])
-        .status()
-        .map_err(|e| {
-            anyhow::anyhow!(
-                "Failed to run cargo lambda: {} (is cargo-lambda installed?)",
-                e
-            )
-        })?;
+    let zip_path = if let Some(ref path) = zip_path_override {
+        println!("   Using pre-built zip: {}", path);
+        if !std::path::Path::new(path).exists() {
+            return Err(anyhow::anyhow!("Zip file not found: {}", path));
+        }
+        path.clone()
+    } else {
+        let pkg = package.unwrap_or_else(|| DEFAULT_PACKAGE.to_string());
+        let zip = format!("infra/build/{}.zip", pkg);
 
-    if !status.success() {
-        return Err(anyhow::anyhow!("cargo lambda build failed"));
-    }
+        println!("   Building {} ({})...", pkg, TARGET);
+        let status = Command::new("cargo")
+            .args([
+                "lambda",
+                "build",
+                "--release",
+                "--package",
+                &pkg,
+                "--target",
+                TARGET,
+            ])
+            .status()
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to run cargo lambda: {} (is cargo-lambda installed?)",
+                    e
+                )
+            })?;
 
-    // Package bootstrap binary into lambda.zip
-    println!("   Packaging {}...", ZIP_PATH);
-    std::fs::create_dir_all("infra/build")
-        .map_err(|e| anyhow::anyhow!("Failed to create infra/build: {}", e))?;
+        if !status.success() {
+            return Err(anyhow::anyhow!("cargo lambda build failed"));
+        }
 
-    // Remove stale zip to avoid zip appending to old archive
-    let _ = std::fs::remove_file(ZIP_PATH);
+        println!("   Packaging {}...", zip);
+        std::fs::create_dir_all("infra/build")
+            .map_err(|e| anyhow::anyhow!("Failed to create infra/build: {}", e))?;
 
-    let bootstrap_path = format!("target/lambda/{}/bootstrap", PACKAGE);
-    let status = Command::new("zip")
-        .args(["-j", ZIP_PATH, &bootstrap_path])
-        .status()
-        .map_err(|e| anyhow::anyhow!("Failed to run zip: {}", e))?;
+        let _ = std::fs::remove_file(&zip);
 
-    if !status.success() {
-        return Err(anyhow::anyhow!("Failed to create deployment package"));
-    }
+        let bootstrap_path = format!("target/lambda/{}/bootstrap", pkg);
+        let status = Command::new("zip")
+            .args(["-j", &zip, &bootstrap_path])
+            .status()
+            .map_err(|e| anyhow::anyhow!("Failed to run zip: {}", e))?;
 
-    // Upload zip to Lambda
-    println!("   Uploading to Lambda function: {}...", func_name);
+        if !status.success() {
+            return Err(anyhow::anyhow!("Failed to create deployment package"));
+        }
+
+        zip
+    };
+
+    println!("   Uploading to Lambda function: {}...", function);
     let config = crate::aws::create_aws_config(profile).await?;
     let client = LambdaClient::new(&config);
 
-    let zip_data = std::fs::read(ZIP_PATH)
-        .map_err(|e| anyhow::anyhow!("Failed to read {}: {}", ZIP_PATH, e))?;
+    let zip_data = std::fs::read(&zip_path)
+        .map_err(|e| anyhow::anyhow!("Failed to read {}: {}", zip_path, e))?;
 
     client
         .update_function_code()
-        .function_name(&func_name)
+        .function_name(&function)
         .zip_file(aws_sdk_lambda::primitives::Blob::new(zip_data))
         .send()
         .await
         .map_err(|e| anyhow::anyhow!("Failed to update Lambda function: {}", e))?;
 
-    println!("✅ Lambda function deployed: {}", func_name);
+    println!("✅ Lambda function deployed: {}", function);
     Ok(())
 }
