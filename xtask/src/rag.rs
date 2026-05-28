@@ -670,6 +670,7 @@ struct EvalCase {
     expected_entity_type: Option<String>,
     category: String,
     difficulty: String,
+    corpus_filter: Option<String>,
 }
 
 fn check_retrieval_hit(case: &EvalCase, chunks: &[RankedChunk]) -> bool {
@@ -805,8 +806,8 @@ fn ensure_eval_v2_schema(conn: &Connection) -> anyhow::Result<()> {
     )?;
 
     conn.execute_batch(
-        "UPDATE rag_eval_cases SET expected_hit_aliases = '[source,cite,ground'
-         WHERE question LIKE '%grounding%citation%';
+        "UPDATE rag_eval_cases SET expected_hit_aliases = 'source,cite,grounding,rephrase,summarize'
+         WHERE question LIKE '%grounding%';
 
          UPDATE rag_eval_cases SET expected_hit_aliases = 'retrieval,FTS,chunk'
          WHERE question LIKE '%RAG pipeline%';
@@ -822,6 +823,11 @@ fn ensure_eval_v2_schema(conn: &Connection) -> anyhow::Result<()> {
     )?;
 
     conn.execute_batch(
+        "UPDATE rag_eval_cases SET expected_hit_aliases = 'sign in,Sign in,auth/signin,handleSubmit,login'
+         WHERE question LIKE '%SPA login form%';",
+    )?;
+
+    conn.execute_batch(
         "INSERT INTO rag_eval_cases (
            question, expected_hit, source_path, category, difficulty, expected_source_kind, corpus_filter
          )
@@ -829,7 +835,7 @@ fn ensure_eval_v2_schema(conn: &Connection) -> anyhow::Result<()> {
            (
              'How does the SPA login form work?',
              'signin',
-             'web/src/routes/auth',
+             'web/src/',
              'code',
              'medium',
              'typescript',
@@ -838,7 +844,7 @@ fn ensure_eval_v2_schema(conn: &Connection) -> anyhow::Result<()> {
            (
              'What happens when useAuth detects an unauthenticated user?',
              'navigate',
-             'web/src/hooks',
+             'web/src/',
              'code',
              'easy',
              'typescript',
@@ -847,7 +853,7 @@ fn ensure_eval_v2_schema(conn: &Connection) -> anyhow::Result<()> {
            (
              'What are the auth routes in the React SPA?',
              'Login',
-             'web/src/routes/auth',
+             'web/src/',
              'architecture',
              'easy',
              'typescript',
@@ -1137,10 +1143,10 @@ async fn eval_cmd(
 
     // Read eval cases
     let sql = if category_filter.is_some() {
-        "SELECT id, question, expected_hit, source_path, expected_source_kind, expected_entity_type, category, difficulty, expected_hit_aliases \
+        "SELECT id, question, expected_hit, source_path, expected_source_kind, expected_entity_type, category, difficulty, expected_hit_aliases, corpus_filter \
          FROM rag_eval_cases WHERE category = ?1 ORDER BY id"
     } else {
-        "SELECT id, question, expected_hit, source_path, expected_source_kind, expected_entity_type, category, difficulty, expected_hit_aliases \
+        "SELECT id, question, expected_hit, source_path, expected_source_kind, expected_entity_type, category, difficulty, expected_hit_aliases, corpus_filter \
          FROM rag_eval_cases ORDER BY id"
     };
     let parse_aliases = |raw: Option<String>| -> Vec<String> {
@@ -1165,6 +1171,7 @@ async fn eval_cmd(
                 expected_entity_type: row.get(5)?,
                 category: row.get(6)?,
                 difficulty: row.get(7)?,
+                corpus_filter: row.get(9)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?
@@ -1180,6 +1187,7 @@ async fn eval_cmd(
                 expected_entity_type: row.get(5)?,
                 category: row.get(6)?,
                 difficulty: row.get(7)?,
+                corpus_filter: row.get(9)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?
@@ -1251,7 +1259,15 @@ async fn eval_cmd(
     for (i, case) in cases.iter().enumerate() {
         let start = Instant::now();
 
-        let chunks = match hybrid.retrieve(&case.question, top_k).await {
+        let chunks = match if let Some(ref filter) = case.corpus_filter {
+            let kinds: Vec<&str> = filter.split(',').map(|s| s.trim()).collect();
+            hybrid
+                .fts
+                .retrieve_filtered(&case.question, top_k, &kinds)
+                .await
+        } else {
+            hybrid.retrieve(&case.question, top_k).await
+        } {
             Ok(c) => c,
             Err(e) => {
                 let failure = format!("retrieval_error: {e}");

@@ -3,7 +3,9 @@ use crate::portfolio::PortfolioDataProvider;
 use crate::types::RankedChunk;
 use crate::{RagError, Retriever};
 use async_trait::async_trait;
+use regex::Regex;
 use std::collections::VecDeque;
+use std::sync::LazyLock;
 
 const PORTFOLIO_ENTITY_KEYWORDS: &[&str] = &[
     "experience",
@@ -24,6 +26,15 @@ const PORTFOLIO_ENTITY_KEYWORDS: &[&str] = &[
     "challenges",
     "project",
     "projects",
+    "platform",
+    "platforms",
+    "product",
+    "products",
+    "built",
+    "cloud",
+    "aws",
+    "expertise",
+    "leadership",
 ];
 
 const CODEBASE_KEYWORDS: &[&str] = &[
@@ -34,7 +45,6 @@ const CODEBASE_KEYWORDS: &[&str] = &[
     "architecture",
     "implement",
     "design",
-    "infrastructure",
     "deploy",
     "lambda",
     "database",
@@ -45,6 +55,17 @@ const CODEBASE_KEYWORDS: &[&str] = &[
     "handler",
     "middleware",
     "service",
+];
+
+const SPA_KEYWORDS: &[&str] = &[
+    "spa",
+    "react",
+    "component",
+    "tsx",
+    "hook",
+    "useauth",
+    "frontend",
+    "vite",
 ];
 
 pub struct HybridRetriever<R, P> {
@@ -197,6 +218,17 @@ impl<R: Retriever, P: PortfolioDataProvider> HybridRetriever<R, P> {
         mix
     }
 
+    fn is_spa_query(query: &str) -> bool {
+        let lower = query.to_lowercase();
+        SPA_KEYWORDS.iter().any(|kw| lower.contains(kw))
+    }
+
+    fn is_adr_query(query: &str) -> bool {
+        static ADR_RE: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"(?i)\bADR[- ]?\d+\b").unwrap());
+        ADR_RE.is_match(query)
+    }
+
     fn pop_take(queue: &mut VecDeque<RankedChunk>, count: usize, out: &mut Vec<RankedChunk>) {
         for _ in 0..count {
             if let Some(chunk) = queue.pop_front() {
@@ -238,6 +270,49 @@ impl<R: Retriever, P: PortfolioDataProvider> HybridRetriever<R, P> {
 #[async_trait]
 impl<R: Retriever, P: PortfolioDataProvider> Retriever for HybridRetriever<R, P> {
     async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<RankedChunk>, RagError> {
+        let spa_query = Self::is_spa_query(query);
+        let adr_query = Self::is_adr_query(query);
+
+        // SPA queries: split FTS budget between TS-filtered and general
+        if spa_query {
+            let ts_budget = (top_k * 2 / 3).max(1);
+            let general_budget = top_k.saturating_sub(ts_budget);
+            let mut results = self
+                .fts
+                .retrieve_filtered(query, ts_budget, &["typescript"])
+                .await?;
+            if general_budget > 0 {
+                let general = self.fts.retrieve(query, general_budget).await?;
+                for c in general {
+                    if !results.iter().any(|r| r.chunk_id == c.chunk_id) {
+                        results.push(c);
+                    }
+                }
+            }
+            results.truncate(top_k);
+            return Ok(results);
+        }
+
+        // ADR queries: boost plan docs by reserving half the budget for plan corpus
+        if adr_query {
+            let plan_budget = (top_k / 2).max(1);
+            let general_budget = top_k.saturating_sub(plan_budget);
+            let mut results = self
+                .fts
+                .retrieve_filtered(query, plan_budget, &["plan"])
+                .await?;
+            if general_budget > 0 {
+                let general = self.fts.retrieve(query, general_budget).await?;
+                for c in general {
+                    if !results.iter().any(|r| r.chunk_id == c.chunk_id) {
+                        results.push(c);
+                    }
+                }
+            }
+            results.truncate(top_k);
+            return Ok(results);
+        }
+
         let portfolio_budget = Self::portfolio_budget_for(query, top_k);
 
         if portfolio_budget == 0 {

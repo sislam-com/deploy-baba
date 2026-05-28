@@ -495,7 +495,7 @@ static STOP_WORDS: &[&str] = &[
 
 fn to_fts5_or_query(query: &str) -> String {
     let all_terms: Vec<String> = query
-        .split_whitespace()
+        .split(|c: char| c.is_whitespace() || c == '-')
         .filter_map(|t| {
             let clean: String = t
                 .chars()
@@ -540,6 +540,18 @@ fn to_fts5_or_query(query: &str) -> String {
 impl Retriever for RagStore {
     async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<RankedChunk>, RagError> {
         self.retrieve_filtered(query, top_k, None)
+    }
+    async fn retrieve_filtered(
+        &self,
+        query: &str,
+        top_k: usize,
+        kinds: &[&str],
+    ) -> Result<Vec<RankedChunk>, RagError> {
+        if kinds.is_empty() {
+            RagStore::retrieve_filtered(self, query, top_k, None)
+        } else {
+            RagStore::retrieve_filtered(self, query, top_k, Some(kinds))
+        }
     }
 }
 
@@ -718,11 +730,13 @@ mod tests {
             to_fts5_or_query("SQLite database"),
             "\"sqlite database\" OR sqlite OR database"
         );
-        // Hyphenated compound: cleaned to single token
+        // Hyphenated compound: split into separate tokens (matches FTS5 unicode61 tokenizer)
         assert_eq!(
             to_fts5_or_query("FTS5 full-text"),
-            "\"fts5 fulltext\" OR fts5 OR fulltext"
+            "\"fts5 full text\" OR fts5 OR full OR text"
         );
+        // ADR-NNN patterns split correctly
+        assert_eq!(to_fts5_or_query("ADR-016"), "\"adr 016\" OR adr OR 016");
         // Single content word
         assert_eq!(to_fts5_or_query("single"), "single");
     }
