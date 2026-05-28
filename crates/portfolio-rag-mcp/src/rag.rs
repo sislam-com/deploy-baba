@@ -35,6 +35,7 @@ impl PortfolioRAG {
             "plan".to_string(),
             "cache".to_string(),
             "challenge".to_string(),
+            "typescript".to_string(),
         ];
 
         info!("Portfolio RAG initialized with {} corpora", corpora.len());
@@ -255,6 +256,229 @@ impl PortfolioRAG {
         }
     }
 
+    pub fn eval_report(&self) -> Result<Value> {
+        let conn = self.db_conn.lock().unwrap();
+
+        let run = conn.query_row(
+            "SELECT total_cases, pass_count, avg_groundedness, avg_correctness, run_at
+             FROM rag_eval_runs ORDER BY id DESC LIMIT 1",
+            [],
+            |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, Option<f64>>(2)?,
+                    row.get::<_, Option<f64>>(3)?,
+                    row.get::<_, String>(4)?,
+                ))
+            },
+        );
+
+        let (total, passed, groundedness, correctness, run_at) = match run {
+            Ok(r) => r,
+            Err(_) => return Ok(serde_json::json!({"status": "no eval runs yet"})),
+        };
+
+        let pass_rate = if total > 0 {
+            (passed as f64 / total as f64 * 100.0).round()
+        } else {
+            0.0
+        };
+
+        let mut category_stmt = conn.prepare(
+            "SELECT category, COUNT(*) as total,
+                    SUM(CASE WHEN passed = 1 THEN 1 ELSE 0 END) as pass_count
+             FROM rag_eval_results
+             WHERE run_id = (SELECT MAX(id) FROM rag_eval_runs)
+             GROUP BY category",
+        )?;
+
+        let categories: Vec<Value> = category_stmt
+            .query_map([], |row| {
+                let cat: String = row.get(0)?;
+                let cat_total: i64 = row.get(1)?;
+                let cat_passed: i64 = row.get(2)?;
+                let cat_rate = if cat_total > 0 {
+                    (cat_passed as f64 / cat_total as f64 * 100.0).round()
+                } else {
+                    0.0
+                };
+                Ok(serde_json::json!({
+                    "category": cat,
+                    "total": cat_total,
+                    "passed": cat_passed,
+                    "pass_rate_pct": cat_rate,
+                }))
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        Ok(serde_json::json!({
+            "last_run": run_at,
+            "total_cases": total,
+            "pass_count": passed,
+            "pass_rate_pct": pass_rate,
+            "avg_groundedness": groundedness,
+            "avg_correctness": correctness,
+            "categories": categories,
+        }))
+    }
+
+    pub fn eval_failures(&self) -> Result<Value> {
+        let conn = self.db_conn.lock().unwrap();
+
+        let latest_run_id: Option<i64> = conn
+            .query_row("SELECT MAX(id) FROM rag_eval_runs", [], |row| row.get(0))
+            .unwrap_or(None);
+
+        let run_id = match latest_run_id {
+            Some(id) => id,
+            None => return Ok(serde_json::json!({"status": "no eval runs yet", "failures": []})),
+        };
+
+        let mut stmt = conn.prepare(
+            "SELECT er.category, ec.question, er.answer, er.groundedness_score,
+                    er.correctness_score, ec.expected_hit, ec.source_path
+             FROM rag_eval_results er
+             JOIN rag_eval_cases ec ON er.case_id = ec.id
+             WHERE er.run_id = ?1 AND er.passed = 0",
+        )?;
+
+        let failures: Vec<Value> = stmt
+            .query_map([run_id], |row| {
+                Ok(serde_json::json!({
+                    "category": row.get::<_, String>(0)?,
+                    "question": row.get::<_, String>(1)?,
+                    "answer": row.get::<_, Option<String>>(2)?,
+                    "groundedness_score": row.get::<_, Option<f64>>(3)?,
+                    "correctness_score": row.get::<_, Option<f64>>(4)?,
+                    "expected_hit": row.get::<_, Option<String>>(5)?,
+                    "source_path": row.get::<_, Option<String>>(6)?,
+                }))
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        Ok(serde_json::json!({
+            "run_id": run_id,
+            "failure_count": failures.len(),
+            "failures": failures,
+        }))
+    }
+
+    pub fn corpus_gaps(&self) -> Result<Value> {
+        let workspace_root = std::env::var("RAG_CORPORA_PATH").unwrap_or_else(|_| ".".to_string());
+        let root = Path::new(&workspace_root);
+
+        let indexed_docs = {
+            let conn = self.db_conn.lock().unwrap();
+            let mut stmt = conn.prepare(
+                "SELECT source_kind, COUNT(*), GROUP_CONCAT(DISTINCT source_path)
+                 FROM rag_documents GROUP BY source_kind",
+            )?;
+            let results: Vec<_> = stmt
+                .query_map([], |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, i64>(1)?,
+                        row.get::<_, Option<String>>(2)?,
+                    ))
+                })?
+                .filter_map(|r| r.ok())
+                .collect();
+            results
+        };
+
+        let corpus_dirs: &[(&str, &[&str], &[&str])] = &[
+            (
+                "rust",
+                &["crates", "services/ui/src", "services/email/src"],
+                &["rs"],
+            ),
+            ("hcl", &["infra"], &["tf"]),
+            ("plan", &["plans"], &["md"]),
+            ("typescript", &["web/src"], &["ts", "tsx"]),
+            ("openapi", &["crates/api-openapi"], &["rs"]),
+        ];
+
+        let mut gaps = Vec::new();
+        for (corpus, dirs, extensions) in corpus_dirs {
+            let mut fs_count = 0u64;
+            for dir in *dirs {
+                let full = root.join(dir);
+                if full.exists() {
+                    fs_count += count_files_recursive(&full, extensions);
+                }
+            }
+
+            let indexed_count = indexed_docs
+                .iter()
+                .find(|(k, _, _)| k == corpus)
+                .map(|(_, c, _)| *c as u64)
+                .unwrap_or(0);
+
+            if fs_count > indexed_count {
+                gaps.push(serde_json::json!({
+                    "corpus": corpus,
+                    "filesystem_files": fs_count,
+                    "indexed_documents": indexed_count,
+                    "gap": fs_count - indexed_count,
+                    "directories": dirs,
+                }));
+            }
+        }
+
+        let indexed_summary: Vec<Value> = indexed_docs
+            .iter()
+            .map(|(kind, count, _)| {
+                serde_json::json!({
+                    "corpus": kind,
+                    "indexed_documents": count,
+                })
+            })
+            .collect();
+
+        Ok(serde_json::json!({
+            "indexed_corpora": indexed_summary,
+            "gaps": gaps,
+            "gap_count": gaps.len(),
+        }))
+    }
+
+    pub fn reindex_status(&self) -> Result<Value> {
+        let conn = self.db_conn.lock().unwrap();
+
+        let mut stmt = conn.prepare(
+            "SELECT source_kind,
+                    COUNT(*) as doc_count,
+                    (SELECT COUNT(*) FROM rag_chunks rc
+                     JOIN rag_documents rd2 ON rc.document_id = rd2.id
+                     WHERE rd2.source_kind = rd.source_kind) as chunk_count,
+                    MIN(updated_at) as oldest,
+                    MAX(updated_at) as newest
+             FROM rag_documents rd
+             GROUP BY source_kind",
+        )?;
+
+        let corpora: Vec<Value> = stmt
+            .query_map([], |row| {
+                Ok(serde_json::json!({
+                    "corpus": row.get::<_, String>(0)?,
+                    "document_count": row.get::<_, i64>(1)?,
+                    "chunk_count": row.get::<_, i64>(2)?,
+                    "oldest_update": row.get::<_, String>(3)?,
+                    "newest_update": row.get::<_, String>(4)?,
+                }))
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        Ok(serde_json::json!({
+            "corpora": corpora,
+            "corpus_count": corpora.len(),
+        }))
+    }
+
     fn compute_cache_age(&self, root: &Path) -> String {
         let cache_path = root.join(".agent-cache/index.json");
         match std::fs::metadata(&cache_path) {
@@ -277,4 +501,24 @@ impl PortfolioRAG {
             Err(_) => "cache not found".to_string(),
         }
     }
+}
+
+fn count_files_recursive(dir: &Path, extensions: &[&str]) -> u64 {
+    let mut count = 0;
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                if !name.starts_with('.') && name != "node_modules" && name != "target" {
+                    count += count_files_recursive(&path, extensions);
+                }
+            } else if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                if extensions.contains(&ext) {
+                    count += 1;
+                }
+            }
+        }
+    }
+    count
 }

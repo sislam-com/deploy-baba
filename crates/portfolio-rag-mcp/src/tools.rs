@@ -98,6 +98,50 @@ pub fn list_tools() -> Vec<Tool> {
                 "required": []
             }),
         },
+        Tool {
+            name: "eval_report".to_string(),
+            description: Some(
+                "Get the latest RAG eval run results: overall pass rate, per-category breakdown, groundedness and correctness scores. ~100 tokens vs ~2000 via sqlite3.".to_string(),
+            ),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {},
+                "required": []
+            }),
+        },
+        Tool {
+            name: "eval_failures".to_string(),
+            description: Some(
+                "Get details on failing RAG eval cases from the latest run: question, answer, scores, expected hits. Use to diagnose retrieval quality issues.".to_string(),
+            ),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {},
+                "required": []
+            }),
+        },
+        Tool {
+            name: "corpus_gaps".to_string(),
+            description: Some(
+                "Scan workspace for unindexed files by comparing filesystem against RAG documents table. Identifies directories/file types missing from the index.".to_string(),
+            ),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {},
+                "required": []
+            }),
+        },
+        Tool {
+            name: "reindex_status".to_string(),
+            description: Some(
+                "Show last ingest time per corpus, document and chunk counts, and stale detection. Use to check if re-indexing is needed.".to_string(),
+            ),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {},
+                "required": []
+            }),
+        },
     ]
 }
 
@@ -228,6 +272,66 @@ pub fn project_health(rag: &PortfolioRAG) -> Result<Value> {
         Err(e) => {
             error!("Project health failed: {}", e);
             Err(anyhow::anyhow!("Project health failed: {}", e))
+        }
+    }
+}
+
+pub fn eval_report(rag: &PortfolioRAG) -> Result<Value> {
+    info!("Eval report request");
+
+    match rag.eval_report() {
+        Ok(report) => Ok(serde_json::json!({
+            "success": true,
+            "report": report
+        })),
+        Err(e) => {
+            error!("Eval report failed: {}", e);
+            Err(anyhow::anyhow!("Eval report failed: {}", e))
+        }
+    }
+}
+
+pub fn eval_failures(rag: &PortfolioRAG) -> Result<Value> {
+    info!("Eval failures request");
+
+    match rag.eval_failures() {
+        Ok(failures) => Ok(serde_json::json!({
+            "success": true,
+            "data": failures
+        })),
+        Err(e) => {
+            error!("Eval failures failed: {}", e);
+            Err(anyhow::anyhow!("Eval failures failed: {}", e))
+        }
+    }
+}
+
+pub fn corpus_gaps(rag: &PortfolioRAG) -> Result<Value> {
+    info!("Corpus gaps request");
+
+    match rag.corpus_gaps() {
+        Ok(gaps) => Ok(serde_json::json!({
+            "success": true,
+            "data": gaps
+        })),
+        Err(e) => {
+            error!("Corpus gaps failed: {}", e);
+            Err(anyhow::anyhow!("Corpus gaps failed: {}", e))
+        }
+    }
+}
+
+pub fn reindex_status(rag: &PortfolioRAG) -> Result<Value> {
+    info!("Reindex status request");
+
+    match rag.reindex_status() {
+        Ok(status) => Ok(serde_json::json!({
+            "success": true,
+            "data": status
+        })),
+        Err(e) => {
+            error!("Reindex status failed: {}", e);
+            Err(anyhow::anyhow!("Reindex status failed: {}", e))
         }
     }
 }

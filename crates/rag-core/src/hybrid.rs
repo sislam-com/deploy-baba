@@ -5,7 +5,7 @@ use crate::{RagError, Retriever};
 use async_trait::async_trait;
 use std::collections::VecDeque;
 
-const PORTFOLIO_KEYWORDS: &[&str] = &[
+const PORTFOLIO_ENTITY_KEYWORDS: &[&str] = &[
     "experience",
     "skills",
     "job",
@@ -17,11 +17,16 @@ const PORTFOLIO_KEYWORDS: &[&str] = &[
     "about",
     "contact",
     "social",
-    "endpoint",
-    "api",
     "career",
     "company",
     "position",
+    "challenge",
+    "challenges",
+    "project",
+    "projects",
+];
+
+const CODEBASE_KEYWORDS: &[&str] = &[
     "authentication",
     "auth",
     "cognito",
@@ -34,10 +39,12 @@ const PORTFOLIO_KEYWORDS: &[&str] = &[
     "lambda",
     "database",
     "sqlite",
-    "challenge",
-    "challenges",
-    "project",
-    "projects",
+    "endpoint",
+    "api",
+    "route",
+    "handler",
+    "middleware",
+    "service",
 ];
 
 pub struct HybridRetriever<R, P> {
@@ -53,9 +60,19 @@ struct QueryIntent {
 }
 
 impl<R: Retriever, P: PortfolioDataProvider> HybridRetriever<R, P> {
-    fn query_matches_portfolio(query: &str) -> bool {
+    fn portfolio_budget_for(query: &str, top_k: usize) -> usize {
         let lower = query.to_lowercase();
-        PORTFOLIO_KEYWORDS.iter().any(|kw| lower.contains(kw))
+        let has_entity = PORTFOLIO_ENTITY_KEYWORDS
+            .iter()
+            .any(|kw| lower.contains(kw));
+        let has_codebase = CODEBASE_KEYWORDS.iter().any(|kw| lower.contains(kw));
+
+        match (has_entity, has_codebase) {
+            (true, false) => top_k.min(5),
+            (false, true) => top_k.min(2),
+            (true, true) => top_k.min(3),
+            (false, false) => 0,
+        }
     }
 
     fn classify_entity(val: &serde_json::Value) -> (String, String) {
@@ -221,14 +238,12 @@ impl<R: Retriever, P: PortfolioDataProvider> HybridRetriever<R, P> {
 #[async_trait]
 impl<R: Retriever, P: PortfolioDataProvider> Retriever for HybridRetriever<R, P> {
     async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<RankedChunk>, RagError> {
-        let should_inject_portfolio = Self::query_matches_portfolio(query);
+        let portfolio_budget = Self::portfolio_budget_for(query, top_k);
 
-        if !should_inject_portfolio {
-            // Pure codebase query - just return FTS results
+        if portfolio_budget == 0 {
             return self.fts.retrieve(query, top_k).await;
         }
 
-        let portfolio_budget = top_k.min(5);
         let fts_budget = top_k.saturating_sub(portfolio_budget);
         let intent = Self::parse_intent(query);
 
@@ -492,6 +507,56 @@ mod tests {
         assert_eq!(
             chunk.source_path,
             "portfolio://challenge/rag-grounding-citation"
+        );
+    }
+
+    #[tokio::test]
+    async fn codebase_query_reduces_portfolio_budget() {
+        let fts_chunks: Vec<_> = (0..8)
+            .map(|i| make_fts_chunk("rust", &format!("auth handler chunk {}", i)))
+            .collect();
+        let hybrid = HybridRetriever {
+            fts: StubRetriever { chunks: fts_chunks },
+            portfolio: StubPortfolio,
+        };
+
+        let results = hybrid
+            .retrieve("how is authentication implemented?", 10)
+            .await
+            .unwrap();
+        let live_count = results.iter().filter(|c| c.git_sha == "live").count();
+        let fts_count = results.iter().filter(|c| c.git_sha != "live").count();
+        assert!(
+            live_count <= 2,
+            "codebase-only query should cap portfolio at 2, got {}",
+            live_count
+        );
+        assert!(
+            fts_count >= 8,
+            "codebase query should get most slots for FTS code results, got {}",
+            fts_count
+        );
+    }
+
+    #[tokio::test]
+    async fn mixed_query_gets_middle_budget() {
+        let fts_chunks: Vec<_> = (0..8)
+            .map(|i| make_fts_chunk("rust", &format!("chunk {}", i)))
+            .collect();
+        let hybrid = HybridRetriever {
+            fts: StubRetriever { chunks: fts_chunks },
+            portfolio: StubPortfolio,
+        };
+
+        let results = hybrid
+            .retrieve("what skills relate to authentication?", 10)
+            .await
+            .unwrap();
+        let live_count = results.iter().filter(|c| c.git_sha == "live").count();
+        assert!(
+            live_count <= 3,
+            "mixed entity+codebase query should cap portfolio at 3, got {}",
+            live_count
         );
     }
 

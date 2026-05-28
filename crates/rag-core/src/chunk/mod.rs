@@ -19,6 +19,7 @@ pub mod markdown;
 pub mod openapi;
 pub mod portfolio;
 pub mod rust;
+pub mod typescript;
 
 use std::path::Path;
 
@@ -34,5 +35,6 @@ pub fn chunk_file(kind: &SourceKind, path: &Path, content: &str) -> Vec<Chunk> {
         SourceKind::Cache => claude_cache::chunk(&path_str, content),
         SourceKind::OpenApi => openapi::chunk(&path_str, content),
         SourceKind::Portfolio => portfolio::chunk(&path_str, content),
+        SourceKind::TypeScript => typescript::chunk(&path_str, content),
     }
 }
