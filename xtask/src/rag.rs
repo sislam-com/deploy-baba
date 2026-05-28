@@ -144,6 +144,11 @@ async fn ingest(db_path: &Path, repo_root: &Path, include_cache: bool) -> anyhow
         ("HCL infra", SourceKind::Hcl, vec!["infra"]),
         ("Plans/ADRs", SourceKind::Plan, vec!["plans"]),
         ("TypeScript/React", SourceKind::TypeScript, vec!["web/src"]),
+        (
+            "Python/LangGraph",
+            SourceKind::Python,
+            vec!["services/agent/src"],
+        ),
     ];
 
     let mut total_docs = 0u64;
@@ -158,6 +163,7 @@ async fn ingest(db_path: &Path, repo_root: &Path, include_cache: bool) -> anyhow
             SourceKind::OpenApi => "json",
             SourceKind::Portfolio => "json",
             SourceKind::TypeScript => "ts,tsx",
+            SourceKind::Python => "py",
         };
         println!("  Indexing {label}...");
         let (docs, chunks) = index_corpus(&store, repo_root, dirs, ext, kind, &git_sha)?;

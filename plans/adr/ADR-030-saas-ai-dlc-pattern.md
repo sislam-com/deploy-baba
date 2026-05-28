@@ -7,7 +7,7 @@
 ## Context
 
 The deploy-baba portfolio has organically built a complete AI-assisted development lifecycle (AI-DLC)
-stack: agent cache for session memory, modular plan system, anti-rot agents, 7-corpus RAG with
+stack: agent cache for session memory, modular plan system, anti-rot agents, 9-corpus RAG with
 grounded retrieval, agentic tool dispatch, and a Cognito-authenticated MCP gateway. Each component
 was built to serve the portfolio itself, but together they form a replicable pattern for any
 software project.

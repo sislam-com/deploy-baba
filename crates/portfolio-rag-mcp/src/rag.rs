@@ -36,6 +36,7 @@ impl PortfolioRAG {
             "cache".to_string(),
             "challenge".to_string(),
             "typescript".to_string(),
+            "python".to_string(),
         ];
 
         info!("Portfolio RAG initialized with {} corpora", corpora.len());
@@ -399,6 +400,7 @@ impl PortfolioRAG {
             ("plan", &["plans"], &["md"]),
             ("typescript", &["web/src"], &["ts", "tsx"]),
             ("openapi", &["crates/api-openapi"], &["rs"]),
+            ("python", &["services/agent/src"], &["py"]),
         ];
 
         let mut gaps = Vec::new();

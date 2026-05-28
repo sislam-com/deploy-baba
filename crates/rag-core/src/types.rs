@@ -13,6 +13,7 @@ pub enum SourceKind {
     OpenApi,
     Portfolio,
     TypeScript,
+    Python,
 }
 
 impl SourceKind {
@@ -25,6 +26,7 @@ impl SourceKind {
             SourceKind::OpenApi => "openapi",
             SourceKind::Portfolio => "portfolio",
             SourceKind::TypeScript => "typescript",
+            SourceKind::Python => "python",
         }
     }
 }

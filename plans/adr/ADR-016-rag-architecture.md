@@ -1,7 +1,7 @@
 # ADR-016: RAG Architecture
 
 **Date:** 2026-04-15
-**Status:** Accepted (2026-05-20 — all architectural decisions validated; FTS+7-corpus+agentic fully operational)
+**Status:** Accepted (2026-05-28 — all architectural decisions validated; FTS+9-corpus+agentic fully operational; TypeScript + Python corpora added)
 **Affected modules:** W-RAG, W-UI, W-LLM
 
 ## Context
@@ -38,6 +38,8 @@ Key choices:
 - **Per-corpus chunkers:** Rust source uses `syn` AST walk (fn/impl/doc chunks); HCL uses
   brace-balance regex (resource/variable blocks); Markdown uses H2/H3 heading split (sections);
   `.claude/` JSON uses leaf-value + MD heading split (local-CLI only).
+  TypeScript/TSX uses brace-balance keyword split (export/function/const/class blocks).
+  Python uses indent-based splitting on def/async def/class/decorator boundaries.
 - **Content-hash embedding cache** in `meta_json` eliminates redundant embedding API calls on
   re-index when chunk content is unchanged.
 - **Grounding contract** (shared with ADR-015 / `cross-cutting/llm-policy.md`): retrieved chunks

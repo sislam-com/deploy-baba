@@ -1,5 +1,5 @@
 # deploy-baba — Plan Index
-**GitHub:** `sislam-com/deploy-baba` | **Last updated:** 2026-05-27
+**GitHub:** `sislam-com/deploy-baba` | **Last updated:** 2026-05-28
 **Source repo:** `~/shanto` (Baba Toolchain, ~85K LOC) | **Status:** ~90% complete (microservices transformation in progress)
 
 See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming rules.
@@ -37,7 +37,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | dashboard-sync | W-SYNC | `plans/modules/dashboard-sync.md`, `services/ui/migrations/`, `services/ui/src/db.rs`, `services/ui/src/routes/api/admin.rs`, `.claude/skills/sync-dashboard-data/` | DONE | 4.1–4.5 complete; zero drift on first run 2026-04-08; .4.6/.4.7 deferred (on-demand) |
 | llm-core + llm-anthropic + llm-openai | W-LLM | `crates/llm-core/`, `crates/llm-anthropic/`, `crates/llm-openai/` | DONE | W-LLM.4.1–4.16 all DONE; LlmProvider + EmbeddingProvider traits; Anthropic + OpenAI adapters; tool-dispatch loop (ADR-023) |
 | resume-tailor | W-RST | `services/ui/src/tailor/`, `crates/api-openapi/src/models/tailor.rs`, `services/ui/migrations/016` | TODO | All items; BLOCKED-on-deploy for 4.3/4.4/4.5 until W-SEC deployed + `anthropic-api-key` in SM |
-| rag | W-RAG | `crates/rag-core/`, `crates/rag-sqlite/` | DONE | P1–P5 complete; 7 corpora; eval.rs live; embedding + hybrid FTS/ANN retrieval via RRF (W-RAG.4.1 DONE); sqlite-vec native ANN deferred (W-RAG.6.2) |
+| rag | W-RAG | `crates/rag-core/`, `crates/rag-sqlite/`, `crates/portfolio-rag-mcp/` | DONE | P1–P6 complete; 9 corpora (TypeScript + Python added); eval suite + MCP tools; hybrid FTS/ANN via RRF; sqlite-vec native ANN deferred (W-RAG.6.2) |
 | gdrive-planning | W-GDR | `justfile`, `.claude/settings.json`, `.github/workflows/` | TODO | Drive MCP plan export/import (W-GDR.4.1–4.3); Stop hook quality gate (W-GDR.4.4); evaluated from Gemini proposal 2026-04-15 |
 | ai-dlc | W-AIL | `.claude/agents/`, `.claude/skills/` | DONE | plan-doctor + drift-detector subagents; /plan-sync, /cache-refresh, /memory-curate skills; weekly schedule |
 | ci | W-CI | `.github/workflows/` | WIP | Code complete (C.1 + C.2 DONE). W-CI.4.9 RESOLVED 2026-05-04 — GH Variables replaced by SM fetch (DRL-2026-05-04-sislam-outage); bootstrap ARNs set. Remaining: W-CI.4.5 (dev Lambda workspace), W-CI.4.10 (production env gate) |
@@ -50,7 +50,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | mcp-cloud | W-MCP | `crates/mcp-rs/`, `services/mcp-gateway/` | WIP | Private MCP gateway; local mcp-rs + cloud Cognito-authenticated Lambda gateway (ADR-028) |
 | env-promote | W-PROM | `xtask/src/deploy/promote.rs`, `infra/*.tf`, `.github/workflows/` | WIP | Phase 1 DONE (workspace refactoring); Phase 1.5 TODO (deploy recipe alignment — W-XT.4.9); Phase 2–5 TODO (infra param, dev workspace, promote cmd, CI) |
 | saas-onboard | W-SAAS | `xtask/src/onboard.rs`, `crates/portfolio-rag-mcp/`, `services/ui/src/routes/api/eval.rs` | WIP | Project onboarding for external repos; eval dashboard; project_health MCP tool (ADR-030) |
-| agent | W-AGT | `services/agent/` (Python/LangGraph) | TODO | Cover letter generation agent; first Python Lambda; LangGraph ReAct with 4 tools (ADR-032/033/034) |
+| agent | W-AGT | `services/agent/` (Python/LangGraph) | WIP | Scaffold DONE; RAG sync graph DONE (W-AGT.4.17); cover letter tools TODO (W-AGT.4.2–4.16) |
 | linkedin-sync | W-LINK | `services/ui/src/routes/api/linkedin.rs`, `web/src/routes/dashboard/LinkedInSync.tsx` | WIP | LinkedIn data import (CSV export); admin diff UI; sync status badges on Jobs/Challenges; secret pre-wired |
 
 ---
@@ -100,7 +100,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 6. ~~**W-OTF.4.1–4.7**~~ — **DONE 2026-05-01** — `tofu` v1.11.5 installed; `just infra-plan deploy-baba` clean. HCL fixes: duplicate `aws_caller_identity`, duplicate `file_system_config`, lifecycle `filter {}`. See DRL-2026-05-01-infra-plan-blockers.
 
 ### P1.5 — Agentic Cover Letter (ADR-032/033/034)
-1. **W-AGT.4.1** — Scaffold `services/agent/` with pyproject.toml, LangGraph graph, Mangum handler — **DONE** (2026-05-24)
+1. ~~**W-AGT.4.1**~~ — Scaffold `services/agent/` with pyproject.toml, LangGraph graph, Mangum handler — **DONE** (2026-05-24)
 2. **W-AGT.4.2–4.6** — Implement 4 LangGraph tools (resume retrieval, JD matcher, cover letter generator, S3 artifact)
 3. **W-AGT.4.3** — Add `POST /api/v1/tailor/match` thin Rust endpoint exposing `matcher.rs`
 4. **W-AGT.4.7–4.8** — Wire full LangGraph graph + FastAPI endpoint
@@ -151,7 +151,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 14. ~~**W-RAG.4.1**~~ — Wire embedder (OpenAI text-embedding-3-small via `LlmEmbedder` bridge) — **DONE** (2026-05-21)
 15. ~~**W-RAG.4.2 + 5.1**~~ — PromptAssembler + generate integration + deploy-failure diagnosis hook — **DONE** (2026-04-15)
 16. ~~**W-RAG.6.1–6.3**~~ — Public `/api/ask` endpoint + rate-limit — **DONE** (2026-05-01)
-17. ~~**W-RAG.7.1–7.5**~~ — Extended RAG corpora: OpenAPI spec + portfolio data chunkers, 7-corpus ingest — **DONE**
+17. ~~**W-RAG.7.1–7.5**~~ — Extended RAG corpora: OpenAPI spec + portfolio data chunkers — **DONE**
 18. ~~**W-RAG.8.1–8.2**~~ — Portfolio-aware prompt assembly + filtered retrieval — **DONE**
 19. ~~**W-RAG.9.1–9.6**~~ — Live-data retrieval: `PortfolioDataProvider`, `HybridRetriever`, hybrid fix — **DONE** (2026-05-09)
 20. ~~**W-LLM.4.8–4.14**~~ — Tool-dispatch loop: `ToolExecutor` trait, `run_agent_loop()`, `ChatMessage` content enum, Anthropic adapter update (ADR-023) — **DONE**
@@ -160,6 +160,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 23. ~~**W-LLM.4.16**~~ — OpenAI `EmbeddingProvider` adapter (text-embedding-3-small) — **DONE** (2026-05-21)
 24. **W-RAG.6.2** — Bundle `sqlite-vec` aarch64 SO into Lambda zip — DEFERRED (brute-force ANN sufficient for current corpus)
 25. ~~**W-RAG.12.1**~~ — Deterministic groundedness scoring (`eval.rs`) — **DONE** (live in ask handler)
+26. ~~**W-RAG.13.1–13.10**~~ — P6: TypeScript corpus, Python corpus, FTS stop words + phrase boost, corpora aliasing split, MCP eval tools, eval aliases, SPA eval cases, UI RAG endpoints, LangGraph sync agent — **DONE** (2026-05-28)
 
 ---
 
@@ -230,6 +231,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | DRL-2026-05-04-adr005-askama-claim | 2026-05-04 | ADR-005 rule 2 references Askama, which was removed by ADR-019 | **RESOLVED 2026-05-04** — ADR-005 rule 2 updated with ADR-019 supersession |
 | DRL-2026-05-04-adr015-feature-flag-not-implemented | 2026-05-04 | ADR-015 rule 3 claims feature-flag adapter selection; actual uses llm-proxy Lambda | **RESOLVED** — ADR-015 rule 3 updated to describe runtime provider selection via llm-proxy |
 | DRL-2026-05-09-rag-challenges-corpus | 2026-05-09 | Challenges 7th corpus undocumented in plan system (W-RAG, W-CHL, ADR-016) | 7 entries; 6 RESOLVED, 1 PENDING (cache refresh) |
+| DRL-2026-05-28-rag-quality-p6 | 2026-05-28 | RAG quality P6: TypeScript + Python corpora, FTS improvements, aliasing split, MCP eval tools, sync agent, plan drift | 9 entries; all RESOLVED |
 
 ---
 
@@ -242,7 +244,7 @@ api-openapi  ←── api-merger, services/ui
 api-graphql  ←── api-merger
 api-grpc     ←── api-merger
 llm-core     ←── llm-anthropic, services/ui (via W-RST), services/llm-proxy (agent loop, ADR-023)
-rag-core     ←── rag-sqlite, services/ui (ask handler), xtask (rag commands)
+rag-core     ←── rag-sqlite, portfolio-rag-mcp, services/ui (ask handler), services/agent (rag sync), xtask (rag commands)
 ```
 
 Full dependency order: `plans/cross-cutting/dependency-graph.md`
