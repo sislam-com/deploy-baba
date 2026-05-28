@@ -659,7 +659,8 @@ rag-sync-agent ENV="dev" PROFILE="default":
     just rag-eval-full
     just rag-push {{ ENV }} {{ PROFILE }}
     just rag-ingest {{ ENV }} {{ PROFILE }}
-    cd services/agent && uv run python -m agent.rag_sync
+    cd services/agent && ANTHROPIC_API_KEY=$(cargo xtask secret get anthropic-api-key --profile {{ PROFILE }} | tail -1) \
+    PYTHONPATH=src uv run python -m agent.rag_sync
 
 # ── Local MCP ────────────────────────────────────────────────────────────────
 
