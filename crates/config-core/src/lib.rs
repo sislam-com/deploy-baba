@@ -6,10 +6,10 @@
 //!
 //! # Core Concepts
 //!
-//! - **ConfigParser<T>**: Universal trait for parsing strings into typed configuration objects
-//! - **ConfigValidator<T>**: Universal trait for validating configuration objects
-//! - **ConfigMerger<T>**: Universal trait for merging multiple configurations
-//! - **EnvironmentInterpolator<T>**: Universal trait for environment variable substitution
+//! - **`ConfigParser<T>`**: Universal trait for parsing strings into typed configuration objects
+//! - **`ConfigValidator<T>`**: Universal trait for validating configuration objects
+//! - **`ConfigMerger<T>`**: Universal trait for merging multiple configurations
+//! - **`EnvironmentInterpolator<T>`**: Universal trait for environment variable substitution
 //! - **ConfigSource**: Enumeration of where configuration comes from
 //!
 //! # Example: Basic Parsing

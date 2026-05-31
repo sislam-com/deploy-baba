@@ -159,7 +159,7 @@ export default function ChallengeDetail() {
       sort_order: form.sort_order,
     }
 
-    const url = isNew ? '/api/admin/challenges' : `/api/admin/challenges/${id}`
+    const url = isNew ? '/api/v1/admin/challenges' : `/api/v1/admin/challenges/${id}`
     const method = isNew ? 'POST' : 'PUT'
 
     const res = await fetch(url, {
@@ -176,7 +176,7 @@ export default function ChallengeDetail() {
   }
 
   const handleDelete = async () => {
-    const res = await fetch(`/api/admin/challenges/${id}`, { method: 'DELETE' }).catch(() => null)
+    const res = await fetch(`/api/v1/admin/challenges/${id}`, { method: 'DELETE' }).catch(() => null)
     if (!res || !res.ok) {
       setError(res ? await res.text() : 'Network error')
       return
