@@ -486,9 +486,16 @@ impl RagStore {
 ///
 /// Terms are lowercased and stripped to alphanumeric characters to avoid
 /// FTS5 syntax errors from punctuation in the user query.
+static STOP_WORDS: &[&str] = &[
+    "how", "does", "what", "is", "the", "in", "a", "an", "of", "to", "for", "and", "or", "this",
+    "that", "it", "are", "was", "be", "has", "with", "on", "at", "do", "can", "my", "your", "me",
+    "we", "they", "its", "by", "from", "not", "but", "if", "about", "which", "when", "there",
+    "tell", "describe", "explain",
+];
+
 fn to_fts5_or_query(query: &str) -> String {
-    let terms: Vec<String> = query
-        .split_whitespace()
+    let all_terms: Vec<String> = query
+        .split(|c: char| c.is_whitespace() || c == '-')
         .filter_map(|t| {
             let clean: String = t
                 .chars()
@@ -502,17 +509,49 @@ fn to_fts5_or_query(query: &str) -> String {
             }
         })
         .collect();
-    if terms.is_empty() {
-        // Fallback: use the raw query and let SQLite return an error if malformed
+    if all_terms.is_empty() {
         return query.to_owned();
     }
-    terms.join(" OR ")
+
+    let content_terms: Vec<&str> = all_terms
+        .iter()
+        .filter(|t| !STOP_WORDS.contains(&t.as_str()))
+        .map(|t| t.as_str())
+        .collect();
+
+    // If all terms are stop words, use all terms as fallback
+    let terms = if content_terms.is_empty() {
+        all_terms.iter().map(|t| t.as_str()).collect::<Vec<_>>()
+    } else {
+        content_terms
+    };
+
+    if terms.len() == 1 {
+        return terms[0].to_string();
+    }
+
+    // Prepend a quoted phrase of all content terms for phrase-boost ranking
+    let phrase = format!("\"{}\"", terms.join(" "));
+    let or_terms = terms.join(" OR ");
+    format!("{phrase} OR {or_terms}")
 }
 
 #[async_trait]
 impl Retriever for RagStore {
     async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<RankedChunk>, RagError> {
         self.retrieve_filtered(query, top_k, None)
+    }
+    async fn retrieve_filtered(
+        &self,
+        query: &str,
+        top_k: usize,
+        kinds: &[&str],
+    ) -> Result<Vec<RankedChunk>, RagError> {
+        if kinds.is_empty() {
+            RagStore::retrieve_filtered(self, query, top_k, None)
+        } else {
+            RagStore::retrieve_filtered(self, query, top_k, Some(kinds))
+        }
     }
 }
 
@@ -686,9 +725,38 @@ mod tests {
 
     #[test]
     fn to_fts5_or_query_joins_with_or() {
-        assert_eq!(to_fts5_or_query("SQLite database"), "sqlite OR database");
-        assert_eq!(to_fts5_or_query("FTS5 full-text"), "fts5 OR fulltext");
+        // Two content words: phrase boost + OR
+        assert_eq!(
+            to_fts5_or_query("SQLite database"),
+            "\"sqlite database\" OR sqlite OR database"
+        );
+        // Hyphenated compound: split into separate tokens (matches FTS5 unicode61 tokenizer)
+        assert_eq!(
+            to_fts5_or_query("FTS5 full-text"),
+            "\"fts5 full text\" OR fts5 OR full OR text"
+        );
+        // ADR-NNN patterns split correctly
+        assert_eq!(to_fts5_or_query("ADR-016"), "\"adr 016\" OR adr OR 016");
+        // Single content word
         assert_eq!(to_fts5_or_query("single"), "single");
+    }
+
+    #[test]
+    fn to_fts5_or_query_filters_stop_words() {
+        // Stop words filtered, content words preserved
+        let result = to_fts5_or_query("How does error handling work?");
+        assert!(result.contains("error"));
+        assert!(result.contains("handling"));
+        assert!(result.contains("work"));
+        assert!(!result.contains(" how "));
+        assert!(!result.contains(" does "));
+    }
+
+    #[test]
+    fn to_fts5_or_query_all_stop_words_fallback() {
+        // When all words are stop words, use them all
+        let result = to_fts5_or_query("what is it");
+        assert!(!result.is_empty());
     }
 
     #[tokio::test]

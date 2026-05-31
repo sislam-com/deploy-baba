@@ -114,3 +114,11 @@ name = "Stack Example Config"
 type = "file"
 path = "stack.example.toml"
 mime_type = "application/toml"
+
+[[resources]]
+uri = "project://rag-eval"
+name = "RAG Eval Latest Results"
+description = "Latest eval run pass rate and category breakdown"
+type = "command"
+command = "sqlite3 deploy-baba.db 'SELECT json_object(\"total\", total_cases, \"passed\", pass_count, \"groundedness\", avg_groundedness, \"correctness\", avg_correctness, \"run_at\", run_at) FROM rag_eval_runs ORDER BY id DESC LIMIT 1'"
+mime_type = "application/json"

@@ -227,6 +227,10 @@ async fn handle_request(rag: &PortfolioRAG, request: &str) -> Result<String> {
                         .ok_or_else(|| anyhow::anyhow!("{}: Missing arguments", INVALID_PARAMS))?;
                     tools::get_corpus_stats(rag, args)?
                 }
+                "eval_report" => tools::eval_report(rag)?,
+                "eval_failures" => tools::eval_failures(rag)?,
+                "corpus_gaps" => tools::corpus_gaps(rag)?,
+                "reindex_status" => tools::reindex_status(rag)?,
                 _ => {
                     return Err(anyhow::anyhow!(
                         "{}: Unknown tool: {}",

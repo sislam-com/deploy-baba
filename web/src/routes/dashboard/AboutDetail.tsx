@@ -53,7 +53,7 @@ export default function AboutDetail() {
       sort_order: Number(form.sort_order),
     }
     const res = await fetch(
-      isNew ? '/api/admin/about' : `/api/admin/about/${id}`,
+      isNew ? '/api/v1/admin/about' : `/api/v1/admin/about/${id}`,
       { method: isNew ? 'POST' : 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
     ).catch(() => null)
 
@@ -64,7 +64,7 @@ export default function AboutDetail() {
 
   async function handleDelete() {
     if (!confirm('Delete this section?')) return
-    const res = await fetch(`/api/admin/about/${id}`, { method: 'DELETE' }).catch(() => null)
+    const res = await fetch(`/api/v1/admin/about/${id}`, { method: 'DELETE' }).catch(() => null)
     if (!res || !res.ok) { setError('Delete failed'); return }
     navigate('/dashboard/about')
   }

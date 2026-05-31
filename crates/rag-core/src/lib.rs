@@ -60,12 +60,29 @@ pub trait Retriever: Send + Sync {
     ///
     /// Returns [`RagError::Database`] on SQLite failure.
     async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<RankedChunk>, RagError>;
+
+    async fn retrieve_filtered(
+        &self,
+        query: &str,
+        top_k: usize,
+        _kinds: &[&str],
+    ) -> Result<Vec<RankedChunk>, RagError> {
+        self.retrieve(query, top_k).await
+    }
 }
 
 #[async_trait]
 impl<T: Retriever> Retriever for Arc<T> {
     async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<RankedChunk>, RagError> {
         (**self).retrieve(query, top_k).await
+    }
+    async fn retrieve_filtered(
+        &self,
+        query: &str,
+        top_k: usize,
+        kinds: &[&str],
+    ) -> Result<Vec<RankedChunk>, RagError> {
+        (**self).retrieve_filtered(query, top_k, kinds).await
     }
 }
 

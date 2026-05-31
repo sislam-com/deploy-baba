@@ -653,6 +653,15 @@ rag-sync ENV PROFILE="default":
     just rag-push {{ ENV }} {{ PROFILE }}
     just rag-ingest {{ ENV }} {{ PROFILE }}
 
+# RAG sync + agent analysis: full sync then run LangGraph quality report
+rag-sync-agent ENV="dev" PROFILE="default":
+    just rag-index-full
+    just rag-eval-full
+    just rag-push {{ ENV }} {{ PROFILE }}
+    just rag-ingest {{ ENV }} {{ PROFILE }}
+    cd services/agent && ANTHROPIC_API_KEY=$(cargo xtask secret get anthropic-api-key --profile {{ PROFILE }} | tail -1) \
+    PYTHONPATH=src uv run python -m agent.rag_sync
+
 # ── Local MCP ────────────────────────────────────────────────────────────────
 
 # Build the local mcp-rs server binary

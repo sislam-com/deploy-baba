@@ -51,7 +51,7 @@ export default function CompetencyDetail() {
       sort_order: Number(form.sort_order),
     }
     const res = await fetch(
-      isNew ? '/api/admin/competencies' : `/api/admin/competencies/${id}`,
+      isNew ? '/api/v1/admin/competencies' : `/api/v1/admin/competencies/${id}`,
       { method: isNew ? 'POST' : 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
     ).catch(() => null)
 
@@ -62,7 +62,7 @@ export default function CompetencyDetail() {
 
   async function handleDelete() {
     if (!confirm('Delete this competency?')) return
-    const res = await fetch(`/api/admin/competencies/${id}`, { method: 'DELETE' }).catch(() => null)
+    const res = await fetch(`/api/v1/admin/competencies/${id}`, { method: 'DELETE' }).catch(() => null)
     if (!res || !res.ok) { setError('Delete failed'); return }
     navigate('/dashboard/competencies')
   }
