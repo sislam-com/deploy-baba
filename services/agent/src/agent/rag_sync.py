@@ -6,7 +6,6 @@ Or as part of `just rag-sync`.
 
 from __future__ import annotations
 
-import json
 import os
 from typing import Any
 
@@ -24,7 +23,13 @@ from agent.tools.rag_eval import (
     get_reindex_status,
 )
 
-rag_tools = [check_rag_health, get_eval_report, get_eval_failures, get_corpus_gaps, get_reindex_status]
+rag_tools = [
+    check_rag_health,
+    get_eval_report,
+    get_eval_failures,
+    get_corpus_gaps,
+    get_reindex_status,
+]
 rag_tool_node = ToolNode(rag_tools)
 
 
@@ -95,7 +100,12 @@ async def run_sync() -> str:
     """Run the RAG sync graph and return the final report."""
     result = await rag_sync_graph.ainvoke(
         {
-            "messages": [HumanMessage(content="Analyze the current RAG system quality and produce an improvement report.")],
+            "messages": [
+                HumanMessage(
+                    content="Analyze the current RAG system quality "
+                    "and produce an improvement report.",
+                )
+            ],
             "health": None,
             "failures": None,
             "suggestions": None,
