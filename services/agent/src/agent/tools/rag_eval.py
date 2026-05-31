@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+from typing import Any
 
 import httpx
 from langchain_core.tools import tool
@@ -11,13 +12,14 @@ from langchain_core.tools import tool
 _UI_BASE = os.environ.get("UI_SERVICE_URL", "http://localhost:3000")
 
 
-def _call_ui(method: str, path: str) -> dict:
+def _call_ui(method: str, path: str) -> dict[str, Any]:
     """Call the UI service RAG endpoints."""
     url = f"{_UI_BASE}{path}"
     with httpx.Client(timeout=30) as client:
         resp = client.request(method, url)
         resp.raise_for_status()
-        return resp.json()
+        result: dict[str, Any] = resp.json()
+        return result
 
 
 @tool
