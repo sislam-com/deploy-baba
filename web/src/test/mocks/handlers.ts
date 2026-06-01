@@ -178,7 +178,7 @@ export const handlers = [
       id: 1,
       slug: 'terms',
       title: 'Terms of Service',
-      content: 'Welcome to deploy-baba. By accessing or using this website, you agree to be bound by these Terms of Service.',
+      content: '# Terms of Service\n\n## Usage Rules\n\nBy accessing this website, you agree to be **bound** by these terms.\n\n### Restrictions\n\nYou must not:\n\n- Misuse the service\n- Share credentials\n\n1. Comply with all laws\n2. Respect other users\n\nFor questions, contact [support](https://sislam.com).\n\n> All rights reserved.',
       updated_at: '2026-01-01T00:00:00Z',
     })
   }),
@@ -188,7 +188,7 @@ export const handlers = [
       id: 2,
       slug: 'privacy',
       title: 'Privacy Policy',
-      content: 'This Privacy Policy describes how deploy-baba collects, uses, and protects your information.',
+      content: '# Privacy Policy\n\n## Data Collection\n\nWe collect **minimal data** to operate this service.\n\n### Cookies\n\nWe use the following:\n\n- Session cookies\n- Analytics cookies\n\n1. First-party only\n2. No third-party tracking\n\nFor details, see [our repo](https://github.com/shantopagla/portfolio).\n\n> Your privacy matters to us.',
       updated_at: '2026-01-01T00:00:00Z',
     })
   }),
