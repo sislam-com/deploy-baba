@@ -782,7 +782,7 @@ mcp-rag-smoke DB="deploy-baba.db":
         print(f"initialized: {init.get('serverInfo', {}).get('name', 'portfolio-rag')}")
         tool_count = len(tools.get('tools', []))
         print(f"tools: {tool_count}")
-        assert tool_count == 5, f"expected 5 tools, got {tool_count}"
+        assert tool_count == 9, f"expected 9 tools, got {tool_count}"
         print(f"corpora: {corpora.get('corpus_count', 0)}")
         print(f"rag_results: {results.get('result_count', 0)}")
     finally:

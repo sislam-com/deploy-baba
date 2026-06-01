@@ -20,7 +20,7 @@ describe('Privacy', () => {
       expect(screen.queryByText('Loading…')).not.toBeInTheDocument()
     })
 
-    expect(screen.getByText(/This Privacy Policy describes/)).toBeInTheDocument()
+    expect(screen.getByText(/minimal data/)).toBeInTheDocument()
   })
 
   it('renders last updated date', async () => {
