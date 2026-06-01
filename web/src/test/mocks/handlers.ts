@@ -100,7 +100,14 @@ export const handlers = [
   }),
 
   http.post('/api/auth/respond-to-challenge', () => {
-    return HttpResponse.json({ success: true })
+    return HttpResponse.json({ 
+      success: true,
+      tokens: { id_token: 'mock-id-token' }
+    })
+  }),
+
+  http.get('/auth/set-session', () => {
+    return new HttpResponse(null, { status: 302 })
   }),
 
   // Resume endpoint
