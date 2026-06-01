@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Helmet } from 'react-helmet-async'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 interface LegalDocument {
   id: number
@@ -44,9 +46,23 @@ export default function Privacy() {
 
         {doc && (
           <div className="bg-gray-800/50 rounded-lg p-6 border border-gray-700">
-            <div className="text-gray-300 leading-relaxed whitespace-pre-line">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                h1: ({ children }) => <h1 className="text-xl font-bold text-white mt-6 mb-2">{children}</h1>,
+                h2: ({ children }) => <h2 className="text-lg font-semibold text-cyan-400 mt-6 mb-2">{children}</h2>,
+                h3: ({ children }) => <h3 className="text-base font-medium text-gray-100 mt-4 mb-1">{children}</h3>,
+                p: ({ children }) => <p className="text-gray-300 leading-relaxed my-2">{children}</p>,
+                ul: ({ children }) => <ul className="list-disc list-inside my-2 space-y-1 text-gray-300">{children}</ul>,
+                ol: ({ children }) => <ol className="list-decimal list-inside my-2 space-y-1 text-gray-300">{children}</ol>,
+                li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                a: ({ href, children }) => <a href={href} className="text-cyan-400 underline hover:text-cyan-300">{children}</a>,
+                strong: ({ children }) => <strong className="text-gray-100 font-semibold">{children}</strong>,
+                blockquote: ({ children }) => <blockquote className="border-l-2 border-cyan-500 pl-3 text-gray-400 my-2 italic">{children}</blockquote>,
+              }}
+            >
               {doc.content}
-            </div>
+            </ReactMarkdown>
           </div>
         )}
       </div>
