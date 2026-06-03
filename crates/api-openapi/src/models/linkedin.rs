@@ -288,3 +288,179 @@ impl ApiModel for StatusUpdateRequest {
         }
     }
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct LinkedInOAuthToken {
+    pub access_token: String,
+    pub expires_at: i64,
+    pub name: Option<String>,
+    pub email: Option<String>,
+    pub picture_url: Option<String>,
+}
+
+impl ApiModel for LinkedInOAuthToken {
+    fn schema_name() -> &'static str {
+        "LinkedInOAuthToken"
+    }
+    fn example() -> Self {
+        Self {
+            access_token: "li-token-abc123".to_string(),
+            expires_at: 1748900000,
+            name: Some("Shanto".to_string()),
+            email: Some("test@example.com".to_string()),
+            picture_url: Some("https://example.com/photo.jpg".to_string()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct LinkedInOAuthStatus {
+    pub connected: bool,
+    pub name: Option<String>,
+    pub email: Option<String>,
+    pub picture_url: Option<String>,
+    pub token_expires_at: Option<String>,
+}
+
+impl ApiModel for LinkedInOAuthStatus {
+    fn schema_name() -> &'static str {
+        "LinkedInOAuthStatus"
+    }
+    fn example() -> Self {
+        Self {
+            connected: true,
+            name: Some("Shanto".to_string()),
+            email: Some("test@example.com".to_string()),
+            picture_url: Some("https://example.com/photo.jpg".to_string()),
+            token_expires_at: Some("1748900000".to_string()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct BulkStatusRequest {
+    pub ids: Vec<i64>,
+    pub status: String,
+}
+
+impl ApiModel for BulkStatusRequest {
+    fn schema_name() -> &'static str {
+        "BulkStatusRequest"
+    }
+    fn example() -> Self {
+        Self {
+            ids: vec![1, 2, 3],
+            status: "synced".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct BulkStatusResult {
+    pub updated: i64,
+}
+
+impl ApiModel for BulkStatusResult {
+    fn schema_name() -> &'static str {
+        "BulkStatusResult"
+    }
+    fn example() -> Self {
+        Self { updated: 3 }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct AutoMatchResult {
+    pub positions_matched: i64,
+    pub projects_matched: i64,
+}
+
+impl ApiModel for AutoMatchResult {
+    fn schema_name() -> &'static str {
+        "AutoMatchResult"
+    }
+    fn example() -> Self {
+        Self {
+            positions_matched: 2,
+            projects_matched: 1,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ApplyFieldsRequest {
+    pub fields: Vec<String>,
+}
+
+impl ApiModel for ApplyFieldsRequest {
+    fn schema_name() -> &'static str {
+        "ApplyFieldsRequest"
+    }
+    fn example() -> Self {
+        Self {
+            fields: vec!["title".to_string(), "description".to_string()],
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ApplyResult {
+    pub fields_applied: Vec<String>,
+}
+
+impl ApiModel for ApplyResult {
+    fn schema_name() -> &'static str {
+        "ApplyResult"
+    }
+    fn example() -> Self {
+        Self {
+            fields_applied: vec!["title".to_string(), "description".to_string()],
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ReconciliationItem {
+    pub id: i64,
+    pub entity_type: String,
+    pub title: String,
+    pub sync_status: String,
+    pub has_mapping: bool,
+    pub differing_fields: Vec<String>,
+}
+
+impl ApiModel for ReconciliationItem {
+    fn schema_name() -> &'static str {
+        "ReconciliationItem"
+    }
+    fn example() -> Self {
+        Self {
+            id: 1,
+            entity_type: "position".to_string(),
+            title: "Senior Software Engineer".to_string(),
+            sync_status: "diverged".to_string(),
+            has_mapping: true,
+            differing_fields: vec!["title".to_string(), "location".to_string()],
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ReconciliationSummary {
+    pub needs_linkedin_update: Vec<ReconciliationItem>,
+    pub needs_db_import: Vec<ReconciliationItem>,
+    pub in_sync: Vec<ReconciliationItem>,
+}
+
+impl ApiModel for ReconciliationSummary {
+    fn schema_name() -> &'static str {
+        "ReconciliationSummary"
+    }
+    fn example() -> Self {
+        Self {
+            needs_linkedin_update: vec![ReconciliationItem::example()],
+            needs_db_import: vec![],
+            in_sync: vec![],
+        }
+    }
+}

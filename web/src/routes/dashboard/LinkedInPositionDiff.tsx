@@ -39,6 +39,9 @@ export default function LinkedInPositionDiff() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedJobId, setSelectedJobId] = useState<string>('')
+  const [applying, setApplying] = useState(false)
+  const [applyResult, setApplyResult] = useState<string | null>(null)
+  const [copiedField, setCopiedField] = useState<string | null>(null)
 
   useEffect(() => {
     Promise.all([
@@ -82,11 +85,63 @@ export default function LinkedInPositionDiff() {
     }
   }
 
+  const handleApplyAll = async () => {
+    if (!diff) return
+    const differingFields = diff.fields.filter(f => f.differs).map(f => f.field)
+    if (differingFields.length === 0) return
+
+    setApplying(true)
+    setApplyResult(null)
+    try {
+      const res = await fetch(`/api/v1/admin/linkedin/positions/${id}/apply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: differingFields }),
+      })
+      if (!res.ok) throw new Error(await res.text())
+      const result = await res.json()
+      setApplyResult(`Applied: ${result.fields_applied.join(', ')}`)
+      window.location.reload()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Apply failed')
+    } finally {
+      setApplying(false)
+    }
+  }
+
+  const handleApplyField = async (field: string) => {
+    setApplying(true)
+    setApplyResult(null)
+    try {
+      const res = await fetch(`/api/v1/admin/linkedin/positions/${id}/apply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: [field] }),
+      })
+      if (!res.ok) throw new Error(await res.text())
+      setApplyResult(`Applied: ${field}`)
+      window.location.reload()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Apply failed')
+    } finally {
+      setApplying(false)
+    }
+  }
+
+  const copyToClipboard = (field: string, value: string | null) => {
+    if (!value) return
+    navigator.clipboard.writeText(value).then(() => {
+      setCopiedField(field)
+      setTimeout(() => setCopiedField(null), 1500)
+    })
+  }
+
   if (loading) return <div className="p-8 text-gray-500">Loading...</div>
   if (error) return <div className="p-8 text-red-400">{error}</div>
   if (!diff) return <div className="p-8 text-gray-500">Not found</div>
 
   const { position, fields } = diff
+  const hasDiffs = fields.some(f => f.differs)
 
   return (
     <div className="p-8 max-w-4xl">
@@ -125,12 +180,27 @@ export default function LinkedInPositionDiff() {
       {/* Field-by-field diff */}
       {fields.length > 0 && (
         <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden mb-6">
+          {hasDiffs && position.mapped_job_id && (
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700 bg-gray-800/50">
+              <p className="text-sm text-gray-400">
+                {fields.filter(f => f.differs).length} field(s) differ
+              </p>
+              <button
+                onClick={handleApplyAll}
+                disabled={applying}
+                className="bg-cyan-600 hover:bg-cyan-500 disabled:bg-gray-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition"
+              >
+                {applying ? 'Applying...' : 'Apply All LinkedIn → DB'}
+              </button>
+            </div>
+          )}
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-700">
                 <th className="text-left px-4 py-3 text-gray-500 font-medium w-32">Field</th>
                 <th className="text-left px-4 py-3 text-gray-500 font-medium">LinkedIn</th>
                 <th className="text-left px-4 py-3 text-gray-500 font-medium">Database</th>
+                <th className="text-right px-4 py-3 text-gray-500 font-medium w-24">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -146,6 +216,29 @@ export default function LinkedInPositionDiff() {
                   <td className={`px-4 py-3 ${f.differs ? 'text-green-300' : 'text-gray-300'}`}>
                     {f.db_value ?? <span className="text-gray-600 italic">empty</span>}
                   </td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex gap-1 justify-end">
+                      {f.differs && position.mapped_job_id && (
+                        <button
+                          onClick={() => handleApplyField(f.field)}
+                          disabled={applying}
+                          className="text-[10px] bg-cyan-700 hover:bg-cyan-600 text-white px-2 py-0.5 rounded transition"
+                          title="Apply LinkedIn value to DB"
+                        >
+                          Apply
+                        </button>
+                      )}
+                      {f.db_value && (
+                        <button
+                          onClick={() => copyToClipboard(f.field, f.db_value)}
+                          className="text-[10px] bg-gray-700 hover:bg-gray-600 text-gray-300 px-2 py-0.5 rounded transition"
+                          title="Copy DB value (for manual LinkedIn update)"
+                        >
+                          {copiedField === f.field ? 'Copied' : 'Copy'}
+                        </button>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -157,6 +250,10 @@ export default function LinkedInPositionDiff() {
         <p className="text-gray-500 text-sm mb-6">
           Map this position to an internal job to see a field-by-field comparison.
         </p>
+      )}
+
+      {applyResult && (
+        <p className="text-green-400 text-sm mb-4">{applyResult}</p>
       )}
 
       {/* Actions */}

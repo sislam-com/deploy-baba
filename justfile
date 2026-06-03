@@ -321,6 +321,7 @@ dev-env ENV="prod":
     jwks=$(curl -fsSL "https://cognito-idp.us-east-1.amazonaws.com/${pool_id}/.well-known/jwks.json")
     echo "export AWS_PROFILE={{ PROFILE }}"
     echo "export ANTHROPIC_API_KEY_ARN=root-anthropic-access-key"
+    echo "export LINKEDIN_SECRET_ARN=deploy-baba/prod/linkedin-api-key"
     echo "export RAG_PUBLIC_ENABLED=1"
     echo "export COGNITO_POOL_ID=${pool_id}"
     echo "export COGNITO_CLIENT_ID=${client_id}"
@@ -810,7 +811,7 @@ publish:
 
 # Write a secret to AWS Secrets Manager (e.g. just secret-put pow-secret $(openssl rand -hex 32))
 secret-put NAME VALUE PROFILE="default":
-    just aws-check {{ PROFILE }} && cargo xtask secret put {{ NAME }} {{ VALUE }} --profile {{ PROFILE }}
+    just aws-check {{ PROFILE }} && cargo xtask secret put {{ NAME }} '{{ VALUE }}' --profile {{ PROFILE }}
 
 # Read a secret value from AWS Secrets Manager
 secret-get NAME PROFILE="default":

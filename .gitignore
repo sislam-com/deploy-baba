@@ -44,3 +44,16 @@ mcp-audit.jsonl
 
 # TypeScript build artifacts
 web/*.tsbuildinfo
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# SQLite (extend existing)
+*.db.corrupted
+*.db.corrupted-shm
+*.db.corrupted-wal

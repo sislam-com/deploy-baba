@@ -319,6 +319,34 @@ export const handlers = [
     return new HttpResponse(null, { status: 200 })
   }),
 
+  http.get('/api/v1/admin/linkedin/reconciliation', () => {
+    return HttpResponse.json({
+      needs_linkedin_update: [],
+      needs_db_import: [],
+      in_sync: [],
+    })
+  }),
+
+  http.put('/api/v1/admin/linkedin/positions/bulk-status', () => {
+    return HttpResponse.json({ updated: 0 })
+  }),
+
+  http.put('/api/v1/admin/linkedin/projects/bulk-status', () => {
+    return HttpResponse.json({ updated: 0 })
+  }),
+
+  http.post('/api/v1/admin/linkedin/auto-match', () => {
+    return HttpResponse.json({ positions_matched: 0, projects_matched: 0 })
+  }),
+
+  http.post('/api/v1/admin/linkedin/positions/:id/apply', () => {
+    return HttpResponse.json({ fields_applied: ['title'] })
+  }),
+
+  http.post('/api/v1/admin/linkedin/projects/:id/apply', () => {
+    return HttpResponse.json({ fields_applied: ['title'] })
+  }),
+
   // LinkedIn OAuth (agent service)
   http.get('/api/v1/agent/linkedin/status', () => {
     return HttpResponse.json({
