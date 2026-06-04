@@ -13,7 +13,8 @@ pub use api_openapi::models::{
     ApplyFieldsRequest, ApplyResult, AutoMatchResult, BulkStatusRequest, BulkStatusResult,
     LinkedInImportPayload, LinkedInImportResult, LinkedInOAuthStatus, LinkedInOAuthToken,
     LinkedInPosition, LinkedInProject, LinkedInSyncLogEntry, MapRequest, PositionDiff, ProjectDiff,
-    ReconciliationItem, ReconciliationSummary, StatusUpdateRequest, SyncFieldComparison,
+    ReconciliationItem, ReconciliationSummary, SeedFromDbResult, StatusUpdateRequest,
+    SyncFieldComparison,
 };
 
 type ApiResult<T> = Result<T, (StatusCode, String)>;
@@ -1219,6 +1220,59 @@ pub async fn apply_project_to_challenge(
     }))
 }
 
+// ── Seed from DB ──────────────────────────────────────────────────────────
+
+#[utoipa::path(
+    post,
+    path = "/api/admin/linkedin/seed-from-db",
+    tag = "admin-linkedin",
+    responses(
+        (status = 200, description = "Seeded from existing DB data", body = SeedFromDbResult),
+        (status = 401, description = "Unauthorized"),
+    ),
+    security(("cookieAuth" = []), ("bearerAuth" = [])),
+)]
+pub async fn seed_from_db(State(db): State<Arc<Db>>) -> ApiResult<Json<SeedFromDbResult>> {
+    let conn = db.conn.lock().unwrap();
+
+    let positions_seeded = conn
+        .execute(
+            "INSERT INTO linkedin_positions (company, title, location, start_date, end_date, description, mapped_job_id, sync_status)
+             SELECT j.company, j.title, j.location, j.start_date, j.end_date, j.summary, j.id, 'local_only'
+             FROM jobs j
+             WHERE NOT EXISTS (
+                 SELECT 1 FROM linkedin_positions lp WHERE lp.mapped_job_id = j.id
+             )",
+            [],
+        )
+        .map_err(db_err)? as i64;
+
+    let projects_seeded = conn
+        .execute(
+            "INSERT INTO linkedin_projects (title, description, url, mapped_challenge_id, sync_status)
+             SELECT c.title, c.description, c.url, c.id, 'local_only'
+             FROM challenges c
+             WHERE NOT EXISTS (
+                 SELECT 1 FROM linkedin_projects lp WHERE lp.mapped_challenge_id = c.id
+             )",
+            [],
+        )
+        .map_err(db_err)? as i64;
+
+    if positions_seeded > 0 || projects_seeded > 0 {
+        conn.execute(
+            "INSERT INTO linkedin_sync_log (source, positions_count, projects_count) VALUES ('seed-from-db', ?1, ?2)",
+            rusqlite::params![positions_seeded, projects_seeded],
+        )
+        .map_err(db_err)?;
+    }
+
+    Ok(Json(SeedFromDbResult {
+        positions_seeded,
+        projects_seeded,
+    }))
+}
+
 // ── Router ──────────────────────────────────────────────────────────────────
 
 pub fn router() -> Router<AppState> {
@@ -1245,4 +1299,5 @@ pub fn router() -> Router<AppState> {
         .route("/reconciliation", get(get_reconciliation))
         .route("/positions/:id/apply", post(apply_position_to_job))
         .route("/projects/:id/apply", post(apply_project_to_challenge))
+        .route("/seed-from-db", post(seed_from_db))
 }

@@ -315,6 +315,10 @@ dev-env ENV="prod":
     #!/usr/bin/env bash
     set -euo pipefail
     AWS="env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN AWS_PROFILE={{ PROFILE }} aws"
+    if ! $AWS sts get-caller-identity --query Account --output text >/dev/null 2>&1; then
+        echo "ERROR: AWS SSO session expired or not configured. Run: just sso-login" >&2
+        exit 1
+    fi
     pool_id=$($AWS ssm get-parameter --name /deploy-baba/{{ ENV }}/cognito-pool-id    --query Parameter.Value --output text)
     client_id=$($AWS ssm get-parameter --name /deploy-baba/{{ ENV }}/cognito-client-id --query Parameter.Value --output text)
     domain=$($AWS    ssm get-parameter --name /deploy-baba/{{ ENV }}/cognito-domain    --query Parameter.Value --output text)
@@ -380,10 +384,16 @@ db-sync:
     set -euo pipefail
     DB="deploy-baba.db"
     if [ -f "$DB" ]; then
-        age=$(( $(date +%s) - $(stat -f %m "$DB") ))
-        if [ "$age" -lt 3600 ]; then
-            echo "⏩ $DB is ${age}s old (< 1h) — skipping S3 sync"
-            exit 0
+        # Skip download if the file is fresh AND passes integrity check
+        if sqlite3 "$DB" "PRAGMA quick_check;" >/dev/null 2>&1; then
+            age=$(( $(date +%s) - $(stat -f %m "$DB") ))
+            if [ "$age" -lt 3600 ]; then
+                echo "⏩ $DB is ${age}s old (< 1h) and healthy — skipping S3 sync"
+                exit 0
+            fi
+        else
+            echo "⚠️  $DB failed integrity check — will re-download from S3"
+            rm -f "$DB" "${DB}-wal" "${DB}-shm"
         fi
     fi
     echo "⬇️  Syncing latest S3 backup → $DB"
@@ -409,7 +419,29 @@ dev-stack:
     done
 
     just db-sync
-    eval "$(just dev-env)"
+
+    # Integrity check — catch corruption before launching services
+    if [ -f deploy-baba.db ]; then
+        if ! sqlite3 deploy-baba.db "PRAGMA quick_check;" >/dev/null 2>&1; then
+            echo "ERROR: deploy-baba.db is corrupted. Run: just db-reset" >&2
+            exit 1
+        fi
+    fi
+
+    # Load AWS env (SSO required) — fall back to offline dev mode if unavailable
+    if DEV_ENV_OUTPUT=$(just dev-env 2>&1); then
+        eval "$DEV_ENV_OUTPUT"
+    else
+        echo "WARNING: AWS SSO not available — running in offline dev mode (auth bypass)"
+        echo "  Run 'just sso-login' to enable full functionality."
+        export DEV_MODE=1
+        export COGNITO_POOL_ID="offline"
+        export COGNITO_CLIENT_ID="offline"
+        export COGNITO_DOMAIN="offline"
+        export COGNITO_REGION="us-east-1"
+        export COGNITO_JWKS='{}'
+        export RAG_PUBLIC_ENABLED=1
+    fi
 
     # Start API server directly (use just ui for cargo watch + auto-reload)
     echo "Starting API server on :3001..."
@@ -555,6 +587,15 @@ deploy-all ENV="prod":
     just rag-sync {{ ENV }}
 
 # ── Database (SQLite + S3) ───────────────────────────────────────────────────
+
+# Check local SQLite integrity
+db-check DB="deploy-baba.db":
+    @sqlite3 {{ DB }} "PRAGMA integrity_check;"
+
+# Delete local SQLite and let next startup recreate from migrations
+db-reset:
+    rm -f deploy-baba.db deploy-baba.db-wal deploy-baba.db-shm
+    @echo "Local DB deleted. Next 'just dev-stack' will create a fresh one from migrations."
 
 # Back up SQLite from EFS to S3
 db-backup PROFILE="default":

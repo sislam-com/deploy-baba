@@ -70,6 +70,17 @@ jobs:
             --function-name "$UI_FN_NAME" \
             --region us-east-1
 
+      - name: Force UI Lambda cold start (runs migrations)
+        run: |
+          aws lambda invoke \
+            --function-name "$UI_FN_NAME" \
+            --payload '{"action":"health"}' \
+            --cli-binary-format raw-in-base64-out \
+            /tmp/health-response.json \
+            --region us-east-1
+          echo "UI Lambda cold start response:"
+          cat /tmp/health-response.json
+
       # ── Build + deploy Agent Lambda ──────────────────────────────────────────
 
       - uses: actions/setup-python@v5

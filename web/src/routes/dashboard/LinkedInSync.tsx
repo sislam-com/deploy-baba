@@ -49,6 +49,11 @@ interface ImportResult {
   projects_matched: number
 }
 
+interface SeedResult {
+  positions_seeded: number
+  projects_seeded: number
+}
+
 interface ReconciliationItem {
   id: number
   entity_type: string
@@ -97,6 +102,8 @@ export default function LinkedInSync() {
   const [connecting, setConnecting] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [reconciliation, setReconciliation] = useState<ReconciliationSummary | null>(null)
+  const [seeding, setSeeding] = useState(false)
+  const [seedResult, setSeedResult] = useState<SeedResult | null>(null)
 
   useEffect(() => {
     fetch('/api/v1/agent/linkedin/status')
@@ -224,6 +231,23 @@ export default function LinkedInSync() {
     }
   }
 
+  const handleSeedFromDb = async () => {
+    setSeeding(true)
+    setSeedResult(null)
+    setError(null)
+    try {
+      const res = await fetch('/api/v1/admin/linkedin/seed-from-db', { method: 'POST' })
+      if (!res.ok) throw new Error(await res.text())
+      const result: SeedResult = await res.json()
+      setSeedResult(result)
+      fetchData()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Seed from DB failed')
+    } finally {
+      setSeeding(false)
+    }
+  }
+
   const toggleSelection = (id: number) => {
     setSelectedIds(prev => {
       const next = new Set(prev)
@@ -291,7 +315,7 @@ export default function LinkedInSync() {
               {connecting ? 'Redirecting...' : 'Connect LinkedIn'}
             </button>
             <p className="text-xs text-gray-500">
-              Sign in with LinkedIn to enable API-driven data sync.
+              Sign in with LinkedIn to verify your profile identity.
             </p>
           </div>
         )}
@@ -369,6 +393,48 @@ export default function LinkedInSync() {
       </div>
 
       {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
+
+      {seedResult && (
+        <p className="text-sm text-green-400 mb-4">
+          Seeded {seedResult.positions_seeded} positions and {seedResult.projects_seeded} projects from your existing DB data.
+        </p>
+      )}
+
+      {/* Empty-state onboarding */}
+      {!loading && positions.length === 0 && projects.length === 0 && (
+        <div className="bg-gray-800 border border-cyan-700/50 rounded-xl p-6 mb-6">
+          <h2 className="text-lg font-semibold text-white mb-3">Get Started</h2>
+          <p className="text-sm text-gray-300 mb-4">
+            No positions or projects imported yet. LinkedIn does not provide an API to fetch work history,
+            so data must be imported manually. You have two options:
+          </p>
+          <div className="grid md:grid-cols-2 gap-4 mb-4">
+            <div className="bg-gray-900 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-2">Option 1: Import from LinkedIn Export</h3>
+              <ol className="text-xs text-gray-400 space-y-1 list-decimal list-inside">
+                <li>Go to LinkedIn Settings &rarr; Data Privacy &rarr; Get a copy of your data</li>
+                <li>Select "Want something in particular?" and choose Positions or Projects</li>
+                <li>Download the CSV files when ready</li>
+                <li>Upload them using the "Upload CSV" button above</li>
+              </ol>
+            </div>
+            <div className="bg-gray-900 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-purple-400 mb-2">Option 2: Seed from Existing DB</h3>
+              <p className="text-xs text-gray-400 mb-3">
+                Pre-populate from your existing jobs and challenges data. These entries will be marked
+                as "local only" and can be matched with LinkedIn data later.
+              </p>
+              <button
+                onClick={handleSeedFromDb}
+                disabled={seeding}
+                className="bg-purple-600 hover:bg-purple-500 disabled:bg-gray-600 text-white text-xs font-semibold px-4 py-2 rounded-lg transition"
+              >
+                {seeding ? 'Seeding...' : 'Seed from DB'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Last sync info */}
       {syncLog.length > 0 && (

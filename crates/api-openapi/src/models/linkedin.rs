@@ -446,6 +446,24 @@ impl ApiModel for ReconciliationItem {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct SeedFromDbResult {
+    pub positions_seeded: i64,
+    pub projects_seeded: i64,
+}
+
+impl ApiModel for SeedFromDbResult {
+    fn schema_name() -> &'static str {
+        "SeedFromDbResult"
+    }
+    fn example() -> Self {
+        Self {
+            positions_seeded: 5,
+            projects_seeded: 3,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ReconciliationSummary {
     pub needs_linkedin_update: Vec<ReconciliationItem>,
     pub needs_db_import: Vec<ReconciliationItem>,

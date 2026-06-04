@@ -200,6 +200,9 @@ pub const ALL_MODELS: &[(&str, ModelFactory)] = &[
     ("ReconciliationItem", || {
         serde_json::to_value(ReconciliationItem::example()).expect("ReconciliationItem example")
     }),
+    ("SeedFromDbResult", || {
+        serde_json::to_value(SeedFromDbResult::example()).expect("SeedFromDbResult example")
+    }),
     ("ReconciliationSummary", || {
         serde_json::to_value(ReconciliationSummary::example())
             .expect("ReconciliationSummary example")

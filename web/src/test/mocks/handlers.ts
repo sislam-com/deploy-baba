@@ -339,6 +339,10 @@ export const handlers = [
     return HttpResponse.json({ positions_matched: 0, projects_matched: 0 })
   }),
 
+  http.post('/api/v1/admin/linkedin/seed-from-db', () => {
+    return HttpResponse.json({ positions_seeded: 3, projects_seeded: 2 })
+  }),
+
   http.post('/api/v1/admin/linkedin/positions/:id/apply', () => {
     return HttpResponse.json({ fields_applied: ['title'] })
   }),
