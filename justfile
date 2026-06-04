@@ -393,7 +393,8 @@ db-sync:
             exit 1
         fi
         # Skip download if the file is fresh AND passes integrity check
-        if sqlite3 "$DB" "PRAGMA quick_check;" >/dev/null 2>&1; then
+        integrity=$(sqlite3 "$DB" "PRAGMA quick_check;" 2>&1)
+        if [ "$integrity" = "ok" ]; then
             age=$(( $(date +%s) - $(stat -f %m "$DB") ))
             if [ "$age" -lt 3600 ]; then
                 echo "⏩ $DB is ${age}s old (< 1h) and healthy — skipping S3 sync"
@@ -428,7 +429,8 @@ dev-stack:
 
     # If a local DB exists, validate it; if not, try S3 sync then fall back to fresh-from-migrations
     if [ -f deploy-baba.db ]; then
-        if ! sqlite3 deploy-baba.db "PRAGMA quick_check;" >/dev/null 2>&1; then
+        integrity=$(sqlite3 deploy-baba.db "PRAGMA quick_check;" 2>&1)
+        if [ "$integrity" != "ok" ]; then
             echo "⚠️  deploy-baba.db is corrupted — removing and will recreate"
             rm -f deploy-baba.db deploy-baba.db-wal deploy-baba.db-shm
         fi
@@ -437,9 +439,12 @@ dev-stack:
     if [ ! -f deploy-baba.db ]; then
         if just db-sync 2>/dev/null; then
             # Verify the downloaded backup is healthy
-            if [ -f deploy-baba.db ] && ! sqlite3 deploy-baba.db "PRAGMA quick_check;" >/dev/null 2>&1; then
-                echo "⚠️  S3 backup is corrupt — creating fresh DB from migrations instead"
-                rm -f deploy-baba.db deploy-baba.db-wal deploy-baba.db-shm
+            if [ -f deploy-baba.db ]; then
+                integrity=$(sqlite3 deploy-baba.db "PRAGMA quick_check;" 2>&1)
+                if [ "$integrity" != "ok" ]; then
+                    echo "⚠️  S3 backup is corrupt — creating fresh DB from migrations instead"
+                    rm -f deploy-baba.db deploy-baba.db-wal deploy-baba.db-shm
+                fi
             fi
         else
             echo "⚠️  S3 sync unavailable — creating fresh DB from migrations"
