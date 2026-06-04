@@ -384,6 +384,14 @@ db-sync:
     set -euo pipefail
     DB="deploy-baba.db"
     if [ -f "$DB" ]; then
+        # Warn if there are unsynced dashboard edits that would be lost
+        unsynced=$(sqlite3 "$DB" "SELECT COUNT(*) FROM _change_log WHERE synced = 0;" 2>/dev/null || echo "0")
+        if [ "$unsynced" -gt 0 ]; then
+            echo "⚠️  $DB has $unsynced unsynced dashboard edit(s). Run 'just db-changes' to review."
+            echo "    To discard: just db-reset && just db-sync"
+            echo "    To capture: run /sync-dashboard-data first, then just db-changes-ack"
+            exit 1
+        fi
         # Skip download if the file is fresh AND passes integrity check
         if sqlite3 "$DB" "PRAGMA quick_check;" >/dev/null 2>&1; then
             age=$(( $(date +%s) - $(stat -f %m "$DB") ))
@@ -591,6 +599,28 @@ deploy-all ENV="prod":
 # Check local SQLite integrity
 db-check DB="deploy-baba.db":
     @sqlite3 {{ DB }} "PRAGMA integrity_check;"
+
+# Show unsynced dashboard edits (change-tracking log)
+db-changes DB="deploy-baba.db":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ ! -f "{{ DB }}" ]; then
+        echo "No database file found at {{ DB }}"
+        exit 0
+    fi
+    count=$(sqlite3 "{{ DB }}" "SELECT COUNT(*) FROM _change_log WHERE synced = 0;" 2>/dev/null || echo "0")
+    if [ "$count" = "0" ]; then
+        echo "No unsynced dashboard changes."
+    else
+        echo "$count unsynced change(s):"
+        sqlite3 -header -column "{{ DB }}" \
+            "SELECT table_name, natural_key, operation, changed_at FROM _change_log WHERE synced = 0 ORDER BY changed_at;"
+    fi
+
+# Mark all change-log entries as synced (run after generating a sync migration)
+db-changes-ack DB="deploy-baba.db":
+    sqlite3 "{{ DB }}" "UPDATE _change_log SET synced = 1 WHERE synced = 0;"
+    @echo "All change-log entries marked as synced."
 
 # Delete local SQLite and let next startup recreate from migrations
 db-reset:

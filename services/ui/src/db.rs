@@ -146,6 +146,10 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "035_linkedin_oauth_tokens",
         include_str!("../migrations/035_linkedin_oauth_tokens.sql"),
     ),
+    (
+        "036_change_tracking",
+        include_str!("../migrations/036_change_tracking.sql"),
+    ),
 ];
 
 /// Re-exported from `api_openapi::models::social` — the canonical SSOT.
