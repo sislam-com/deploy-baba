@@ -91,7 +91,10 @@ describe('Home', () => {
   })
 
   it('renders embedded Ask component', async () => {
+    const user = userEvent.setup()
     render(<Home />, { route: '/?view=ask' })
+    const toggle = await screen.findByText('Ask me anything...')
+    await user.click(toggle)
     await waitFor(() => {
       expect(screen.getByText('Common questions')).toBeInTheDocument()
     })
@@ -99,7 +102,10 @@ describe('Home', () => {
   })
 
   it('renders suggested questions in embedded Ask', async () => {
+    const user = userEvent.setup()
     render(<Home />, { route: '/?view=ask' })
+    const toggle = await screen.findByText('Ask me anything...')
+    await user.click(toggle)
     await waitFor(() => {
       expect(screen.getByText('Match to a role')).toBeInTheDocument()
     })

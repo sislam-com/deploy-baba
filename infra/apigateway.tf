@@ -173,6 +173,36 @@ resource "aws_lambda_permission" "apigw_mcp_gateway" {
   source_arn    = "${aws_apigatewayv2_api.contact.execution_arn}/*/*/mcp*"
 }
 
+# ─── Agent Lambda Integration ──────────────────────────────────────────────────
+# Routes POST /api/v1/agent/* through API Gateway for OAC body hash workaround
+
+resource "aws_apigatewayv2_integration" "agent" {
+  api_id                 = aws_apigatewayv2_api.contact.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = aws_lambda_function.agent.invoke_arn
+  payload_format_version = "2.0"
+}
+
+resource "aws_apigatewayv2_route" "agent_cover_letter" {
+  api_id    = aws_apigatewayv2_api.contact.id
+  route_key = "POST /api/v1/agent/cover-letter"
+  target    = "integrations/${aws_apigatewayv2_integration.agent.id}"
+}
+
+resource "aws_apigatewayv2_route" "agent_cover_letter_stream" {
+  api_id    = aws_apigatewayv2_api.contact.id
+  route_key = "POST /api/v1/agent/cover-letter/stream"
+  target    = "integrations/${aws_apigatewayv2_integration.agent.id}"
+}
+
+resource "aws_lambda_permission" "apigw_agent" {
+  statement_id  = "AllowAPIGatewayAgentInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.agent.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.contact.execution_arn}/*/*/api/v1/agent/*"
+}
+
 # ─── Locals ────────────────────────────────────────────────────────────────────
 
 locals {

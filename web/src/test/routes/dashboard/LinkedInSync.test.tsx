@@ -43,7 +43,7 @@ describe('LinkedInSync', () => {
   it('shows description text when disconnected', async () => {
     renderSync()
     await waitFor(() => {
-      expect(screen.getByText('Sign in with LinkedIn to enable API-driven data sync.')).toBeInTheDocument()
+      expect(screen.getByText('Sign in with LinkedIn to verify your profile identity.')).toBeInTheDocument()
     })
   })
 

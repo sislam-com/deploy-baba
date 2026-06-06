@@ -27,7 +27,7 @@ export default function DashboardHome() {
       fetch('/api/jobs').then(r => r.json()),
       fetch('/api/competencies').then(r => r.json()),
       fetch('/api/about/sections').then(r => r.json()),
-      fetch('/api/social-links').then(r => r.json()),
+      fetch('/api/v1/social-links').then(r => r.json()),
       fetch('/api/v1/admin/linkedin/positions').then(r => r.json()).catch(() => []),
       fetch('/api/v1/admin/linkedin/projects').then(r => r.json()).catch(() => []),
     ])

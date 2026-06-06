@@ -26,8 +26,8 @@ use llm_anthropic::AnthropicProvider;
 use llm_core::{ChatMessage, GenerationConfig, LlmProvider, LlmRequest, MessageRole};
 use llm_openai::OpenAIProvider;
 use rag_core::{
-    DefaultPromptAssembler, HybridRetriever, PromptAssembler, ResponseValidator, Retriever,
-    ValidationVerdict, ValidatorConfig,
+    is_job_match_query, DefaultPromptAssembler, HybridRetriever, PromptAssembler,
+    ResponseValidator, Retriever, ValidationVerdict, ValidatorConfig,
 };
 use rag_sqlite::RagStore;
 
@@ -245,6 +245,9 @@ pub async fn ask(
 
     let pipeline_start = Instant::now();
 
+    let is_job_match = is_job_match_query(&req.query);
+    let max_tokens: u32 = if is_job_match { 4096 } else { 1024 };
+
     // Clamp top_k
     let top_k = req.top_k.clamp(1, 20);
 
@@ -385,10 +388,17 @@ pub async fn ask(
             &bundle.system_prompt,
             &bundle.user_message,
             provider_id,
+            max_tokens,
         )
         .await
     } else {
-        generate_direct(provider_id, &bundle.system_prompt, &bundle.user_message).await
+        generate_direct(
+            provider_id,
+            &bundle.system_prompt,
+            &bundle.user_message,
+            max_tokens,
+        )
+        .await
     };
 
     let mut proxy_resp = match proxy_resp {
@@ -403,7 +413,15 @@ pub async fn ask(
     };
 
     // Validate response quality: groundedness + citation accuracy
-    let validator = ResponseValidator::new(ValidatorConfig::default());
+    let validator_config = if is_job_match {
+        ValidatorConfig {
+            min_groundedness: 0.3,
+            max_invalid_refs: 0,
+        }
+    } else {
+        ValidatorConfig::default()
+    };
+    let validator = ResponseValidator::new(validator_config);
     let verdict = validator.validate(&proxy_resp.content, chunks.len(), false);
 
     if let ValidationVerdict::RetryWithUpgrade {
@@ -428,9 +446,22 @@ pub async fn ask(
         );
 
         let retry_resp = if let Some(ref fn_name) = proxy_fn_name {
-            invoke_proxy_lambda(fn_name, &upgrade_system, &bundle.user_message, provider_id).await
+            invoke_proxy_lambda(
+                fn_name,
+                &upgrade_system,
+                &bundle.user_message,
+                provider_id,
+                max_tokens,
+            )
+            .await
         } else {
-            generate_direct("anthropic", &upgrade_system, &bundle.user_message).await
+            generate_direct(
+                "anthropic",
+                &upgrade_system,
+                &bundle.user_message,
+                max_tokens,
+            )
+            .await
         };
 
         if let Ok(resp) = retry_resp {
@@ -512,6 +543,7 @@ pub async fn ask(
         model: proxy_resp.model,
         input_tokens: proxy_resp.input_tokens,
         output_tokens: proxy_resp.output_tokens,
+        is_job_match,
     }))
 }
 
@@ -520,11 +552,12 @@ async fn invoke_proxy_lambda(
     system_prompt: &str,
     user_message: &str,
     provider_id: &str,
+    max_tokens: u32,
 ) -> Result<AskProxyResponse, (StatusCode, Json<serde_json::Value>)> {
     let proxy_req = AskProxyRequest {
         system_prompt: system_prompt.to_owned(),
         user_message: user_message.to_owned(),
-        max_tokens: 1024,
+        max_tokens,
         temperature: 0.2,
         tools: vec![],
         api_base_url: std::env::var("PORTFOLIO_API_BASE_URL").ok(),
@@ -562,6 +595,7 @@ async fn generate_direct(
     provider_id: &str,
     system_prompt: &str,
     user_message: &str,
+    max_tokens: u32,
 ) -> Result<AskProxyResponse, (StatusCode, Json<serde_json::Value>)> {
     let provider: Box<dyn LlmProvider> = match provider_id {
         "anthropic" => {
@@ -597,7 +631,7 @@ async fn generate_direct(
         tools: vec![],
         grounding: None,
         config: GenerationConfig {
-            max_tokens: 1024,
+            max_tokens,
             temperature: 0.2,
             prompt_version: "ask-v1",
         },

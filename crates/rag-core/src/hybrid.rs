@@ -57,6 +57,23 @@ const CODEBASE_KEYWORDS: &[&str] = &[
     "service",
 ];
 
+const JOB_MATCH_PREFIX: &str = "paste a job description below";
+
+const JOB_MATCH_SIGNALS: &[&str] = &[
+    "we're looking for",
+    "we are looking for",
+    "about the role",
+    "about this role",
+    "what you'll do",
+    "what you will do",
+    "who you are",
+    "requirements",
+    "responsibilities",
+    "nice to have",
+    "qualifications",
+    "you'll thrive",
+];
+
 const SPA_KEYWORDS: &[&str] = &[
     "spa",
     "react",
@@ -67,6 +84,22 @@ const SPA_KEYWORDS: &[&str] = &[
     "frontend",
     "vite",
 ];
+
+pub fn is_job_match_query(query: &str) -> bool {
+    let lower = query.to_lowercase();
+    if lower.starts_with(JOB_MATCH_PREFIX) {
+        return true;
+    }
+    let word_count = query.split_whitespace().count();
+    if word_count > 100 {
+        let signal_count = JOB_MATCH_SIGNALS
+            .iter()
+            .filter(|s| lower.contains(**s))
+            .count();
+        return signal_count >= 2;
+    }
+    false
+}
 
 pub struct HybridRetriever<R, P> {
     pub fts: R,
@@ -270,6 +303,80 @@ impl<R: Retriever, P: PortfolioDataProvider> HybridRetriever<R, P> {
 #[async_trait]
 impl<R: Retriever, P: PortfolioDataProvider> Retriever for HybridRetriever<R, P> {
     async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<RankedChunk>, RagError> {
+        // Job-match queries: user pasted a JD and wants alignment analysis.
+        // Prioritise portfolio data heavily — FTS on JD text just matches noise.
+        if is_job_match_query(query) {
+            let portfolio_budget = top_k.min(8);
+            let fts_budget = top_k.saturating_sub(portfolio_budget);
+
+            let fts_results = if fts_budget > 0 {
+                self.fts.retrieve(query, fts_budget).await?
+            } else {
+                Vec::new()
+            };
+
+            let jobs = self.portfolio.get_jobs_summary().await?;
+            let competencies = self.portfolio.get_competencies_summary().await?;
+            let about = self.portfolio.get_about_sections().await?;
+            let challenges = self.portfolio.get_challenges_summary().await?;
+
+            let mut job_q: VecDeque<_> = jobs
+                .iter()
+                .enumerate()
+                .map(|(i, v)| Self::value_to_chunk(v, i))
+                .collect();
+            let mut comp_q: VecDeque<_> = competencies
+                .iter()
+                .enumerate()
+                .map(|(i, v)| Self::value_to_chunk(v, i + 100))
+                .collect();
+            let mut about_q: VecDeque<_> = about
+                .iter()
+                .enumerate()
+                .map(|(i, v)| Self::value_to_chunk(v, i + 200))
+                .collect();
+            let mut challenge_q: VecDeque<_> = challenges
+                .iter()
+                .enumerate()
+                .map(|(i, v)| Self::value_to_chunk(v, i + 300))
+                .collect();
+
+            // Weight: jobs=3, competencies=2, about=1, challenges=2
+            let mix = [3usize.min(portfolio_budget), 2, 1, 2];
+            let mut live_chunks = Vec::new();
+            Self::pop_take(&mut job_q, mix[0], &mut live_chunks);
+            Self::pop_take(&mut comp_q, mix[1], &mut live_chunks);
+            Self::pop_take(&mut about_q, mix[2], &mut live_chunks);
+            Self::pop_take(&mut challenge_q, mix[3], &mut live_chunks);
+
+            // Fill remaining budget from overflow
+            if live_chunks.len() < portfolio_budget {
+                let mut overflow = VecDeque::from(Self::gather_live_chunks(
+                    &jobs,
+                    &competencies,
+                    &about,
+                    &challenges,
+                ));
+                while live_chunks.len() < portfolio_budget {
+                    if let Some(next) = overflow.pop_front() {
+                        if !live_chunks
+                            .iter()
+                            .any(|c| c.source_path == next.source_path)
+                        {
+                            live_chunks.push(next);
+                        }
+                    } else {
+                        break;
+                    }
+                }
+            }
+
+            let mut merged = live_chunks;
+            merged.extend(fts_results);
+            merged.truncate(top_k);
+            return Ok(merged);
+        }
+
         let spa_query = Self::is_spa_query(query);
         let adr_query = Self::is_adr_query(query);
 

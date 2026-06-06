@@ -176,6 +176,37 @@ pub const ALL_MODELS: &[(&str, ModelFactory)] = &[
     ("StatusUpdateRequest", || {
         serde_json::to_value(StatusUpdateRequest::example()).expect("StatusUpdateRequest example")
     }),
+    ("LinkedInOAuthToken", || {
+        serde_json::to_value(LinkedInOAuthToken::example()).expect("LinkedInOAuthToken example")
+    }),
+    ("LinkedInOAuthStatus", || {
+        serde_json::to_value(LinkedInOAuthStatus::example()).expect("LinkedInOAuthStatus example")
+    }),
+    ("BulkStatusRequest", || {
+        serde_json::to_value(BulkStatusRequest::example()).expect("BulkStatusRequest example")
+    }),
+    ("BulkStatusResult", || {
+        serde_json::to_value(BulkStatusResult::example()).expect("BulkStatusResult example")
+    }),
+    ("AutoMatchResult", || {
+        serde_json::to_value(AutoMatchResult::example()).expect("AutoMatchResult example")
+    }),
+    ("ApplyFieldsRequest", || {
+        serde_json::to_value(ApplyFieldsRequest::example()).expect("ApplyFieldsRequest example")
+    }),
+    ("ApplyResult", || {
+        serde_json::to_value(ApplyResult::example()).expect("ApplyResult example")
+    }),
+    ("ReconciliationItem", || {
+        serde_json::to_value(ReconciliationItem::example()).expect("ReconciliationItem example")
+    }),
+    ("SeedFromDbResult", || {
+        serde_json::to_value(SeedFromDbResult::example()).expect("SeedFromDbResult example")
+    }),
+    ("ReconciliationSummary", || {
+        serde_json::to_value(ReconciliationSummary::example())
+            .expect("ReconciliationSummary example")
+    }),
 ];
 
 #[cfg(test)]

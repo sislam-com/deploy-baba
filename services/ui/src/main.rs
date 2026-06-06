@@ -17,6 +17,7 @@ mod openapi;
 mod router;
 mod routes;
 mod state;
+mod tailor;
 mod telemetry;
 
 #[tokio::main]

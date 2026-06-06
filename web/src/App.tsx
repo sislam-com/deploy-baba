@@ -8,6 +8,7 @@ const AboutRepo = lazy(() => import('./routes/AboutRepo'))
 const Contact = lazy(() => import('./routes/Contact'))
 const Terms = lazy(() => import('./routes/Terms'))
 const Privacy = lazy(() => import('./routes/Privacy'))
+const CoverLetter = lazy(() => import('./routes/CoverLetter'))
 const NotFound = lazy(() => import('./routes/NotFound'))
 
 const Login = lazy(() => import('./routes/auth/Login'))
@@ -49,6 +50,7 @@ export default function App() {
           <Route path="/about/me" element={<AboutMe />} />
           <Route path="/about/repo" element={<AboutRepo />} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/cover-letter" element={<CoverLetter />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="*" element={<NotFound />} />

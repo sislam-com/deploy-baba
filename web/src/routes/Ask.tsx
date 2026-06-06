@@ -1,4 +1,5 @@
 import { useState, useRef, FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -18,6 +19,7 @@ interface AskResult {
   model: string
   input_tokens: number
   output_tokens: number
+  is_job_match: boolean
 }
 
 const KIND_ICON_MAP: Record<string, string> = {
@@ -64,12 +66,29 @@ function CitationBadge({ index, path, kind, url }: { index: number; path: string
   )
 }
 
+function truncate(text: string, max: number) {
+  return text.length > max ? text.slice(0, max) + '…' : text
+}
+
 export default function Ask({ embedded = false }: { embedded?: boolean }) {
   const [query, setQuery] = useState(RECRUITER_QUESTIONS[0].value)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<AskResult | null>(null)
+  const [submittedQuery, setSubmittedQuery] = useState<string | null>(null)
+  const [isOpen, setIsOpen] = useState(!embedded)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const navigate = useNavigate()
+
+  const hasResponse = submittedQuery !== null
+
+  function handleReset() {
+    setResult(null)
+    setError(null)
+    setSubmittedQuery(null)
+    setQuery(RECRUITER_QUESTIONS[0].value)
+    setTimeout(() => textareaRef.current?.focus(), 0)
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -79,6 +98,7 @@ export default function Ask({ embedded = false }: { embedded?: boolean }) {
     setLoading(true)
     setError(null)
     setResult(null)
+    setSubmittedQuery(q)
 
     try {
       const res = await fetch('/api/ask', {
@@ -119,10 +139,33 @@ export default function Ask({ embedded = false }: { embedded?: boolean }) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
-        {/* Left column - Form */}
-        <div className="space-y-3">
-          {/* Suggested question pills */}
+      {embedded && !hasResponse && (
+        <button
+          type="button"
+          onClick={() => {
+            setIsOpen(o => !o)
+            if (!isOpen) setTimeout(() => textareaRef.current?.focus(), 0)
+          }}
+          className="w-full flex items-center justify-between gap-3 bg-gray-800/60 border border-gray-700
+                     rounded-lg px-4 py-3 mb-3 transition hover:border-cyan-500/50 group cursor-pointer"
+          aria-expanded={isOpen}
+        >
+          <div className="flex items-center gap-2.5">
+            <SvgIcon name="chat" className="w-4 h-4 text-cyan-400 shrink-0" />
+            <span className="text-sm text-gray-300 group-hover:text-white transition">
+              Ask me anything...
+            </span>
+          </div>
+          <SvgIcon
+            name={isOpen ? 'chevron-up' : 'chevron-down'}
+            className="w-4 h-4 text-gray-500 group-hover:text-cyan-400 transition shrink-0"
+          />
+        </button>
+      )}
+
+      {/* State A: Full question form (no response yet) */}
+      {isOpen && !hasResponse && (
+        <div className="max-w-2xl mx-auto space-y-3">
           <div>
             <span className="block text-xs font-medium text-gray-400 mb-2">Common questions</span>
             <div className="flex flex-wrap gap-2">
@@ -186,17 +229,63 @@ export default function Ask({ embedded = false }: { embedded?: boolean }) {
             </div>
           )}
         </div>
+      )}
 
-        {/* Right column - Response */}
-        <div className="lg:max-h-[70vh] lg:overflow-y-auto">
+      {/* State B: Collapsed question bar + full-width response */}
+      {hasResponse && (
+        <div className="space-y-4">
+          {/* Collapsed question bar */}
+          <div className="flex items-center gap-3 bg-gray-800/60 border border-gray-700 rounded-lg px-4 py-2.5">
+            <SvgIcon name="chat" className="w-4 h-4 text-gray-500 shrink-0" />
+            <p className="flex-1 text-sm text-gray-300 truncate">{truncate(submittedQuery, 120)}</p>
+            <button
+              type="button"
+              onClick={handleReset}
+              className="shrink-0 text-xs text-cyan-400 hover:text-cyan-300 font-medium transition"
+            >
+              New question
+            </button>
+          </div>
+
+          {/* Loading */}
+          {loading && (
+            <div className="bg-gray-800/30 border border-gray-700 rounded-lg p-6 text-center">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-cyan-400 mx-auto mb-3" />
+              <p className="text-gray-500 text-sm">Retrieving sources and generating answer&hellip;</p>
+            </div>
+          )}
+
+          {/* Error */}
+          {error && (
+            <div className="px-3 py-2 rounded-lg text-xs font-medium bg-red-900/60 border border-red-700 text-red-300">
+              {error}
+            </div>
+          )}
+
+          {/* Response */}
           {result && (
             <div className="space-y-3">
               <div className="bg-gray-800/60 border border-gray-700 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-cyan-400">Answer</span>
-                  <span className="text-xs text-gray-600">&middot; {result.model}</span>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-cyan-400">Answer</span>
+                    <span className="text-xs text-gray-600">&middot; {result.model}</span>
+                  </div>
+                  {result.is_job_match && (
+                    <button
+                      type="button"
+                      onClick={() => navigate('/cover-letter', { state: { jobDescription: query } })}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-cyan-600 text-cyan-400
+                                 hover:bg-cyan-600/10 hover:text-cyan-300 transition text-xs font-medium"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      Cover Letter
+                    </button>
+                  )}
                 </div>
-                <div className="ask-prose text-xs sm:text-sm max-h-[40vh] overflow-y-auto">
+                <div className="ask-prose text-xs sm:text-sm">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     components={{
@@ -250,25 +339,8 @@ export default function Ask({ embedded = false }: { embedded?: boolean }) {
               </p>
             </div>
           )}
-
-          {!result && !loading && (
-            <div className="bg-gray-800/30 border border-gray-700 rounded-lg p-8 text-center">
-              <SvgIcon name="chat" className="w-8 h-8 text-gray-600 mx-auto mb-3" />
-              <p className="text-gray-400 text-sm font-medium mb-1">AI-Powered Q&A</p>
-              <p className="text-gray-500 text-xs max-w-xs mx-auto">
-                Ask about skills, experience, architecture decisions, or anything in the codebase. Answers include source citations.
-              </p>
-            </div>
-          )}
-
-          {loading && (
-            <div className="bg-gray-800/30 border border-gray-700 rounded-lg p-6 text-center">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-cyan-400 mx-auto mb-3" />
-              <p className="text-gray-500 text-sm">Retrieving sources and generating answer…</p>
-            </div>
-          )}
         </div>
-      </div>
+      )}
     </div>
   )
 
@@ -277,7 +349,7 @@ export default function Ask({ embedded = false }: { embedded?: boolean }) {
   return (
     <>
       <Helmet>
-        <title>Ask — Portfolio</title>
+        <title>Ask &mdash; Portfolio</title>
       </Helmet>
       <div className="min-h-screen bg-gray-900">
         {content}

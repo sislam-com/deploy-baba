@@ -17,7 +17,7 @@ export default function SocialLinks() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/social-links')
+    fetch('/api/v1/social-links')
       .then(r => r.json())
       .then((data: SocialLink[]) => setItems(data))
       .catch(() => setError('Failed to load social links'))

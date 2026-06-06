@@ -10,6 +10,7 @@ pub mod openapi;
 pub mod router;
 pub mod routes;
 pub mod state;
+pub mod tailor;
 pub mod telemetry;
 
 // Re-export commonly used types

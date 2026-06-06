@@ -1,7 +1,7 @@
 # ADR-033: Cover Letter Agent Architecture
 
 **Date:** 2026-05-24
-**Status:** Accepted
+**Status:** Superseded by [ADR-035](ADR-035-pydantic-ai-agent-migration.md)
 **Affected modules:** W-AGT, W-RST, W-RAG, W-LLM, W-WEB, W-UI
 
 ## Context

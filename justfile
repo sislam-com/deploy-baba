@@ -20,9 +20,10 @@ default:
 
 # ── Inner Loop (daily dev) ────────────────────────────────────────────────────
 
-# Format all code (Rust + OpenTofu HCL)
+# Format all code with configured formatters (Rust + Python + OpenTofu HCL)
 fmt:
     cargo xtask build format
+    just agent-fmt
     tofu fmt -recursive infra/
 
 # Run clippy (warnings = errors) + verify HCL formatting
@@ -199,7 +200,7 @@ mcp-cloud-smoke PROFILE="default" BASE_URL="https://sislam.com":
 
 # Run the agent service locally on :3003 with auto-reload
 agent-dev:
-    cd services/agent && PYTHONPATH=src uv run uvicorn handler:app --host 0.0.0.0 --port 3003 --reload
+    cd services/agent && UI_BASE_URL=http://localhost:3001 PYTHONPATH=src uv run uvicorn handler:app --host 0.0.0.0 --port 3003 --reload
 
 # Run agent tests
 agent-test:
@@ -231,6 +232,39 @@ agent-deploy ENV="prod":
     just aws-check {{ PROFILE }} && just agent-build && cargo xtask deploy lambda \
         --profile {{ PROFILE }} --function deploy-baba-{{ ENV }}-agent \
         --zip-path infra/build/agent-lambda.zip
+
+# ── PDF Lambda (Docker-based WeasyPrint service) ─────────────────────────────
+
+# Build and push PDF Lambda Docker image to ECR
+pdf-build ENV="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    just aws-check {{ PROFILE }}
+    REGION=$(aws configure get region --profile {{ PROFILE }} 2>/dev/null || echo "us-east-1")
+    AWS_ACCOUNT=$(aws sts get-caller-identity --query Account --output text --profile {{ PROFILE }})
+    ECR_REPO="${AWS_ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com/deploy-baba-{{ ENV }}-pdf"
+    echo "Building PDF Lambda image for ${ECR_REPO}..."
+    aws ecr get-login-password --region ${REGION} --profile {{ PROFILE }} | \
+        docker login --username AWS --password-stdin ${AWS_ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com
+    docker buildx build --platform linux/amd64 --provenance=false --sbom=false --tag deploy-baba-pdf:latest services/pdf/
+    docker tag deploy-baba-pdf:latest "${ECR_REPO}:latest"
+    docker push "${ECR_REPO}:latest"
+    echo "PDF Lambda image pushed: ${ECR_REPO}:latest"
+
+# Build and deploy PDF Lambda (requires infra to be applied first for ECR repo)
+pdf-deploy ENV="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    just pdf-build {{ ENV }}
+    echo "Updating PDF Lambda function with new image..."
+    just aws-check {{ PROFILE }}
+    REGION=$(aws configure get region --profile {{ PROFILE }} 2>/dev/null || echo "us-east-1")
+    AWS_ACCOUNT=$(aws sts get-caller-identity --query Account --output text --profile {{ PROFILE }})
+    aws lambda update-function-code \
+        --function-name "deploy-baba-{{ ENV }}-pdf" \
+        --image-uri "${AWS_ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com/deploy-baba-{{ ENV }}-pdf:latest" \
+        --profile {{ PROFILE }}
+    echo "PDF Lambda deployed successfully"
 
 # Verify the live deployment (curl apex + www health checks)
 infra-verify DOMAIN="sislam.com":
@@ -315,12 +349,17 @@ dev-env ENV="prod":
     #!/usr/bin/env bash
     set -euo pipefail
     AWS="env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN AWS_PROFILE={{ PROFILE }} aws"
+    if ! $AWS sts get-caller-identity --query Account --output text >/dev/null 2>&1; then
+        echo "ERROR: AWS SSO session expired or not configured. Run: just sso-login" >&2
+        exit 1
+    fi
     pool_id=$($AWS ssm get-parameter --name /deploy-baba/{{ ENV }}/cognito-pool-id    --query Parameter.Value --output text)
     client_id=$($AWS ssm get-parameter --name /deploy-baba/{{ ENV }}/cognito-client-id --query Parameter.Value --output text)
     domain=$($AWS    ssm get-parameter --name /deploy-baba/{{ ENV }}/cognito-domain    --query Parameter.Value --output text)
     jwks=$(curl -fsSL "https://cognito-idp.us-east-1.amazonaws.com/${pool_id}/.well-known/jwks.json")
     echo "export AWS_PROFILE={{ PROFILE }}"
     echo "export ANTHROPIC_API_KEY_ARN=root-anthropic-access-key"
+    echo "export LINKEDIN_SECRET_ARN=deploy-baba/prod/linkedin-api-key"
     echo "export RAG_PUBLIC_ENABLED=1"
     echo "export COGNITO_POOL_ID=${pool_id}"
     echo "export COGNITO_CLIENT_ID=${client_id}"
@@ -328,6 +367,29 @@ dev-env ENV="prod":
     echo "export COGNITO_REGION=us-east-1"
     echo "export APP_DOMAIN=http://localhost:3000"
     printf 'export COGNITO_JWKS=%q\n' "${jwks}"
+
+    # AWS region for boto3 clients in agent service
+    echo "export AWS_REGION=us-east-1"
+    echo "export AWS_REGION_OVERRIDE=us-east-1"
+
+    # Agent service infrastructure refs (UI Lambda for resume data, PDF Lambda, S3 bucket)
+    echo "export UI_LAMBDA_NAME=deploy-baba-prod"
+    echo "export PDF_LAMBDA_NAME=deploy-baba-prod-pdf"
+    echo "export ARTIFACTS_BUCKET=deploy-baba-assets-062513063428"
+
+    # Fetch actual secret values for Python agent service (checks env var first)
+    anthropic_key=$($AWS secretsmanager get-secret-value --secret-id deploy-baba/prod/anthropic-api-key --query SecretString --output text 2>/dev/null || echo "")
+    if [ -n "$anthropic_key" ] && [ "$anthropic_key" != "placeholder-set-via-just-secret-put" ]; then
+        printf 'export ANTHROPIC_API_KEY=%q\n' "$anthropic_key"
+    fi
+
+    linkedin_secret=$($AWS secretsmanager get-secret-value --secret-id deploy-baba/prod/linkedin-api-key --query SecretString --output text 2>/dev/null || echo "")
+    if [ -n "$linkedin_secret" ] && [ "$linkedin_secret" != "placeholder-set-via-just-secret-put" ]; then
+        client_id=$(printf '%s' "$linkedin_secret" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('client_id',''))")
+        client_secret=$(printf '%s' "$linkedin_secret" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('client_secret',''))")
+        [ -n "$client_id" ] && printf 'export LINKEDIN_CLIENT_ID=%q\n' "$client_id"
+        [ -n "$client_secret" ] && printf 'export LINKEDIN_CLIENT_SECRET=%q\n' "$client_secret"
+    fi
 
 # Verify all prerequisites (rustup, cargo-lambda, node≥20, pnpm, tofu, AWS SSO, cache)
 dev-doctor:
@@ -379,17 +441,54 @@ db-sync:
     set -euo pipefail
     DB="deploy-baba.db"
     if [ -f "$DB" ]; then
-        age=$(( $(date +%s) - $(stat -f %m "$DB") ))
-        if [ "$age" -lt 3600 ]; then
-            echo "⏩ $DB is ${age}s old (< 1h) — skipping S3 sync"
-            exit 0
+        # Warn if there are unsynced dashboard edits that would be lost
+        unsynced=$(sqlite3 "$DB" "SELECT COUNT(*) FROM _change_log WHERE synced = 0;" 2>/dev/null || echo "0")
+        if [ "$unsynced" -gt 0 ]; then
+            echo "⚠️  $DB has $unsynced unsynced dashboard edit(s). Run 'just db-changes' to review."
+            echo "    To discard: just db-reset && just db-sync"
+            echo "    To capture: run /sync-dashboard-data first, then just db-changes-ack"
+            exit 1
+        fi
+        # Skip download if the file is fresh AND passes integrity check
+        integrity=$(sqlite3 "$DB" "PRAGMA quick_check;" 2>&1)
+        if [ "$integrity" = "ok" ]; then
+            age=$(( $(date +%s) - $(stat -f %m "$DB") ))
+            if [ "$age" -lt 3600 ]; then
+                echo "⏩ $DB is ${age}s old (< 1h) and healthy — skipping S3 sync"
+                exit 0
+            fi
+        else
+            echo "⚠️  $DB failed integrity check — will re-download from S3"
+            rm -f "$DB" "${DB}-wal" "${DB}-shm"
         fi
     fi
     echo "⬇️  Syncing latest S3 backup → $DB"
     just db-restore {{ PROFILE }}
 
+# Start local S3 emulator (moto) on :5555 with artifacts bucket
+dev-s3:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    pid=$(lsof -ti tcp:5555 2>/dev/null || true)
+    if [ -n "$pid" ]; then
+        echo "Port 5555 occupied by PID $pid — stopping..."
+        kill "$pid" 2>/dev/null || true; sleep 0.5
+    fi
+    echo "Starting moto S3 server on :5555..."
+    (cd services/agent && uv run moto_server -p 5555) &
+    MOTO_PID=$!
+    for i in $(seq 1 15); do
+        if curl -sf http://localhost:5555/ >/dev/null 2>&1; then break; fi
+        sleep 0.5
+    done
+    AWS_ACCESS_KEY_ID=testing AWS_SECRET_ACCESS_KEY=testing \
+        aws --endpoint-url http://localhost:5555 s3 mb s3://deploy-baba-artifacts 2>/dev/null || true
+    echo "Local S3 ready — bucket deploy-baba-artifacts on :5555 (PID $MOTO_PID)"
+    trap "kill $MOTO_PID 2>/dev/null || true" SIGINT SIGTERM EXIT
+    wait $MOTO_PID
+
 # Start the Rust API server (:3001), Vite dev server (:3000), and agent service (:3003) in parallel.
-# Port assignments: 3000=Vite SPA, 3001=Rust API, 3002=Auth Lambda, 3003=Python Agent
+# Port assignments: 3000=Vite SPA, 3001=Rust API, 3002=Auth Lambda, 3003=Python Agent, 5555=Local S3
 
 # Pre-cleans stale processes on all ports and guarantees cleanup on exit.
 dev-stack:
@@ -397,7 +496,7 @@ dev-stack:
     set -euo pipefail
 
     # Pre-empt any stale processes on our ports
-    for port in 3000 3001 3002 3003; do
+    for port in 3000 3001 3002 3003 5555; do
         pid=$(lsof -ti tcp:$port 2>/dev/null || true)
         if [ -n "$pid" ]; then
             echo "Port $port occupied by PID $pid — stopping..."
@@ -407,8 +506,44 @@ dev-stack:
         fi
     done
 
-    just db-sync
-    eval "$(just dev-env)"
+    # If a local DB exists, validate it; if not, try S3 sync then fall back to fresh-from-migrations
+    if [ -f deploy-baba.db ]; then
+        integrity=$(sqlite3 deploy-baba.db "PRAGMA quick_check;" 2>&1)
+        if [ "$integrity" != "ok" ]; then
+            echo "⚠️  deploy-baba.db is corrupted — removing and will recreate"
+            rm -f deploy-baba.db deploy-baba.db-wal deploy-baba.db-shm
+        fi
+    fi
+
+    if [ ! -f deploy-baba.db ]; then
+        if just db-sync 2>/dev/null; then
+            # Verify the downloaded backup is healthy
+            if [ -f deploy-baba.db ]; then
+                integrity=$(sqlite3 deploy-baba.db "PRAGMA quick_check;" 2>&1)
+                if [ "$integrity" != "ok" ]; then
+                    echo "⚠️  S3 backup is corrupt — creating fresh DB from migrations instead"
+                    rm -f deploy-baba.db deploy-baba.db-wal deploy-baba.db-shm
+                fi
+            fi
+        else
+            echo "⚠️  S3 sync unavailable — creating fresh DB from migrations"
+        fi
+    fi
+
+    # Load AWS env (SSO required) — fall back to offline dev mode if unavailable
+    if DEV_ENV_OUTPUT=$(just dev-env 2>&1); then
+        eval "$DEV_ENV_OUTPUT"
+    else
+        echo "WARNING: AWS SSO not available — running in offline dev mode (auth bypass)"
+        echo "  Run 'just sso-login' to enable full functionality."
+        export DEV_MODE=1
+        export COGNITO_POOL_ID="offline"
+        export COGNITO_CLIENT_ID="offline"
+        export COGNITO_DOMAIN="offline"
+        export COGNITO_REGION="us-east-1"
+        export COGNITO_JWKS='{}'
+        export RAG_PUBLIC_ENABLED=1
+    fi
 
     # Start API server directly (use just ui for cargo watch + auto-reload)
     echo "Starting API server on :3001..."
@@ -435,11 +570,33 @@ dev-stack:
         sleep 1
     done
 
-    # Start agent service (Python/LangGraph) if uv is available
+    # Start local S3 emulator (moto) for agent artifact storage
+    MOTO_PID=""
+    if command -v uv &>/dev/null; then
+        echo "Starting local S3 on :5555..."
+        (cd services/agent && uv run moto_server -p 5555) &
+        MOTO_PID=$!
+        for i in $(seq 1 15); do
+            if curl -sf http://localhost:5555/ >/dev/null 2>&1; then break; fi
+            sleep 0.5
+        done
+        AWS_ACCESS_KEY_ID=testing AWS_SECRET_ACCESS_KEY=testing \
+            aws --endpoint-url http://localhost:5555 s3 mb s3://deploy-baba-artifacts 2>/dev/null || true
+        echo "Local S3 ready on :5555"
+    fi
+
+    # Start agent service (PydanticAI) if uv is available
     AGENT_PID=""
     if command -v uv &>/dev/null; then
         echo "Starting agent service on :3003..."
-        (cd services/agent && PYTHONPATH=src uv run uvicorn handler:app --host 0.0.0.0 --port 3003 --reload) &
+        (cd services/agent && \
+            S3_ENDPOINT_URL=http://localhost:5555 \
+            ARTIFACTS_BUCKET=deploy-baba-artifacts \
+            AWS_ACCESS_KEY_ID=testing \
+            AWS_SECRET_ACCESS_KEY=testing \
+            UI_BASE_URL=http://localhost:3001 \
+            PYTHONPATH=src \
+            uv run uvicorn handler:app --host 0.0.0.0 --port 3003 --reload) &
         AGENT_PID=$!
     else
         echo "⚠️  uv not found — skipping agent service on :3003 (install: curl -LsSf https://astral.sh/uv/install.sh | sh)"
@@ -460,12 +617,14 @@ dev-stack:
         kill $API_PID 2>/dev/null || true
         kill $AUTH_PID 2>/dev/null || true
         [ -n "$AGENT_PID" ] && kill $AGENT_PID 2>/dev/null || true
+        [ -n "$MOTO_PID" ] && kill $MOTO_PID 2>/dev/null || true
         sleep 1
         kill -9 $WEB_PID 2>/dev/null || true
         kill -9 $API_PID 2>/dev/null || true
         kill -9 $AUTH_PID 2>/dev/null || true
         [ -n "$AGENT_PID" ] && kill -9 $AGENT_PID 2>/dev/null || true
-        for port in 3000 3001 3002 3003; do
+        [ -n "$MOTO_PID" ] && kill -9 $MOTO_PID 2>/dev/null || true
+        for port in 3000 3001 3002 3003 5555; do
             pid=$(lsof -ti tcp:$port 2>/dev/null || true)
             [ -n "$pid" ] && kill -9 "$pid" 2>/dev/null || true
         done
@@ -554,6 +713,37 @@ deploy-all ENV="prod":
     just rag-sync {{ ENV }}
 
 # ── Database (SQLite + S3) ───────────────────────────────────────────────────
+
+# Check local SQLite integrity
+db-check DB="deploy-baba.db":
+    @sqlite3 {{ DB }} "PRAGMA integrity_check;"
+
+# Show unsynced dashboard edits (change-tracking log)
+db-changes DB="deploy-baba.db":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ ! -f "{{ DB }}" ]; then
+        echo "No database file found at {{ DB }}"
+        exit 0
+    fi
+    count=$(sqlite3 "{{ DB }}" "SELECT COUNT(*) FROM _change_log WHERE synced = 0;" 2>/dev/null || echo "0")
+    if [ "$count" = "0" ]; then
+        echo "No unsynced dashboard changes."
+    else
+        echo "$count unsynced change(s):"
+        sqlite3 -header -column "{{ DB }}" \
+            "SELECT table_name, natural_key, operation, changed_at FROM _change_log WHERE synced = 0 ORDER BY changed_at;"
+    fi
+
+# Mark all change-log entries as synced (run after generating a sync migration)
+db-changes-ack DB="deploy-baba.db":
+    sqlite3 "{{ DB }}" "UPDATE _change_log SET synced = 1 WHERE synced = 0;"
+    @echo "All change-log entries marked as synced."
+
+# Delete local SQLite and let next startup recreate from migrations
+db-reset:
+    rm -f deploy-baba.db deploy-baba.db-wal deploy-baba.db-shm
+    @echo "Local DB deleted. Next 'just dev-stack' will create a fresh one from migrations."
 
 # Back up SQLite from EFS to S3
 db-backup PROFILE="default":
@@ -810,7 +1000,7 @@ publish:
 
 # Write a secret to AWS Secrets Manager (e.g. just secret-put pow-secret $(openssl rand -hex 32))
 secret-put NAME VALUE PROFILE="default":
-    just aws-check {{ PROFILE }} && cargo xtask secret put {{ NAME }} {{ VALUE }} --profile {{ PROFILE }}
+    just aws-check {{ PROFILE }} && cargo xtask secret put {{ NAME }} '{{ VALUE }}' --profile {{ PROFILE }}
 
 # Read a secret value from AWS Secrets Manager
 secret-get NAME PROFILE="default":
