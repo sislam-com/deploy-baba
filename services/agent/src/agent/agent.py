@@ -173,7 +173,7 @@ def _register_tools(agent: Agent[AgentDeps, CoverLetterOutput]) -> None:
         Args:
             pdf_base64: Base64-encoded PDF bytes from convert_to_pdf.
         """
-        if not ctx.deps.artifacts_bucket or os.environ.get("UI_BASE_URL"):
+        if not ctx.deps.artifacts_bucket:
             return "#dev-mode-no-download"
 
         pdf_bytes = base64.b64decode(pdf_base64)
@@ -185,10 +185,12 @@ def _register_tools(agent: Agent[AgentDeps, CoverLetterOutput]) -> None:
         cfg = botocore.config.Config(
             connect_timeout=10, read_timeout=30, retries={"max_attempts": 1}
         )
+        endpoint_url = os.environ.get("S3_ENDPOINT_URL")
         s3 = boto3.client(
             "s3",
             region_name=os.environ.get("AWS_REGION", "us-east-1"),
             config=cfg,
+            **({"endpoint_url": endpoint_url} if endpoint_url else {}),
         )
         await asyncio.to_thread(
             s3.put_object, Bucket=bucket, Key=key, Body=pdf_bytes, ContentType="application/pdf"

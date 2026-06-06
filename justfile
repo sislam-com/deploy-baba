@@ -465,8 +465,30 @@ db-sync:
     echo "⬇️  Syncing latest S3 backup → $DB"
     just db-restore {{ PROFILE }}
 
+# Start local S3 emulator (moto) on :5555 with artifacts bucket
+dev-s3:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    pid=$(lsof -ti tcp:5555 2>/dev/null || true)
+    if [ -n "$pid" ]; then
+        echo "Port 5555 occupied by PID $pid — stopping..."
+        kill "$pid" 2>/dev/null || true; sleep 0.5
+    fi
+    echo "Starting moto S3 server on :5555..."
+    (cd services/agent && uv run moto_server -p 5555) &
+    MOTO_PID=$!
+    for i in $(seq 1 15); do
+        if curl -sf http://localhost:5555/ >/dev/null 2>&1; then break; fi
+        sleep 0.5
+    done
+    AWS_ACCESS_KEY_ID=testing AWS_SECRET_ACCESS_KEY=testing \
+        aws --endpoint-url http://localhost:5555 s3 mb s3://deploy-baba-artifacts 2>/dev/null || true
+    echo "Local S3 ready — bucket deploy-baba-artifacts on :5555 (PID $MOTO_PID)"
+    trap "kill $MOTO_PID 2>/dev/null || true" SIGINT SIGTERM EXIT
+    wait $MOTO_PID
+
 # Start the Rust API server (:3001), Vite dev server (:3000), and agent service (:3003) in parallel.
-# Port assignments: 3000=Vite SPA, 3001=Rust API, 3002=Auth Lambda, 3003=Python Agent
+# Port assignments: 3000=Vite SPA, 3001=Rust API, 3002=Auth Lambda, 3003=Python Agent, 5555=Local S3
 
 # Pre-cleans stale processes on all ports and guarantees cleanup on exit.
 dev-stack:
@@ -474,7 +496,7 @@ dev-stack:
     set -euo pipefail
 
     # Pre-empt any stale processes on our ports
-    for port in 3000 3001 3002 3003; do
+    for port in 3000 3001 3002 3003 5555; do
         pid=$(lsof -ti tcp:$port 2>/dev/null || true)
         if [ -n "$pid" ]; then
             echo "Port $port occupied by PID $pid — stopping..."
@@ -548,11 +570,33 @@ dev-stack:
         sleep 1
     done
 
-    # Start agent service (Python/LangGraph) if uv is available
+    # Start local S3 emulator (moto) for agent artifact storage
+    MOTO_PID=""
+    if command -v uv &>/dev/null; then
+        echo "Starting local S3 on :5555..."
+        (cd services/agent && uv run moto_server -p 5555) &
+        MOTO_PID=$!
+        for i in $(seq 1 15); do
+            if curl -sf http://localhost:5555/ >/dev/null 2>&1; then break; fi
+            sleep 0.5
+        done
+        AWS_ACCESS_KEY_ID=testing AWS_SECRET_ACCESS_KEY=testing \
+            aws --endpoint-url http://localhost:5555 s3 mb s3://deploy-baba-artifacts 2>/dev/null || true
+        echo "Local S3 ready on :5555"
+    fi
+
+    # Start agent service (PydanticAI) if uv is available
     AGENT_PID=""
     if command -v uv &>/dev/null; then
         echo "Starting agent service on :3003..."
-        (cd services/agent && UI_BASE_URL=http://localhost:3001 PYTHONPATH=src uv run uvicorn handler:app --host 0.0.0.0 --port 3003 --reload) &
+        (cd services/agent && \
+            S3_ENDPOINT_URL=http://localhost:5555 \
+            ARTIFACTS_BUCKET=deploy-baba-artifacts \
+            AWS_ACCESS_KEY_ID=testing \
+            AWS_SECRET_ACCESS_KEY=testing \
+            UI_BASE_URL=http://localhost:3001 \
+            PYTHONPATH=src \
+            uv run uvicorn handler:app --host 0.0.0.0 --port 3003 --reload) &
         AGENT_PID=$!
     else
         echo "⚠️  uv not found — skipping agent service on :3003 (install: curl -LsSf https://astral.sh/uv/install.sh | sh)"
@@ -573,12 +617,14 @@ dev-stack:
         kill $API_PID 2>/dev/null || true
         kill $AUTH_PID 2>/dev/null || true
         [ -n "$AGENT_PID" ] && kill $AGENT_PID 2>/dev/null || true
+        [ -n "$MOTO_PID" ] && kill $MOTO_PID 2>/dev/null || true
         sleep 1
         kill -9 $WEB_PID 2>/dev/null || true
         kill -9 $API_PID 2>/dev/null || true
         kill -9 $AUTH_PID 2>/dev/null || true
         [ -n "$AGENT_PID" ] && kill -9 $AGENT_PID 2>/dev/null || true
-        for port in 3000 3001 3002 3003; do
+        [ -n "$MOTO_PID" ] && kill -9 $MOTO_PID 2>/dev/null || true
+        for port in 3000 3001 3002 3003 5555; do
             pid=$(lsof -ti tcp:$port 2>/dev/null || true)
             [ -n "$pid" ] && kill -9 "$pid" 2>/dev/null || true
         done
