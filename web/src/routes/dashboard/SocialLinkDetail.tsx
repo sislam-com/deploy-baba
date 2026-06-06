@@ -54,7 +54,7 @@ export default function SocialLinkDetail() {
       sort_order: Number(form.sort_order),
     }
     const res = await fetch(
-      isNew ? '/api/admin/social-links' : `/api/admin/social-links/${id}`,
+      isNew ? '/api/v1/admin/social-links' : `/api/v1/admin/social-links/${id}`,
       { method: isNew ? 'POST' : 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
     ).catch(() => null)
 
@@ -65,7 +65,7 @@ export default function SocialLinkDetail() {
 
   async function handleDelete() {
     if (!confirm('Delete this social link?')) return
-    const res = await fetch(`/api/admin/social-links/${id}`, { method: 'DELETE' }).catch(() => null)
+    const res = await fetch(`/api/v1/admin/social-links/${id}`, { method: 'DELETE' }).catch(() => null)
     if (!res || !res.ok) { setError('Delete failed'); return }
     navigate('/dashboard/social-links')
   }

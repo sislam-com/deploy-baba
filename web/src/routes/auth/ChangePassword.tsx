@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 
@@ -21,13 +21,20 @@ export default function ChangePassword() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  // If navigated here without challenge state, redirect to login
+  // Redirect to login if no challenge state present
+  useEffect(() => {
+    if (!state?.challengeName) {
+      const timer = setTimeout(() => navigate('/auth/login', { replace: true }), 100)
+      return () => clearTimeout(timer)
+    }
+  }, [state, navigate])
+
+  // If navigated here without challenge state, show redirect message
   if (!state?.challengeName) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-900">
         <div className="text-center">
           <p className="text-gray-400">No active challenge. Redirecting…</p>
-          {setTimeout(() => navigate('/auth/login', { replace: true }), 100) && null}
         </div>
       </div>
     )

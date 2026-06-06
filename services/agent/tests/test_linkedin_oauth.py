@@ -28,8 +28,8 @@ def _reset_module_state(monkeypatch: pytest.MonkeyPatch) -> None:
     _pending_states.clear()
     monkeypatch.setenv("LINKEDIN_CLIENT_ID", "test-client-id")
     monkeypatch.setenv("LINKEDIN_CLIENT_SECRET", "test-client-secret")
-    monkeypatch.setenv("LINKEDIN_REDIRECT_BASE", "http://localhost:3003")
-    monkeypatch.setenv("DASHBOARD_URL", "http://localhost:5173")
+    monkeypatch.setenv("LINKEDIN_REDIRECT_BASE", "http://localhost:3000")
+    monkeypatch.setenv("DASHBOARD_URL", "http://localhost:3000")
     load_linkedin_credentials()
 
 

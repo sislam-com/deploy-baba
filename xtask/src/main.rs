@@ -157,7 +157,9 @@ async fn publish(environment: String, dry_run: bool) -> anyhow::Result<()> {
     // Deploy
     if !dry_run {
         deploy::execute(deploy::DeployAction::Lambda {
-            function: None,
+            function: format!("deploy-baba-{}", environment),
+            package: None,
+            zip_path: None,
             profile: None,
         })
         .await?;

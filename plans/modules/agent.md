@@ -1,5 +1,5 @@
 # W-AGT: agent
-**Path:** `services/agent/` | **Status:** TODO
+**Path:** `services/agent/` | **Status:** WIP (scaffold DONE; RAG sync graph DONE; cover letter tools TODO)
 **Coverage floor:** N/A (Python) | **Depends on:** W-LLM, W-RST, W-RAG, W-OTF, W-UI | **Depended on by:** W-WEB (Ask.tsx agent mode)
 
 ---
@@ -82,7 +82,7 @@ Reads `ANTHROPIC_API_KEY` from Secrets Manager at cold start (same ARN as llm-pr
 
 | ID | Task | Status | Notes |
 |----|------|--------|-------|
-| W-AGT.4.1 | Scaffold `services/agent/` with pyproject.toml, src layout, handler.py (Mangum dual-mode). Verify `just agent-dev` starts locally. | TODO | ADR-034 structure |
+| W-AGT.4.1 | Scaffold `services/agent/` with pyproject.toml, src layout, handler.py (Mangum dual-mode). Verify `just agent-dev` starts locally. | DONE (2026-05-24) | ADR-034 structure |
 | W-AGT.4.2 | Implement `tools/resume.py` — Lambda SDK invoke to UI Lambda for resume JSON. Mock in tests. | TODO | Reuses existing `/api/v1/resume` endpoint |
 | W-AGT.4.3 | Add thin `POST /api/v1/tailor/match` endpoint in Rust UI Lambda that exposes `matcher.rs` scoring. | TODO | New route in `services/ui/src/routes/api/` |
 | W-AGT.4.4 | Implement `tools/matcher.py` — Lambda SDK invoke to tailor match endpoint. | TODO | Depends on W-AGT.4.3 |
@@ -98,6 +98,7 @@ Reads `ANTHROPIC_API_KEY` from Secrets Manager at cold start (same ARN as llm-pr
 | W-AGT.4.14 | Rate limiting for agent endpoint — 2/day/IP at UI Lambda routing layer. | TODO | Same pattern as ask.rs |
 | W-AGT.4.15 | `just agent-build` + `just agent-deploy` justfile recipes. | TODO | |
 | W-AGT.4.16 | CI workflow: Python test + build job in `.github/workflows/`. | TODO | |
+| W-AGT.4.17 | RAG sync graph + eval tools: `rag_sync.py` (LangGraph ReAct) + `tools/rag_eval.py` (5 tools calling UI RAG endpoints); `just rag-sync-agent` recipe | DONE (2026-05-28) | Produces quality improvement report |
 
 ---
 

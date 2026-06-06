@@ -57,10 +57,13 @@ dev:
 
 # Full quality gate (fmt + lint + test + coverage floors + audit + HCL fmt check + agent)
 quality:
-    just web-types-offline && cargo xtask quality all && just web-coverage && just agent-lint && just agent-test && tofu fmt -check -recursive infra/
+    just web-types-offline && cargo xtask quality all && just web-coverage && just agent-lint && just agent-test && just agent-build && just mcp-build && just mcp-smoke && just mcp-rag-smoke && just mcp-cloud-build && just rag-index && tofu fmt -check -recursive infra/
 
 # Build everything: all Rust Lambda zips + SPA + agent package + MCP gateway bundle
 build: lambda-build-all web-build agent-build mcp-cloud-build
+
+# Build all assets: Lambda zips + SPA + agent + MCP gateway + resume + RAG index
+build-all: build resume-generate rag-index
 
 # ── Documentation ────────────────────────────────────────────────────────────
 
@@ -87,108 +90,66 @@ example NAME:
 lambda-build:
     PATH="$HOME/.cargo/bin:$PATH" cargo lambda build --release --package deploy-baba-ui --target aarch64-unknown-linux-gnu
 
-lambda-deploy PROFILE="default":
-    just aws-check {{ PROFILE }} && just lambda-build && cargo xtask deploy lambda --profile {{ PROFILE }}
+lambda-deploy ENV="prod":
+    just aws-check {{ PROFILE }} && cargo xtask deploy lambda \
+        --profile {{ PROFILE }} --function deploy-baba-{{ ENV }}
 
 # Email (non-VPC, SES sends)
-email-build:
-    PATH="$HOME/.cargo/bin:$PATH" cargo lambda build --release --package email-lambda --target aarch64-unknown-linux-gnu
-    mkdir -p infra/build
-    zip -j infra/build/email-lambda.zip target/lambda/email-lambda/bootstrap
-
-email-deploy PROFILE="default":
-    just aws-check {{ PROFILE }} && just email-build && aws lambda update-function-code \
-        --function-name deploy-baba-email \
-        --zip-file fileb://infra/build/email-lambda.zip \
-        --profile {{ PROFILE }}
+email-deploy ENV="prod":
+    just aws-check {{ PROFILE }} && cargo xtask deploy lambda \
+        --profile {{ PROFILE }} --function deploy-baba-{{ ENV }}-email --package email-lambda
 
 # LLM Proxy (non-VPC, reaches api.anthropic.com)
-llm-proxy-build:
-    PATH="$HOME/.cargo/bin:$PATH" cargo lambda build --release --package llm-proxy --target aarch64-unknown-linux-gnu
-    mkdir -p infra/build
-    zip -j infra/build/llm-proxy-lambda.zip target/lambda/llm-proxy/bootstrap
-
-llm-proxy-deploy PROFILE="default":
-    just aws-check {{ PROFILE }} && just llm-proxy-build && aws lambda update-function-code \
-        --function-name deploy-baba-llm-proxy \
-        --zip-file fileb://infra/build/llm-proxy-lambda.zip \
-        --profile {{ PROFILE }}
+llm-proxy-deploy ENV="prod":
+    just aws-check {{ PROFILE }} && cargo xtask deploy lambda \
+        --profile {{ PROFILE }} --function deploy-baba-{{ ENV }}-llm-proxy --package llm-proxy
 
 # Auth (non-VPC, reaches Cognito IDP)
-auth-build:
-    PATH="$HOME/.cargo/bin:$PATH" cargo lambda build --release --package auth-lambda --target aarch64-unknown-linux-gnu
-    mkdir -p infra/build
-    zip -j infra/build/auth-lambda.zip target/lambda/auth-lambda/bootstrap
-
-auth-deploy PROFILE="default":
-    just aws-check {{ PROFILE }} && just auth-build && aws lambda update-function-code \
-        --function-name deploy-baba-auth \
-        --zip-file fileb://infra/build/auth-lambda.zip \
-        --profile {{ PROFILE }}
+auth-deploy ENV="prod":
+    just aws-check {{ PROFILE }} && cargo xtask deploy lambda \
+        --profile {{ PROFILE }} --function deploy-baba-{{ ENV }}-auth --package auth-lambda
 
 # Portfolio (VPC, read-only data — jobs, competencies, about, social-links, resume, challenges)
-portfolio-build:
-    PATH="$HOME/.cargo/bin:$PATH" cargo lambda build --release --package portfolio-lambda --target aarch64-unknown-linux-gnu
-    mkdir -p infra/build
-    zip -j infra/build/portfolio-lambda.zip target/lambda/portfolio-lambda/bootstrap
-
-portfolio-deploy PROFILE="default":
-    just aws-check {{ PROFILE }} && just portfolio-build && aws lambda update-function-code \
-        --function-name deploy-baba-portfolio \
-        --zip-file fileb://infra/build/portfolio-lambda.zip \
-        --profile {{ PROFILE }}
+portfolio-deploy ENV="prod":
+    just aws-check {{ PROFILE }} && cargo xtask deploy lambda \
+        --profile {{ PROFILE }} --function deploy-baba-{{ ENV }}-portfolio --package portfolio-lambda
 
 # Admin (VPC, dashboard CRUD — migration owner)
-admin-build:
-    PATH="$HOME/.cargo/bin:$PATH" cargo lambda build --release --package admin-lambda --target aarch64-unknown-linux-gnu
-    mkdir -p infra/build
-    zip -j infra/build/admin-lambda.zip target/lambda/admin-lambda/bootstrap
-
-admin-deploy PROFILE="default":
-    just aws-check {{ PROFILE }} && just admin-build && aws lambda update-function-code \
-        --function-name deploy-baba-admin \
-        --zip-file fileb://infra/build/admin-lambda.zip \
-        --profile {{ PROFILE }}
+admin-deploy ENV="prod":
+    just aws-check {{ PROFILE }} && cargo xtask deploy lambda \
+        --profile {{ PROFILE }} --function deploy-baba-{{ ENV }}-admin --package admin-lambda
 
 # Contact (non-VPC, PoW validation + email Lambda delegation)
-contact-build:
-    PATH="$HOME/.cargo/bin:$PATH" cargo lambda build --release --package contact-lambda --target aarch64-unknown-linux-gnu
-    mkdir -p infra/build
-    zip -j infra/build/contact-lambda.zip target/lambda/contact-lambda/bootstrap
-
-contact-deploy PROFILE="default":
-    just aws-check {{ PROFILE }} && just contact-build && aws lambda update-function-code \
-        --function-name deploy-baba-contact \
-        --zip-file fileb://infra/build/contact-lambda.zip \
-        --profile {{ PROFILE }}
+contact-deploy ENV="prod":
+    just aws-check {{ PROFILE }} && cargo xtask deploy lambda \
+        --profile {{ PROFILE }} --function deploy-baba-{{ ENV }}-contact --package contact-lambda
 
 # RAG (VPC, FTS5 retrieval + grounded generation)
-rag-build:
-    PATH="$HOME/.cargo/bin:$PATH" cargo lambda build --release --package rag-lambda --target aarch64-unknown-linux-gnu
-    mkdir -p infra/build
-    zip -j infra/build/rag-lambda.zip target/lambda/rag-lambda/bootstrap
-
-rag-deploy PROFILE="default":
-    just aws-check {{ PROFILE }} && just rag-build && aws lambda update-function-code \
-        --function-name deploy-baba-rag \
-        --zip-file fileb://infra/build/rag-lambda.zip \
-        --profile {{ PROFILE }}
+rag-deploy ENV="prod":
+    just aws-check {{ PROFILE }} && cargo xtask deploy lambda \
+        --profile {{ PROFILE }} --function deploy-baba-{{ ENV }}-rag --package rag-lambda
 
 # ── Consolidated Lambda Builds ───────────────────────────────────────────────
 
 # Build all Rust Lambda zips (excludes Python agent and MCP gateway which have extra bundling steps)
-lambda-build-all: lambda-build email-build llm-proxy-build auth-build portfolio-build admin-build contact-build rag-build
+lambda-build-all:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for pkg in deploy-baba-ui email-lambda llm-proxy auth-lambda portfolio-lambda admin-lambda contact-lambda rag-lambda; do
+        echo "Building ${pkg}..."
+        PATH="$HOME/.cargo/bin:$PATH" cargo lambda build --release --package "$pkg" --target aarch64-unknown-linux-gnu
+    done
 
-# Deploy all Rust Lambdas
-lambda-deploy-all PROFILE="default":
-    just lambda-deploy {{ PROFILE }}
-    just email-deploy {{ PROFILE }}
-    just llm-proxy-deploy {{ PROFILE }}
-    just auth-deploy {{ PROFILE }}
-    just portfolio-deploy {{ PROFILE }}
-    just admin-deploy {{ PROFILE }}
-    just contact-deploy {{ PROFILE }}
-    just rag-deploy {{ PROFILE }}
+# Deploy all Rust Lambdas (ENV: prod or dev)
+lambda-deploy-all ENV="prod":
+    just lambda-deploy {{ ENV }}
+    just email-deploy {{ ENV }}
+    just llm-proxy-deploy {{ ENV }}
+    just auth-deploy {{ ENV }}
+    just portfolio-deploy {{ ENV }}
+    just admin-deploy {{ ENV }}
+    just contact-deploy {{ ENV }}
+    just rag-deploy {{ ENV }}
 
 # Build the read-only context bundle consumed by the private cloud MCP gateway
 mcp-context-build:
@@ -221,11 +182,10 @@ mcp-cloud-build: mcp-context-build
     cd build/mcp-gateway && zip -qr ../../infra/build/mcp-gateway-lambda.zip bootstrap mcp-rs.toml ../mcp-context
 
 # Build + upload the private MCP gateway Lambda
-mcp-cloud-deploy PROFILE="default":
-    just aws-check {{ PROFILE }} && just mcp-cloud-build && aws lambda update-function-code \
-        --function-name deploy-baba-mcp-gateway \
-        --zip-file fileb://infra/build/mcp-gateway-lambda.zip \
-        --profile {{ PROFILE }}
+mcp-cloud-deploy ENV="prod":
+    just aws-check {{ PROFILE }} && just mcp-cloud-build && cargo xtask deploy lambda \
+        --profile {{ PROFILE }} --function deploy-baba-{{ ENV }}-mcp-gateway \
+        --zip-path infra/build/mcp-gateway-lambda.zip
 
 # Smoke the deployed private MCP gateway. Requires MCP_BEARER_TOKEN with a valid Cognito ID token.
 mcp-cloud-smoke PROFILE="default" BASE_URL="https://sislam.com":
@@ -267,11 +227,10 @@ agent-build:
     zip -qr ../../infra/build/agent-lambda.zip .
 
 # Build agent Lambda zip + update the deployed function
-agent-deploy PROFILE="default":
-    just aws-check {{ PROFILE }} && just agent-build && aws lambda update-function-code \
-        --function-name deploy-baba-agent \
-        --zip-file fileb://infra/build/agent-lambda.zip \
-        --profile {{ PROFILE }}
+agent-deploy ENV="prod":
+    just aws-check {{ PROFILE }} && just agent-build && cargo xtask deploy lambda \
+        --profile {{ PROFILE }} --function deploy-baba-{{ ENV }}-agent \
+        --zip-path infra/build/agent-lambda.zip
 
 # Verify the live deployment (curl apex + www health checks)
 infra-verify DOMAIN="sislam.com":
@@ -356,12 +315,17 @@ dev-env ENV="prod":
     #!/usr/bin/env bash
     set -euo pipefail
     AWS="env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN AWS_PROFILE={{ PROFILE }} aws"
+    if ! $AWS sts get-caller-identity --query Account --output text >/dev/null 2>&1; then
+        echo "ERROR: AWS SSO session expired or not configured. Run: just sso-login" >&2
+        exit 1
+    fi
     pool_id=$($AWS ssm get-parameter --name /deploy-baba/{{ ENV }}/cognito-pool-id    --query Parameter.Value --output text)
     client_id=$($AWS ssm get-parameter --name /deploy-baba/{{ ENV }}/cognito-client-id --query Parameter.Value --output text)
     domain=$($AWS    ssm get-parameter --name /deploy-baba/{{ ENV }}/cognito-domain    --query Parameter.Value --output text)
     jwks=$(curl -fsSL "https://cognito-idp.us-east-1.amazonaws.com/${pool_id}/.well-known/jwks.json")
     echo "export AWS_PROFILE={{ PROFILE }}"
     echo "export ANTHROPIC_API_KEY_ARN=root-anthropic-access-key"
+    echo "export LINKEDIN_SECRET_ARN=deploy-baba/prod/linkedin-api-key"
     echo "export RAG_PUBLIC_ENABLED=1"
     echo "export COGNITO_POOL_ID=${pool_id}"
     echo "export COGNITO_CLIENT_ID=${client_id}"
@@ -420,10 +384,24 @@ db-sync:
     set -euo pipefail
     DB="deploy-baba.db"
     if [ -f "$DB" ]; then
-        age=$(( $(date +%s) - $(stat -f %m "$DB") ))
-        if [ "$age" -lt 3600 ]; then
-            echo "⏩ $DB is ${age}s old (< 1h) — skipping S3 sync"
-            exit 0
+        # Warn if there are unsynced dashboard edits that would be lost
+        unsynced=$(sqlite3 "$DB" "SELECT COUNT(*) FROM _change_log WHERE synced = 0;" 2>/dev/null || echo "0")
+        if [ "$unsynced" -gt 0 ]; then
+            echo "⚠️  $DB has $unsynced unsynced dashboard edit(s). Run 'just db-changes' to review."
+            echo "    To discard: just db-reset && just db-sync"
+            echo "    To capture: run /sync-dashboard-data first, then just db-changes-ack"
+            exit 1
+        fi
+        # Skip download if the file is fresh AND passes integrity check
+        if sqlite3 "$DB" "PRAGMA quick_check;" >/dev/null 2>&1; then
+            age=$(( $(date +%s) - $(stat -f %m "$DB") ))
+            if [ "$age" -lt 3600 ]; then
+                echo "⏩ $DB is ${age}s old (< 1h) and healthy — skipping S3 sync"
+                exit 0
+            fi
+        else
+            echo "⚠️  $DB failed integrity check — will re-download from S3"
+            rm -f "$DB" "${DB}-wal" "${DB}-shm"
         fi
     fi
     echo "⬇️  Syncing latest S3 backup → $DB"
@@ -449,7 +427,29 @@ dev-stack:
     done
 
     just db-sync
-    eval "$(just dev-env)"
+
+    # Integrity check — catch corruption before launching services
+    if [ -f deploy-baba.db ]; then
+        if ! sqlite3 deploy-baba.db "PRAGMA quick_check;" >/dev/null 2>&1; then
+            echo "ERROR: deploy-baba.db is corrupted. Run: just db-reset" >&2
+            exit 1
+        fi
+    fi
+
+    # Load AWS env (SSO required) — fall back to offline dev mode if unavailable
+    if DEV_ENV_OUTPUT=$(just dev-env 2>&1); then
+        eval "$DEV_ENV_OUTPUT"
+    else
+        echo "WARNING: AWS SSO not available — running in offline dev mode (auth bypass)"
+        echo "  Run 'just sso-login' to enable full functionality."
+        export DEV_MODE=1
+        export COGNITO_POOL_ID="offline"
+        export COGNITO_CLIENT_ID="offline"
+        export COGNITO_DOMAIN="offline"
+        export COGNITO_REGION="us-east-1"
+        export COGNITO_JWKS='{}'
+        export RAG_PUBLIC_ENABLED=1
+    fi
 
     # Start API server directly (use just ui for cargo watch + auto-reload)
     echo "Starting API server on :3001..."
@@ -552,38 +552,80 @@ push-image PROFILE="default" IMAGE="deploy-baba-ui:latest":
     just aws-check {{ PROFILE }} && cargo xtask deploy push --image {{ IMAGE }} --profile {{ PROFILE }}
 
 # Full deploy: quality gate → zip build → Lambda update (zip-based Lambda, ADR-003)
-deploy PROFILE="default":
-    just quality && just lambda-deploy {{ PROFILE }}
+deploy ENV="prod":
+    just quality && just lambda-deploy {{ ENV }}
 
 # Deploy without quality gate (fast path)
-deploy-fast PROFILE="default":
-    just lambda-deploy {{ PROFILE }}
+deploy-fast ENV="prod":
+    just lambda-deploy {{ ENV }}
 
 # Dry run: build + validate, no push
-deploy-dry PROFILE="default":
+deploy-dry:
     just aws-check {{ PROFILE }} && cargo xtask deploy docker
 
 # Wait for Lambda to settle after a code update (step 2 of full pipeline)
-lambda-wait PROFILE="default":
-    just aws-check {{ PROFILE }} && cargo xtask deploy wait --profile {{ PROFILE }} --function deploy-baba-prod
+lambda-wait ENV="prod":
+    just aws-check {{ PROFILE }} && cargo xtask deploy wait --profile {{ PROFILE }} --function deploy-baba-{{ ENV }}
 
 # SPA-only deploy: build → S3 sync → sync-spa invoke → /health (steps 3–6)
 
 # Requires: SPA_BUCKET, UI_FN_NAME, FN_URL env vars (or set via infra outputs)
-spa-deploy PROFILE="default":
+spa-deploy:
     just aws-check {{ PROFILE }} && cargo xtask deploy spa --profile {{ PROFILE }} --sha "$(git rev-parse HEAD)"
 
 # Full pipeline: quality → Lambda → wait → SPA build → S3 sync → sync-spa → /health
 
 # Pass TAG=1 to also create a dev-vX.Y.Z git tag (mirrors deploy-dev.yml)
-deploy-full PROFILE="default" TAG="":
+deploy-full ENV="prod" TAG="":
     just quality
-    just lambda-deploy {{ PROFILE }}
-    just lambda-wait {{ PROFILE }}
-    just spa-deploy {{ PROFILE }}
+    just lambda-deploy {{ ENV }}
+    just lambda-wait {{ ENV }}
+    just spa-deploy
     {{ if TAG != "" { "just release-tag dev push" } else { "echo 'Skipping dev tag — pass TAG=1 to enable'" } }}
 
+# Deploy all services + SPA + resume + RAG (full production push)
+deploy-all ENV="prod":
+    just quality
+    just lambda-deploy-all {{ ENV }}
+    just agent-deploy {{ ENV }}
+    just mcp-cloud-deploy {{ ENV }}
+    just lambda-wait {{ ENV }}
+    just spa-deploy
+    just resume-upload
+    just rag-sync {{ ENV }}
+
 # ── Database (SQLite + S3) ───────────────────────────────────────────────────
+
+# Check local SQLite integrity
+db-check DB="deploy-baba.db":
+    @sqlite3 {{ DB }} "PRAGMA integrity_check;"
+
+# Show unsynced dashboard edits (change-tracking log)
+db-changes DB="deploy-baba.db":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ ! -f "{{ DB }}" ]; then
+        echo "No database file found at {{ DB }}"
+        exit 0
+    fi
+    count=$(sqlite3 "{{ DB }}" "SELECT COUNT(*) FROM _change_log WHERE synced = 0;" 2>/dev/null || echo "0")
+    if [ "$count" = "0" ]; then
+        echo "No unsynced dashboard changes."
+    else
+        echo "$count unsynced change(s):"
+        sqlite3 -header -column "{{ DB }}" \
+            "SELECT table_name, natural_key, operation, changed_at FROM _change_log WHERE synced = 0 ORDER BY changed_at;"
+    fi
+
+# Mark all change-log entries as synced (run after generating a sync migration)
+db-changes-ack DB="deploy-baba.db":
+    sqlite3 "{{ DB }}" "UPDATE _change_log SET synced = 1 WHERE synced = 0;"
+    @echo "All change-log entries marked as synced."
+
+# Delete local SQLite and let next startup recreate from migrations
+db-reset:
+    rm -f deploy-baba.db deploy-baba.db-wal deploy-baba.db-shm
+    @echo "Local DB deleted. Next 'just dev-stack' will create a fresh one from migrations."
 
 # Back up SQLite from EFS to S3
 db-backup PROFILE="default":
@@ -646,6 +688,51 @@ rag-eval-full DB="deploy-baba.db" PROFILE="default":
 # Run RAG eval filtered by category (portfolio, architecture, code, edge-case)
 rag-eval-category CATEGORY DB="deploy-baba.db":
     cargo xtask rag eval --db-path {{ DB }} --retrieval-only --category {{ CATEGORY }}
+
+# Upload local RAG index to S3 for a given environment (dev or prod)
+rag-push ENV PROFILE="default" DB="deploy-baba.db":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    just aws-check {{ PROFILE }}
+    ACCOUNT_ID=$(aws sts get-caller-identity --profile {{ PROFILE }} --query Account --output text)
+    BUCKET="deploy-baba-{{ ENV }}-backups-${ACCOUNT_ID}"
+    gzip -c {{ DB }} > /tmp/rag-index.db.gz
+    echo "Uploading RAG index to s3://${BUCKET}/rag-index.db.gz"
+    aws s3 cp /tmp/rag-index.db.gz "s3://${BUCKET}/rag-index.db.gz" --profile {{ PROFILE }}
+    rm -f /tmp/rag-index.db.gz
+    echo "done: RAG index uploaded to ${BUCKET}"
+
+# Trigger Lambda to ingest RAG index from S3
+rag-ingest ENV PROFILE="default":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    just aws-check {{ PROFILE }}
+    FN="deploy-baba-{{ ENV }}"
+    echo "Invoking ${FN} with action=ingest-rag"
+    RESP=$(aws lambda invoke --function-name "${FN}" \
+      --payload '{"action":"ingest-rag"}' \
+      --cli-binary-format raw-in-base64-out \
+      --profile {{ PROFILE }} \
+      /tmp/rag-ingest-resp.json 2>&1)
+    cat /tmp/rag-ingest-resp.json
+    rm -f /tmp/rag-ingest-resp.json
+    echo ""
+    echo "done: RAG ingest triggered on ${FN}"
+
+# Full RAG sync: rebuild index locally, upload to S3, trigger Lambda ingest
+rag-sync ENV PROFILE="default":
+    just rag-index-full
+    just rag-push {{ ENV }} {{ PROFILE }}
+    just rag-ingest {{ ENV }} {{ PROFILE }}
+
+# RAG sync + agent analysis: full sync then run LangGraph quality report
+rag-sync-agent ENV="dev" PROFILE="default":
+    just rag-index-full
+    just rag-eval-full
+    just rag-push {{ ENV }} {{ PROFILE }}
+    just rag-ingest {{ ENV }} {{ PROFILE }}
+    cd services/agent && ANTHROPIC_API_KEY=$(cargo xtask secret get anthropic-api-key --profile {{ PROFILE }} | tail -1) \
+    PYTHONPATH=src uv run python -m agent.rag_sync
 
 # ── Local MCP ────────────────────────────────────────────────────────────────
 
@@ -767,7 +854,7 @@ mcp-rag-smoke DB="deploy-baba.db":
         print(f"initialized: {init.get('serverInfo', {}).get('name', 'portfolio-rag')}")
         tool_count = len(tools.get('tools', []))
         print(f"tools: {tool_count}")
-        assert tool_count == 5, f"expected 5 tools, got {tool_count}"
+        assert tool_count == 9, f"expected 9 tools, got {tool_count}"
         print(f"corpora: {corpora.get('corpus_count', 0)}")
         print(f"rag_results: {results.get('result_count', 0)}")
     finally:
@@ -795,7 +882,7 @@ publish:
 
 # Write a secret to AWS Secrets Manager (e.g. just secret-put pow-secret $(openssl rand -hex 32))
 secret-put NAME VALUE PROFILE="default":
-    just aws-check {{ PROFILE }} && cargo xtask secret put {{ NAME }} {{ VALUE }} --profile {{ PROFILE }}
+    just aws-check {{ PROFILE }} && cargo xtask secret put {{ NAME }} '{{ VALUE }}' --profile {{ PROFILE }}
 
 # Read a secret value from AWS Secrets Manager
 secret-get NAME PROFILE="default":

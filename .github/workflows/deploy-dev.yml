@@ -70,6 +70,17 @@ jobs:
             --function-name "$UI_FN_NAME" \
             --region us-east-1
 
+      - name: Force UI Lambda cold start (runs migrations)
+        run: |
+          aws lambda invoke \
+            --function-name "$UI_FN_NAME" \
+            --payload '{"action":"health"}' \
+            --cli-binary-format raw-in-base64-out \
+            /tmp/health-response.json \
+            --region us-east-1
+          echo "UI Lambda cold start response:"
+          cat /tmp/health-response.json
+
       # ── Build + deploy Agent Lambda ──────────────────────────────────────────
 
       - uses: actions/setup-python@v5
@@ -81,8 +92,9 @@ jobs:
 
       - name: Build agent Lambda zip
         run: |
+          mkdir -p build/agent-lambda infra/build
           cd services/agent
-          uv export --frozen --no-dev > /tmp/agent-requirements.txt
+          uv export --frozen --no-dev --no-emit-project > /tmp/agent-requirements.txt
           pip install --target ../../build/agent-lambda -r /tmp/agent-requirements.txt --quiet
           cp -r src/* ../../build/agent-lambda/
           cd ../../build/agent-lambda
@@ -135,6 +147,10 @@ jobs:
 
       - name: Invalidate CloudFront
         run: |
+          if [ -z "$CLOUDFRONT_ID" ]; then
+            echo "No CloudFront distribution — skipping invalidation"
+            exit 0
+          fi
           aws cloudfront create-invalidation \
             --distribution-id "$CLOUDFRONT_ID" \
             --paths "/index.html" "/"

@@ -100,7 +100,14 @@ export const handlers = [
   }),
 
   http.post('/api/auth/respond-to-challenge', () => {
-    return HttpResponse.json({ success: true })
+    return HttpResponse.json({ 
+      success: true,
+      tokens: { id_token: 'mock-id-token' }
+    })
+  }),
+
+  http.get('/auth/set-session', () => {
+    return new HttpResponse(null, { status: 302 })
   }),
 
   // Resume endpoint
@@ -171,7 +178,7 @@ export const handlers = [
       id: 1,
       slug: 'terms',
       title: 'Terms of Service',
-      content: 'Welcome to deploy-baba. By accessing or using this website, you agree to be bound by these Terms of Service.',
+      content: '# Terms of Service\n\n## Usage Rules\n\nBy accessing this website, you agree to be **bound** by these terms.\n\n### Restrictions\n\nYou must not:\n\n- Misuse the service\n- Share credentials\n\n1. Comply with all laws\n2. Respect other users\n\nFor questions, contact [support](https://sislam.com).\n\n> All rights reserved.',
       updated_at: '2026-01-01T00:00:00Z',
     })
   }),
@@ -181,7 +188,7 @@ export const handlers = [
       id: 2,
       slug: 'privacy',
       title: 'Privacy Policy',
-      content: 'This Privacy Policy describes how deploy-baba collects, uses, and protects your information.',
+      content: '# Privacy Policy\n\n## Data Collection\n\nWe collect **minimal data** to operate this service.\n\n### Cookies\n\nWe use the following:\n\n- Session cookies\n- Analytics cookies\n\n1. First-party only\n2. No third-party tracking\n\nFor details, see [our repo](https://github.com/shantopagla/portfolio).\n\n> Your privacy matters to us.',
       updated_at: '2026-01-01T00:00:00Z',
     })
   }),
@@ -310,6 +317,38 @@ export const handlers = [
 
   http.put('/api/v1/admin/linkedin/projects/:id/status', () => {
     return new HttpResponse(null, { status: 200 })
+  }),
+
+  http.get('/api/v1/admin/linkedin/reconciliation', () => {
+    return HttpResponse.json({
+      needs_linkedin_update: [],
+      needs_db_import: [],
+      in_sync: [],
+    })
+  }),
+
+  http.put('/api/v1/admin/linkedin/positions/bulk-status', () => {
+    return HttpResponse.json({ updated: 0 })
+  }),
+
+  http.put('/api/v1/admin/linkedin/projects/bulk-status', () => {
+    return HttpResponse.json({ updated: 0 })
+  }),
+
+  http.post('/api/v1/admin/linkedin/auto-match', () => {
+    return HttpResponse.json({ positions_matched: 0, projects_matched: 0 })
+  }),
+
+  http.post('/api/v1/admin/linkedin/seed-from-db', () => {
+    return HttpResponse.json({ positions_seeded: 3, projects_seeded: 2 })
+  }),
+
+  http.post('/api/v1/admin/linkedin/positions/:id/apply', () => {
+    return HttpResponse.json({ fields_applied: ['title'] })
+  }),
+
+  http.post('/api/v1/admin/linkedin/projects/:id/apply', () => {
+    return HttpResponse.json({ fields_applied: ['title'] })
   }),
 
   // LinkedIn OAuth (agent service)

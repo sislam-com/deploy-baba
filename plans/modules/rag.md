@@ -1,6 +1,6 @@
 # W-RAG: rag-core + rag-sqlite
-**Crate(s):** `crates/rag-core/`, `crates/rag-sqlite/` | **Status:** DONE (P1–P5 complete; embedding/hybrid retrieval via RRF; sqlite-vec native ANN deferred)
-**Coverage floor:** 70% | **Depends on:** W-LLM, W-UI, W-OTF | **Depended on by:** (none yet)
+**Crate(s):** `crates/rag-core/`, `crates/rag-sqlite/`, `crates/portfolio-rag-mcp/` | **Status:** DONE (P1–P6 complete; 9 corpora incl. TypeScript + Python; hybrid FTS/ANN; eval suite; MCP tools; sqlite-vec native ANN deferred)
+**Coverage floor:** 70% | **Depends on:** W-LLM, W-UI, W-OTF | **Depended on by:** W-AGT (RAG sync agent), W-SAAS
 
 ## W-RAG.1 Purpose
 
@@ -19,6 +19,14 @@ OpenTofu HCL, plan modules/ADRs/drift logs, and the `.claude/` agent cache. The 
 - **P5 — Agentic portfolio assistant:** Tool-dispatch loop in llm-proxy Lambda (ADR-023); portfolio
   tools (HTTP call-back to UI Lambda API); Claude selects tools based on query intent. Transforms
   `/api/ask` from static RAG Q&A to an agentic assistant that can query live portfolio data.
+- **P6 — RAG quality + sync agent (2026-05-28):** TypeScript/TSX corpus (8th corpus, ~75 files from
+  `web/src/`). Python corpus (9th, `services/agent/src/**/*.py`) for LangGraph agent code.
+  FTS query builder improved with stop-word filter + phrase boost. Corpora aliasing
+  split: `PORTFOLIO_ENTITY_KEYWORDS` vs `CODEBASE_KEYWORDS` — architecture/auth queries now get 8/10
+  FTS slots instead of 5/10. MCP eval tools (`eval_report`, `eval_failures`, `corpus_gaps`,
+  `reindex_status`) in portfolio-rag-mcp. Eval scoring improved with `expected_hit_aliases` to reduce
+  false negatives. 3 SPA/web eval cases added. LangGraph RAG sync agent in `services/agent/` for
+  periodic quality analysis. UI service exposes `/api/v1/rag/*` endpoints.
 
 The `.claude/` cache corpus (L1 fast-path) is scoped to local CLI only — it is gitignored and must
 not be bundled into the Lambda.
@@ -87,7 +95,7 @@ before returning the top-k results.
 ```sql
 CREATE TABLE IF NOT EXISTS rag_documents (
     id          INTEGER PRIMARY KEY,
-    source_kind TEXT NOT NULL,   -- "rust" | "hcl" | "plan" | "cache"
+    source_kind TEXT NOT NULL,   -- "rust" | "hcl" | "plan" | "cache" | "openapi" | "portfolio" | "typescript" | "python"
     source_path TEXT NOT NULL,
     git_sha     TEXT NOT NULL,
     updated_at  TEXT NOT NULL,
@@ -125,6 +133,8 @@ All `INSERT` statements use `ON CONFLICT DO UPDATE` (ADR-010).
 | OpenAPI spec (P4) | JSON path-operation splitter | one chunk per endpoint + per component schema |
 | Portfolio data (P4) | entity-to-prose serializer | one chunk per job/competency/about section |
 | Challenges (P4) | entity-to-prose serializer | one chunk per challenge (with tech stack, category, job linkage) |
+| TypeScript/React (P6, `web/src/**/*.{ts,tsx}`) | brace-balance keyword splitter | export/function/const/class/interface + test blocks |
+| Python/LangGraph (P6, `services/agent/src/**/*.py`) | indent-based keyword splitter | def/async def/class + decorated functions (@tool, @app., @router.) |
 
 Hard max per chunk: ~800 tokens; oversize blocks fall through to sliding-window with 50% overlap.
 
@@ -232,6 +242,16 @@ injects this contract via `PromptBundle.system_prompt`.
 | W-RAG.11.5 | Extend corpus table in module plan to document challenges as 7th corpus | DONE | Added to Chunkers (per corpus) table in rag.md |
 | W-RAG.12.1 | Deterministic groundedness scoring (`eval.rs`) — `score_groundedness()` + `verify_citation_refs()` | DONE | `crates/rag-core/src/eval.rs` (109 LOC, 6 tests); wired into `ask.rs` handler; scores every `/api/ask` response |
 | W-RAG.12.2 | Eval runner (`just rag-eval`) — reads eval cases, runs HybridRetriever, scores retrieval + optional LLM, stores results in DB, prints terminal report | DONE | `xtask/src/rag.rs` (Eval variant); `just rag-eval` (retrieval-only), `just rag-eval-full` (LLM), `just rag-eval-category` (filtered) |
+| W-RAG.13.1 | Add `TypeScript` variant to `SourceKind` + TypeScript/TSX brace-balance chunker | DONE (2026-05-28) | `crates/rag-core/src/types.rs` + `crates/rag-core/src/chunk/typescript.rs`; 6 tests; handles export/function/const/class/interface/describe/it/test |
+| W-RAG.13.2 | Wire TypeScript corpus into ingest pipeline (`web/src/**/*.{ts,tsx}`) | DONE (2026-05-28) | `xtask/src/rag.rs`; comma-separated extension support in `walk_dir_dyn` |
+| W-RAG.13.3 | FTS query builder: stop-word filter + phrase boost for multi-term queries | DONE (2026-05-28) | `crates/rag-sqlite/src/lib.rs`; 30+ stop words; `"auth login" OR auth OR login` format; 3 tests |
+| W-RAG.13.4 | Corpora aliasing: split `PORTFOLIO_KEYWORDS` into entity vs codebase categories | DONE (2026-05-28) | `crates/rag-core/src/hybrid.rs`; entity-only=5, codebase-only=2, mixed=3 portfolio budget; 2 new tests |
+| W-RAG.13.5 | MCP eval tools: `eval_report`, `eval_failures`, `corpus_gaps`, `reindex_status` in portfolio-rag-mcp | DONE (2026-05-28) | `crates/portfolio-rag-mcp/src/rag.rs` + `tools.rs` + `main.rs`; `project://rag-eval` resource in `.mcp-rs.toml` |
+| W-RAG.13.6 | Eval aliases: `expected_hit_aliases` column + seed aliases for 5 false-negative cases | DONE (2026-05-28) | `xtask/src/rag.rs`; correctness check accepts primary OR any alias |
+| W-RAG.13.7 | SPA/web eval cases: 3 new TypeScript-corpus eval cases (login form, useAuth, auth routes) | DONE (2026-05-28) | `xtask/src/rag.rs`; `ensure_eval_v2_schema()` |
+| W-RAG.13.8 | UI service RAG API endpoints: `/api/v1/rag/{health,eval/report,eval/failures,corpus/gaps,reindex/status}` | DONE (2026-05-28) | `services/ui/src/routes/api/rag.rs` |
+| W-RAG.13.9 | LangGraph RAG sync agent: `rag_sync.py` graph + `rag_eval.py` tools in `services/agent/` | DONE (2026-05-28) | ReAct graph calls UI RAG endpoints; `just rag-sync-agent` recipe |
+| W-RAG.13.10 | Add `Python` variant to `SourceKind` + indent-based Python chunker for `services/agent/src/**/*.py` | DONE (2026-05-28) | `crates/rag-core/src/chunk/python.rs`; 6 tests; handles def/async def/class/decorators; 9th corpus |
 
 ## W-RAG.5 Test Strategy
 

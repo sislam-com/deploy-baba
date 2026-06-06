@@ -1,4 +1,4 @@
-CREATE TABLE social_links (
+CREATE TABLE IF NOT EXISTS social_links (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     platform TEXT NOT NULL UNIQUE,
     url TEXT NOT NULL,

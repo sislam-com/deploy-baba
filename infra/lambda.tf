@@ -64,6 +64,10 @@ resource "aws_lambda_function" "baba" {
     aws_iam_role_policy.lambda_ssm,
     aws_iam_role_policy.lambda_invoke_email,
     aws_iam_role_policy.lambda_invoke_llm_proxy,
+    aws_iam_role_policy.lambda_invoke_portfolio,
+    aws_iam_role_policy.lambda_invoke_admin,
+    aws_iam_role_policy.lambda_invoke_contact,
+    aws_iam_role_policy.lambda_invoke_rag,
     aws_iam_role_policy.lambda_secretsmanager,
   ]
 

@@ -15,9 +15,15 @@ pub mod spa;
 pub enum DeployAction {
     /// Deploy to AWS Lambda
     Lambda {
-        /// Function name (default: deploy-baba-prod)
+        /// Lambda function name (required, e.g. deploy-baba-prod or deploy-baba-prod-email)
         #[arg(long)]
-        function: Option<String>,
+        function: String,
+        /// Cargo package to build (default: deploy-baba-ui). Ignored when --zip-path is set.
+        #[arg(long)]
+        package: Option<String>,
+        /// Path to a pre-built zip file. Skips the cargo-lambda build step.
+        #[arg(long)]
+        zip_path: Option<String>,
         /// AWS profile
         #[arg(long)]
         profile: Option<String>,
@@ -55,9 +61,9 @@ pub enum DeployAction {
         /// AWS profile
         #[arg(long)]
         profile: Option<String>,
-        /// Lambda function name (reads UI_FN_NAME env var if omitted)
+        /// Lambda function name (required)
         #[arg(long)]
-        function: Option<String>,
+        function: String,
     },
     /// Build SPA, sync to S3, invalidate CloudFront, smoke /health
     Spa {
@@ -78,17 +84,19 @@ pub enum DeployAction {
 
 pub async fn execute(action: DeployAction) -> anyhow::Result<()> {
     let result = match action {
-        DeployAction::Lambda { function, profile } => lambda::deploy(function, profile).await,
+        DeployAction::Lambda {
+            function,
+            package,
+            zip_path,
+            profile,
+        } => lambda::deploy(function, package, zip_path, profile).await,
         DeployAction::Ecs { cluster, service } => ecs::deploy(cluster, service).await,
         DeployAction::Docker { platform, tag } => docker::build(&platform, tag).await,
         DeployAction::Push { image, profile } => ecr::push(&image, profile).await,
         DeployAction::Wait { profile, function } => {
-            let fn_name = function
-                .or_else(|| std::env::var("UI_FN_NAME").ok())
-                .unwrap_or_else(|| "deploy-baba-prod".to_string());
             let aws_config = crate::aws::create_aws_config(profile).await?;
             let client = aws_sdk_lambda::Client::new(&aws_config);
-            spa::wait_lambda_active(&client, &fn_name).await
+            spa::wait_lambda_active(&client, &function).await
         }
         DeployAction::Spa {
             profile,

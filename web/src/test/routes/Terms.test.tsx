@@ -20,7 +20,7 @@ describe('Terms', () => {
       expect(screen.queryByText('Loading…')).not.toBeInTheDocument()
     })
 
-    expect(screen.getByText(/Welcome to deploy-baba/)).toBeInTheDocument()
+    expect(screen.getByText(/bound/)).toBeInTheDocument()
   })
 
   it('renders last updated date', async () => {

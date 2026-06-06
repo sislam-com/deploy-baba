@@ -142,6 +142,14 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "034_seed_legal_documents",
         include_str!("../migrations/034_seed_legal_documents.sql"),
     ),
+    (
+        "035_linkedin_oauth_tokens",
+        include_str!("../migrations/035_linkedin_oauth_tokens.sql"),
+    ),
+    (
+        "036_change_tracking",
+        include_str!("../migrations/036_change_tracking.sql"),
+    ),
 ];
 
 /// Re-exported from `api_openapi::models::social` — the canonical SSOT.
@@ -174,6 +182,14 @@ impl Db {
     pub fn open(path: &str) -> Result<Self> {
         let conn = Connection::open(path)?;
         conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")?;
+
+        let integrity: String = conn.query_row("PRAGMA quick_check;", [], |row| row.get(0))?;
+        if integrity != "ok" {
+            anyhow::bail!(
+                "SQLite integrity check failed for {path}: {integrity}. Delete the file and restart to recreate from migrations."
+            );
+        }
+
         let db = Db {
             conn: Mutex::new(conn),
         };

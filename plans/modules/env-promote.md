@@ -112,6 +112,21 @@ Decouple "which workspace/environment to target" from "which AWS credentials to 
 
 Key mapping: `workspace=default` → `environment=prod` (variable default); `workspace=dev` → `-var environment=dev`.
 
+### Phase 1.5: Deploy Recipe Alignment
+
+Align all justfile deploy recipes with the workspace convention established in Phase 1.
+Currently, deploy recipes conflate AWS profile (credentials) with environment (function naming),
+hardcode function names, and use raw `aws` CLI instead of xtask for auxiliary Lambdas.
+
+| ID | Task | Status |
+|---|---|---|
+| W-PROM.4.5a | Generalize xtask `deploy lambda`: add `--package` flag, parameterize zip/bootstrap paths, remove hardcoded `DEFAULT_FUNCTION` (see W-XT.4.9) | TODO |
+| W-PROM.4.5b | Update all justfile `*-deploy` recipes: replace raw `aws lambda update-function-code` with `cargo xtask deploy lambda`, add `ENV` param (default `prod`) | TODO |
+| W-PROM.4.5c | Fix auxiliary Lambda function naming to match infra convention: `deploy-baba-{env}-{service}` (currently hardcoded without env segment, e.g. `deploy-baba-email` should be `deploy-baba-prod-email`) | TODO |
+| W-PROM.4.5d | Update `lambda-deploy-all`, `lambda-wait`, `deploy`, `deploy-fast` to accept and pass `ENV` | TODO |
+
+Key mapping: `ENV=prod` → function `deploy-baba-prod[-service]`; `ENV=dev` → function `deploy-baba-dev[-service]`. Global `PROFILE` (default `deploy-baba`) handles AWS credentials independently.
+
 ### Phase 2: Infra Parameterization
 
 | ID | Task | Status |

@@ -14,7 +14,7 @@ from langchain_core.messages import HumanMessage
 from mangum import Mangum
 
 from agent.graph import graph
-from linkedin_oauth import load_linkedin_credentials
+from linkedin_oauth import _restore_token, load_linkedin_credentials
 from linkedin_oauth import router as linkedin_router
 from models import CoverLetterRequest, CoverLetterResponse
 
@@ -45,6 +45,7 @@ def _load_anthropic_key() -> None:
 async def startup() -> None:
     _load_anthropic_key()
     load_linkedin_credentials()
+    await _restore_token()
 
 
 @app.get("/health")

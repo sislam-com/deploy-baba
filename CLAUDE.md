@@ -85,14 +85,12 @@ Update `git.sha`, `last_updated`, and the relevant component's `git_sha_at_scan`
 | `database` | Engine, location, migration path |
 | `key_commands` | All `just` commands |
 | `known_patterns` | Error handling, async, templating conventions |
-| `adrs` | All 6 architecture decisions at a glance |
+| `adrs` | All 34 architecture decisions at a glance |
 
 ### Cache management
 - `just cache-status` — show cache age and staleness vs current HEAD
 - `just cache-refresh` — re-scan the codebase and rewrite the cache
 - `just cache-clear` — delete cache to force a full re-scan next session
-
----
 
 ---
 
@@ -174,8 +172,9 @@ Zero-cost Rust portfolio and deployment automation platform hosted on AWS Lambda
 
 ```
 portfolio/
-├── crates/           # 10 library crates (pure Rust, no binaries)
-├── services/ui/      # Lambda binary (the deployed service)
+├── crates/           # 18 library crates (pure Rust, no binaries)
+├── services/         # 10 Lambda services (ui, admin, agent, auth, contact, email, llm-proxy, mcp-gateway, portfolio, rag)
+├── web/              # React/Vite SPA (ADR-019) — dashboard + public pages
 ├── xtask/            # Internal CLI — do NOT call directly
 ├── examples/         # 4 example binaries
 ├── infra/            # OpenTofu (Lambda + EFS + S3 + EventBridge + CloudFront)
@@ -191,15 +190,23 @@ Never call `cargo xtask` directly. All commands go through `just`.
 Key commands:
 - `just dev` — inner development loop
 - `just quality` — full quality gate (fmt + clippy + test)
-- `just lambda-deploy PROFILE` — build + upload Lambda zip (no infra changes)
-- `just ui` — run local UI server
-- `just lambda-build` — build Lambda binary (uses cargo-lambda for aarch64)
-- `just infra-plan PROFILE` / `just infra-apply PROFILE` — OpenTofu plan/apply
-- `just secret-put NAME VALUE PROFILE` — write secret to AWS Secrets Manager (W-SEC, TODO)
-- `just secret-get NAME PROFILE` — read secret from AWS Secrets Manager (W-SEC, TODO)
+- `just build` — build all (Lambda services + web + agent + MCP cloud)
+- `just lambda-deploy ENV` — build + update a single Lambda service
+- `just lambda-deploy-all ENV` — build + update all Lambda services
+- `just web` / `just web-build` — run / build the React SPA
+- `just web-test` / `just web-coverage` — run SPA tests / with coverage
+- `just agent-dev` / `just agent-build` — run / build the agent service
+- `just infra-plan WORKSPACE` / `just infra-apply WORKSPACE` — OpenTofu plan/apply
+- `just secret-put NAME VALUE PROFILE` — write secret to AWS Secrets Manager
+- `just secret-get NAME PROFILE` / `just secret-list PROFILE` — read / list secrets
+- `just resume-generate DB` — regenerate resume outputs from SQLite
+- `just rag-index DB` / `just rag-query QUERY DB` — build / query RAG index
+- `just dev-stack` — start local dev stack with all services
+- `just cache-status` / `just cache-refresh` — check / rebuild agent cache
 
-### Architecture Decisions
+### Architecture Decisions (34 ADRs — ADR-001 through ADR-034)
 
+Key decisions:
 - **ADR-001:** justfile-only interface — xtask is internal plumbing, never invoked directly
 - **ADR-002:** SQLite on EFS + S3 backup — no PostgreSQL, no RDS
 - **ADR-003:** Lambda Function URL — no API Gateway (exception: ADR-009)
@@ -207,10 +214,15 @@ Key commands:
 - **ADR-007:** OpenTofu over Terraform — `tofu` CLI binary, MPL-2.0
 - **ADR-008:** Cognito hosted UI auth — implicit grant, JWKS from env, HttpOnly cookie, dev-mode bypass
 - **ADR-009:** API Gateway HTTP API for `POST /api/contact` only — OAC body hash workaround
-- **ADR-024:** API Versioning Strategy — URL-based versioning with Function URL routing; deprecation headers
-- **ADR-025:** SQLite-Based Metrics Collection — Zero-cost observability via SQLite metrics tables
-- **ADR-026:** Code-Level Resilience Patterns — In-memory rate limiting; retry; circuit breaker
-- **ADR-027:** Module-Based Service Decomposition — Logical separation within single Lambda
+- **ADR-015:** LLM Provider Abstraction + Grounding Contract — pluggable `llm-core` trait
+- **ADR-016:** RAG Architecture — FTS5 BM25, 6 corpora, grounded generation
+- **ADR-019:** React/Vite SPA replaces server-side Askama templates
+- **ADR-024:** API Versioning Strategy — URL-based versioning; deprecation headers
+- **ADR-029:** Dev/Prod Separation and Promote — environment promotion workflow
+- **ADR-031:** Lambda Microservices Architecture — per-service Lambda functions
+- **ADR-034:** Agent Lambda Deployment — agentic service deployment pattern
+
+Full list: `plans/adr/`
 
 ### Stack Config (`stack.toml`)
 
@@ -236,10 +248,10 @@ Entry point: `plans/INDEX.md` — lists all modules, ADRs, cross-cutting concern
 **The plan system is the single source of truth for project state.** Keep it updated.
 
 Structure under `plans/`:
-- `modules/` — per-component plans (34 modules incl. ai-dlc, ci, web, dev-environment, api-versioning, observability, resilience, module-decomposition)
-- `adr/` — architecture decision records (ADR-001 through ADR-027)
-- `cross-cutting/` — 11 shared concern files (incl. ai-dlc.md, initial-setup.md, zero-cost-microservices.md)
-- `drift/` — drift logs (format: `DRL-YYYY-MM-DD-topic`)
+- `modules/` — 42 per-component plans (incl. ai-dlc, ci, web, rag, agent, linkedin-sync, challenges, mcp-cloud, env-promote)
+- `adr/` — 34 architecture decision records (ADR-001 through ADR-034)
+- `cross-cutting/` — 12 shared concern files (incl. ai-dlc.md, aws-architecture.md, quality-gates.md, llm-policy.md)
+- `drift/` — 23 drift logs (format: `DRL-YYYY-MM-DD-topic`)
 
 AI-DLC session lifecycle: `plans/cross-cutting/ai-dlc.md` — covers the 6 stages (Startup → Planning → Implementation → Verification → Maintenance → Commit). Run `/plan-sync` at the end of any implementation session to sync module Status fields, INDEX.md, and ADR back-references.
 

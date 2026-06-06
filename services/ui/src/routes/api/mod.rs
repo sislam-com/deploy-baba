@@ -10,6 +10,7 @@ pub mod jobs;
 pub mod legal;
 pub mod linkedin;
 pub mod metrics;
+pub mod rag;
 pub mod resume_data;
 pub mod social_links;
 pub mod stack;
@@ -31,5 +32,6 @@ pub fn router() -> Router<AppState> {
         .nest("/social-links", social_links::router())
         .nest("/resume", resume_data::router())
         .nest("/auth", auth_me::router())
+        .nest("/v1/rag", rag::router())
         .merge(ask::router())
 }
