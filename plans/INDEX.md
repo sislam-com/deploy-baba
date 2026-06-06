@@ -50,7 +50,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | mcp-cloud | W-MCP | `crates/mcp-rs/`, `services/mcp-gateway/` | WIP | Private MCP gateway; local mcp-rs + cloud Cognito-authenticated Lambda gateway (ADR-028) |
 | env-promote | W-PROM | `xtask/src/deploy/promote.rs`, `infra/*.tf`, `.github/workflows/` | WIP | Phase 1 DONE (workspace refactoring); Phase 1.5 TODO (deploy recipe alignment — W-XT.4.9); Phase 2–5 TODO (infra param, dev workspace, promote cmd, CI) |
 | saas-onboard | W-SAAS | `xtask/src/onboard.rs`, `crates/portfolio-rag-mcp/`, `services/ui/src/routes/api/eval.rs` | WIP | Project onboarding for external repos; eval dashboard; project_health MCP tool (ADR-030) |
-| agent | W-AGT | `services/agent/` (Python/LangGraph) | WIP | Scaffold DONE; RAG sync graph DONE (W-AGT.4.17); cover letter tools TODO (W-AGT.4.2–4.16) |
+| agent | W-AGT | `services/agent/` (Python/PydanticAI) | WIP | PydanticAI agent DONE (ADR-035); infra DONE; cover letter flow DONE; remaining: routing, UI, rate limit, CI |
 | linkedin-sync | W-LINK | `services/ui/src/routes/api/linkedin.rs`, `web/src/routes/dashboard/LinkedInSync.tsx` | WIP | LinkedIn data import (CSV export); admin diff UI; sync status badges on Jobs/Challenges; secret pre-wired |
 
 ---
@@ -99,15 +99,15 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 5. **W-PROM Phase 1.5 + W-XT.4.9** — Align deploy recipes with workspace convention: generalize xtask `deploy lambda` for all packages; replace raw `aws` CLI; add `ENV` param; fix function naming to `deploy-baba-{env}[-{service}]` — **TODO**
 6. ~~**W-OTF.4.1–4.7**~~ — **DONE 2026-05-01** — `tofu` v1.11.5 installed; `just infra-plan deploy-baba` clean. HCL fixes: duplicate `aws_caller_identity`, duplicate `file_system_config`, lifecycle `filter {}`. See DRL-2026-05-01-infra-plan-blockers.
 
-### P1.5 — Agentic Cover Letter (ADR-032/033/034)
-1. ~~**W-AGT.4.1**~~ — Scaffold `services/agent/` with pyproject.toml, LangGraph graph, Mangum handler — **DONE** (2026-05-24)
-2. **W-AGT.4.2–4.6** — Implement 4 LangGraph tools (resume retrieval, JD matcher, cover letter generator, S3 artifact)
-3. **W-AGT.4.3** — Add `POST /api/v1/tailor/match` thin Rust endpoint exposing `matcher.rs`
-4. **W-AGT.4.7–4.8** — Wire full LangGraph graph + FastAPI endpoint
-5. **W-AGT.4.9–4.11** — OpenTofu: `agent-lambda.tf`, IAM updates, S3 lifecycle rule
+### P1.5 — Agentic Cover Letter (ADR-032/033/034/035)
+1. ~~**W-AGT.4.1**~~ — Scaffold `services/agent/` — **DONE** (2026-05-24)
+2. ~~**W-AGT.4.2–4.8**~~ — PydanticAI agent + pre-grounding + handler + tests + web hook — **DONE** (2026-06-05, ADR-035)
+3. ~~**W-AGT.4.9**~~ — `agent-lambda.tf` — **DONE** (2026-06-04)
+4. **W-AGT.4.3** — Add `POST /api/v1/tailor/match` thin Rust endpoint exposing `matcher.rs`
+5. **W-AGT.4.10–4.11** — IAM updates, S3 lifecycle rule
 6. **W-AGT.4.12** — Service-protocol routing from UI Lambda to agent Lambda
-7. **W-AGT.4.13** — Ask.tsx: intent detection, cover letter preview, PDF download
-8. **W-AGT.4.14–4.16** — Rate limiting, `just agent-build/deploy`, CI workflow
+7. **W-AGT.4.13** — CoverLetter.tsx: agent stream UI, cover letter preview, PDF download
+8. **W-AGT.4.14, 4.16** — Rate limiting, CI workflow
 
 ### P2 — Quality Gate
 5. ~~**W-DX.3**~~ — Per-crate README files (10 library crates) — **DONE** (MIT license for all 10 crates: config-core, config-toml, config-yaml, config-json, api-core, api-openapi, api-graphql, api-grpc, api-merger, infra-types)
@@ -200,8 +200,9 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | ADR-030 | SaaS AI-DLC Pattern — Six-pillar replicable AI-DLC (onboarding, session lifecycle, anti-rot, RAG, agentic tools, health dashboard); external repo onboarding; eval-driven accuracy loop | W-SAAS, W-RAG, W-MCP, W-AIL, W-LLM |
 | ADR-031 | Lambda Microservices Architecture — api-gateway routing Lambda; service-protocol crate; Lambda SDK invoke; shared EFS SQLite; per-service write conventions; incremental extraction | W-MOD, W-UI, W-RAG, W-AUTH, W-CTF, W-OBS, W-RES |
 | ADR-032 | Monorepo Consolidation (agentic-workflow → portfolio) — absorb Python/LangGraph agent into portfolio; archive agentic-workflow repo | W-AGT, W-WEB, W-DX, W-OTF, W-CI |
-| ADR-033 | Cover Letter Agent Architecture — LangGraph ReAct agent with 4 tools; public-facing with rate limiting; HTML preview + PDF download | W-AGT, W-RST, W-RAG, W-LLM, W-WEB, W-UI |
+| ADR-033 | ~~Cover Letter Agent Architecture~~ — **Superseded by ADR-035**. LangGraph ReAct agent with 4 tools | W-AGT, W-RST, W-RAG, W-LLM, W-WEB, W-UI |
 | ADR-034 | Agent Lambda Deployment Pattern — Python Lambda (arm64, no VPC); Mangum handler; uv build; service-protocol invoke from UI Lambda | W-AGT, W-OTF, W-CI, W-DX |
+| ADR-035 | PydanticAI Agent Migration — replaces LangGraph/LangChain with pre-grounded PydanticAI agent; Haiku default; 400-2000x cost reduction | W-AGT, W-WEB |
 
 ---
 

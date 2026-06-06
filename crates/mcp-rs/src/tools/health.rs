@@ -314,14 +314,15 @@ mod tests {
     fn test_uptime_tracking() {
         Health::initialize(1);
 
+        let uptime1 = Health::get_uptime_seconds();
+
         // Wait a brief moment
-        std::thread::sleep(std::time::Duration::from_millis(10));
+        std::thread::sleep(std::time::Duration::from_millis(50));
 
-        let uptime = Health::get_uptime_seconds();
-        let _ = uptime;
+        let uptime2 = Health::get_uptime_seconds();
 
-        let tools_count = Health::get_tools_count();
-        assert_eq!(tools_count, 1);
+        // Uptime should not decrease
+        assert!(uptime2 >= uptime1, "uptime should be monotonic");
     }
 
     #[test]

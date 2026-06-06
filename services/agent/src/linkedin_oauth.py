@@ -46,7 +46,11 @@ def _ui_base() -> str:
 
 
 async def _persist_token(
-    access_token: str, expires_at: int, name: str | None, email: str | None, picture_url: str | None,
+    access_token: str,
+    expires_at: int,
+    name: str | None,
+    email: str | None,
+    picture_url: str | None,
 ) -> None:
     """Store the OAuth token in the UI service's DB for cold-start recovery."""
     try:
@@ -110,7 +114,8 @@ def load_linkedin_credentials() -> None:
     try:
         import boto3
 
-        client = boto3.client("secretsmanager", region_name=os.environ.get("AWS_REGION", "us-east-1"))
+        region = os.environ.get("AWS_REGION", "us-east-1")
+        client = boto3.client("secretsmanager", region_name=region)
         secret = client.get_secret_value(SecretId=arn)
         data = json.loads(secret["SecretString"])
         _client_id = data.get("client_id", "")

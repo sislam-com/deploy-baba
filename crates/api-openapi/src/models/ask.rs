@@ -72,6 +72,9 @@ pub struct AskResponse {
     pub input_tokens: u32,
     /// Output token count.
     pub output_tokens: u32,
+    /// Whether the query was detected as a job description match.
+    #[serde(default)]
+    pub is_job_match: bool,
 }
 
 impl ApiModel for AskResponse {
@@ -89,6 +92,7 @@ impl ApiModel for AskResponse {
             model: "claude-haiku-4-5-20251001".to_string(),
             input_tokens: 512,
             output_tokens: 128,
+            is_job_match: false,
         }
     }
 }

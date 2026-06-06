@@ -1,13 +1,9 @@
-"""Agent tools for cover letter generation."""
+"""Agent tools — now integrated directly into the PydanticAI agent.
 
-from agent.tools.artifact import save_artifact
-from agent.tools.generator import generate_cover_letter
-from agent.tools.matcher import match_jd_keywords
-from agent.tools.resume import retrieve_resume_data
+Tool functions that were previously LangChain @tool decorated are now either:
+- PydanticAI @agent.tool methods in agent/agent.py (convert_to_pdf, upload_and_link)
+- Pre-grounding functions in agent/preground.py (fetch_resume, match_keywords)
 
-__all__ = [
-    "generate_cover_letter",
-    "match_jd_keywords",
-    "retrieve_resume_data",
-    "save_artifact",
-]
+This module is kept for backward compatibility with imports but the individual
+tool files are deprecated.
+"""

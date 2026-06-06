@@ -1,5 +1,12 @@
-"""LangGraph agentic service for sislam.com."""
+"""PydanticAI agentic service for sislam.com."""
 
-from agent.graph import graph
+from agent.agent import AgentDeps, CoverLetterOutput, get_agent
+from agent.preground import fetch_resume, match_keywords
 
-__all__ = ["graph"]
+__all__ = [
+    "AgentDeps",
+    "CoverLetterOutput",
+    "fetch_resume",
+    "get_agent",
+    "match_keywords",
+]

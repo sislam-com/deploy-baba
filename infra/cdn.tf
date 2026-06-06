@@ -244,6 +244,19 @@ resource "aws_cloudfront_distribution" "main" {
     origin_request_policy_id = data.aws_cloudfront_origin_request_policy.all_viewer_except_host.id
   }
 
+  # Agent service — routed via API Gateway for POST body hash workaround
+  ordered_cache_behavior {
+    path_pattern           = "/api/v1/agent/*"
+    target_origin_id       = "apigw-contact"
+    viewer_protocol_policy = "redirect-to-https"
+
+    allowed_methods = ["GET", "HEAD", "OPTIONS", "PUT", "PATCH", "POST", "DELETE"]
+    cached_methods  = ["GET", "HEAD"]
+
+    cache_policy_id          = data.aws_cloudfront_cache_policy.caching_disabled.id
+    origin_request_policy_id = data.aws_cloudfront_origin_request_policy.all_viewer_except_host.id
+  }
+
   # Cache behaviors for Lambda-served paths — API, auth, docs, health
   ordered_cache_behavior {
     path_pattern           = "/api/*"

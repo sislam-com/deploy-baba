@@ -32,6 +32,7 @@ resource "aws_lambda_function" "agent" {
       ANTHROPIC_API_KEY_ARN = aws_secretsmanager_secret.anthropic_api_key.arn
       LINKEDIN_SECRET_ARN   = aws_secretsmanager_secret.linkedin_api_key.arn
       UI_LAMBDA_NAME        = aws_lambda_function.baba.function_name
+      PDF_LAMBDA_NAME       = length(aws_lambda_function.pdf) > 0 ? aws_lambda_function.pdf[0].function_name : ""
       ARTIFACTS_BUCKET      = aws_s3_bucket.assets.id
       AWS_REGION_OVERRIDE   = var.region
     }
@@ -84,6 +85,12 @@ resource "aws_iam_role_policy" "agent_lambda_permissions" {
         Effect   = "Allow"
         Action   = ["lambda:InvokeFunction"]
         Resource = aws_lambda_function.baba.arn
+      },
+      {
+        Sid      = "InvokePDFLambda"
+        Effect   = "Allow"
+        Action   = ["lambda:InvokeFunction"]
+        Resource = length(aws_lambda_function.pdf) > 0 ? aws_lambda_function.pdf[0].arn : "*"
       },
       {
         Sid    = "ReadSecrets"

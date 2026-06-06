@@ -20,9 +20,10 @@ default:
 
 # ── Inner Loop (daily dev) ────────────────────────────────────────────────────
 
-# Format all code (Rust + OpenTofu HCL)
+# Format all code with configured formatters (Rust + Python + OpenTofu HCL)
 fmt:
     cargo xtask build format
+    just agent-fmt
     tofu fmt -recursive infra/
 
 # Run clippy (warnings = errors) + verify HCL formatting
@@ -199,7 +200,7 @@ mcp-cloud-smoke PROFILE="default" BASE_URL="https://sislam.com":
 
 # Run the agent service locally on :3003 with auto-reload
 agent-dev:
-    cd services/agent && PYTHONPATH=src uv run uvicorn handler:app --host 0.0.0.0 --port 3003 --reload
+    cd services/agent && UI_BASE_URL=http://localhost:3001 PYTHONPATH=src uv run uvicorn handler:app --host 0.0.0.0 --port 3003 --reload
 
 # Run agent tests
 agent-test:
@@ -231,6 +232,39 @@ agent-deploy ENV="prod":
     just aws-check {{ PROFILE }} && just agent-build && cargo xtask deploy lambda \
         --profile {{ PROFILE }} --function deploy-baba-{{ ENV }}-agent \
         --zip-path infra/build/agent-lambda.zip
+
+# ── PDF Lambda (Docker-based WeasyPrint service) ─────────────────────────────
+
+# Build and push PDF Lambda Docker image to ECR
+pdf-build ENV="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    just aws-check {{ PROFILE }}
+    REGION=$(aws configure get region --profile {{ PROFILE }} 2>/dev/null || echo "us-east-1")
+    AWS_ACCOUNT=$(aws sts get-caller-identity --query Account --output text --profile {{ PROFILE }})
+    ECR_REPO="${AWS_ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com/deploy-baba-{{ ENV }}-pdf"
+    echo "Building PDF Lambda image for ${ECR_REPO}..."
+    aws ecr get-login-password --region ${REGION} --profile {{ PROFILE }} | \
+        docker login --username AWS --password-stdin ${AWS_ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com
+    docker buildx build --platform linux/amd64 --provenance=false --sbom=false --tag deploy-baba-pdf:latest services/pdf/
+    docker tag deploy-baba-pdf:latest "${ECR_REPO}:latest"
+    docker push "${ECR_REPO}:latest"
+    echo "PDF Lambda image pushed: ${ECR_REPO}:latest"
+
+# Build and deploy PDF Lambda (requires infra to be applied first for ECR repo)
+pdf-deploy ENV="prod":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    just pdf-build {{ ENV }}
+    echo "Updating PDF Lambda function with new image..."
+    just aws-check {{ PROFILE }}
+    REGION=$(aws configure get region --profile {{ PROFILE }} 2>/dev/null || echo "us-east-1")
+    AWS_ACCOUNT=$(aws sts get-caller-identity --query Account --output text --profile {{ PROFILE }})
+    aws lambda update-function-code \
+        --function-name "deploy-baba-{{ ENV }}-pdf" \
+        --image-uri "${AWS_ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com/deploy-baba-{{ ENV }}-pdf:latest" \
+        --profile {{ PROFILE }}
+    echo "PDF Lambda deployed successfully"
 
 # Verify the live deployment (curl apex + www health checks)
 infra-verify DOMAIN="sislam.com":
@@ -333,6 +367,29 @@ dev-env ENV="prod":
     echo "export COGNITO_REGION=us-east-1"
     echo "export APP_DOMAIN=http://localhost:3000"
     printf 'export COGNITO_JWKS=%q\n' "${jwks}"
+
+    # AWS region for boto3 clients in agent service
+    echo "export AWS_REGION=us-east-1"
+    echo "export AWS_REGION_OVERRIDE=us-east-1"
+
+    # Agent service infrastructure refs (UI Lambda for resume data, PDF Lambda, S3 bucket)
+    echo "export UI_LAMBDA_NAME=deploy-baba-prod"
+    echo "export PDF_LAMBDA_NAME=deploy-baba-prod-pdf"
+    echo "export ARTIFACTS_BUCKET=deploy-baba-assets-062513063428"
+
+    # Fetch actual secret values for Python agent service (checks env var first)
+    anthropic_key=$($AWS secretsmanager get-secret-value --secret-id deploy-baba/prod/anthropic-api-key --query SecretString --output text 2>/dev/null || echo "")
+    if [ -n "$anthropic_key" ] && [ "$anthropic_key" != "placeholder-set-via-just-secret-put" ]; then
+        printf 'export ANTHROPIC_API_KEY=%q\n' "$anthropic_key"
+    fi
+
+    linkedin_secret=$($AWS secretsmanager get-secret-value --secret-id deploy-baba/prod/linkedin-api-key --query SecretString --output text 2>/dev/null || echo "")
+    if [ -n "$linkedin_secret" ] && [ "$linkedin_secret" != "placeholder-set-via-just-secret-put" ]; then
+        client_id=$(printf '%s' "$linkedin_secret" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('client_id',''))")
+        client_secret=$(printf '%s' "$linkedin_secret" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('client_secret',''))")
+        [ -n "$client_id" ] && printf 'export LINKEDIN_CLIENT_ID=%q\n' "$client_id"
+        [ -n "$client_secret" ] && printf 'export LINKEDIN_CLIENT_SECRET=%q\n' "$client_secret"
+    fi
 
 # Verify all prerequisites (rustup, cargo-lambda, node≥20, pnpm, tofu, AWS SSO, cache)
 dev-doctor:
@@ -495,7 +552,7 @@ dev-stack:
     AGENT_PID=""
     if command -v uv &>/dev/null; then
         echo "Starting agent service on :3003..."
-        (cd services/agent && PYTHONPATH=src uv run uvicorn handler:app --host 0.0.0.0 --port 3003 --reload) &
+        (cd services/agent && UI_BASE_URL=http://localhost:3001 PYTHONPATH=src uv run uvicorn handler:app --host 0.0.0.0 --port 3003 --reload) &
         AGENT_PID=$!
     else
         echo "⚠️  uv not found — skipping agent service on :3003 (install: curl -LsSf https://astral.sh/uv/install.sh | sh)"

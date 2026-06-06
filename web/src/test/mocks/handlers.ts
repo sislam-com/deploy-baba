@@ -204,7 +204,7 @@ export const handlers = [
   }),
 
   // Social links
-  http.get('/api/social-links', () => {
+  http.get('/api/v1/social-links', () => {
     return HttpResponse.json(mockSocialLinks)
   }),
 

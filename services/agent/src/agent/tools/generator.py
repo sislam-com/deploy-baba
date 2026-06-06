@@ -23,7 +23,7 @@ Do not include <html>, <head>, or <body> tags — just the content."""
 def generate_cover_letter(
     job_description: str,
     resume_summary: str,
-    matched_bullets: str,
+    matched_bullets: str = "",
 ) -> str:
     """Generate a tailored cover letter using the candidate's resume data.
 
@@ -32,15 +32,16 @@ def generate_cover_letter(
     Args:
         job_description: The target job description.
         resume_summary: JSON summary of the candidate's resume data.
-        matched_bullets: JSON array of matched resume bullets with relevance scores.
+        matched_bullets: Optional JSON array of matched resume bullets with relevance scores.
     """
     from langchain_anthropic import ChatAnthropic
 
     llm = ChatAnthropic(model="claude-sonnet-4-5-20250929", max_tokens=2048)
+    bullets_section = f"Top Matched Bullets:\n{matched_bullets}\n\n" if matched_bullets else ""
     user_prompt = (
         f"Job Description:\n{job_description}\n\n"
         f"Resume Data:\n{resume_summary}\n\n"
-        f"Top Matched Bullets:\n{matched_bullets}\n\n"
+        f"{bullets_section}"
         "Write the cover letter now."
     )
     response = llm.invoke(

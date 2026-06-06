@@ -14,6 +14,7 @@ pub mod rag;
 pub mod resume_data;
 pub mod social_links;
 pub mod stack;
+pub mod tailor;
 
 use axum::Router;
 
@@ -31,6 +32,7 @@ pub fn router() -> Router<AppState> {
         .nest("/legal", legal::router())
         .nest("/social-links", social_links::router())
         .nest("/resume", resume_data::router())
+        .nest("/tailor", tailor::router())
         .nest("/auth", auth_me::router())
         .nest("/v1/rag", rag::router())
         .merge(ask::router())

@@ -113,7 +113,7 @@ export default function Layout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   useEffect(() => {
-    fetch('/api/social-links')
+    fetch('/api/v1/social-links')
       .then(r => r.json())
       .then((data: SocialLink[]) => setSocialLinks(Array.isArray(data) ? data : []))
       .catch(() => {})
@@ -133,6 +133,7 @@ export default function Layout() {
             {/* Desktop nav */}
             <div className="hidden sm:flex items-center gap-3">
               <NavIcon to="/about/me" icon="user" label="About" />
+              <NavIcon to="/cover-letter" icon="document-text" label="Cover Letter" />
               <NavIcon to="/contact" icon="envelope" label="Contact" />
               <NavIcon to="/docs" icon="document-text" label="API Docs" external />
               {socialLinks.map(link => (
@@ -164,6 +165,7 @@ export default function Layout() {
         {mobileMenuOpen && (
           <div className="sm:hidden border-t border-gray-800 bg-gray-900 px-4 py-3 space-y-1">
             <MobileNavItem to="/about/me" icon="user" label="About" onClose={closeMenu} />
+            <MobileNavItem to="/cover-letter" icon="document-text" label="Cover Letter" onClose={closeMenu} />
             <MobileNavItem to="/contact" icon="envelope" label="Contact" onClose={closeMenu} />
             <MobileNavItem to="/docs" icon="document-text" label="API Docs" external onClose={closeMenu} />
             {socialLinks.map(link => (

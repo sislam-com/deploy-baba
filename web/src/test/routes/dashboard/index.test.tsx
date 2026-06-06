@@ -130,7 +130,7 @@ describe('DashboardHome', () => {
       http.get('/api/jobs', () => HttpResponse.json([{ id: 1 }])),
       http.get('/api/competencies', () => HttpResponse.json([{ id: 1 }])),
       http.get('/api/about/sections', () => HttpResponse.json([{ id: 1 }])),
-      http.get('/api/social-links', () => HttpResponse.json([{ id: 1 }]))
+      http.get('/api/v1/social-links', () => HttpResponse.json([{ id: 1 }]))
     )
 
     render(<DashboardHome />, { router: 'memory', route: '/dashboard' })

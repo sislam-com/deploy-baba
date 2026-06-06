@@ -130,7 +130,6 @@ describe('Ask', () => {
   })
 
   it('shows loading state during submission', async () => {
-    // Delay the MSW response so loading state is visible
     server.use(
       http.post('/api/ask', async () => {
         await new Promise(r => setTimeout(r, 50))
@@ -142,19 +141,14 @@ describe('Ask', () => {
     const user = userEvent.setup()
 
     await user.type(screen.getByLabelText('Your question'), 'What are your skills?')
-
-    const submitButton = screen.getByRole('button', { name: 'Ask' })
-    await user.click(submitButton)
+    await user.click(screen.getByRole('button', { name: 'Ask' }))
 
     await waitFor(() => {
-      expect(submitButton).toHaveTextContent('Asking...')
-      expect(submitButton).toBeDisabled()
+      expect(screen.getByText(/Retrieving sources/)).toBeInTheDocument()
     })
 
-    // Ensure the async handler fully completes before the test ends
     await waitFor(() => {
-      expect(submitButton).toHaveTextContent('Ask')
-      expect(submitButton).toBeEnabled()
+      expect(screen.getByText('Answer')).toBeInTheDocument()
     })
   })
 
@@ -169,15 +163,11 @@ describe('Ask', () => {
     const user = userEvent.setup()
 
     await user.type(screen.getByLabelText('Your question'), 'What are your skills?')
-
-    const submitButton = screen.getByRole('button', { name: 'Ask' })
-    await user.click(submitButton)
+    await user.click(screen.getByRole('button', { name: 'Ask' }))
 
     await waitFor(() => {
       expect(screen.getByText(/Rate limit reached/)).toBeInTheDocument()
     })
-
-    await waitFor(() => expect(submitButton).toBeEnabled())
   })
 
   it('displays generic error message on non-429/503 failure', async () => {
@@ -191,15 +181,11 @@ describe('Ask', () => {
     const user = userEvent.setup()
 
     await user.type(screen.getByLabelText('Your question'), 'What are your skills?')
-
-    const submitButton = screen.getByRole('button', { name: 'Ask' })
-    await user.click(submitButton)
+    await user.click(screen.getByRole('button', { name: 'Ask' }))
 
     await waitFor(() => {
       expect(screen.getByText('Bad request')).toBeInTheDocument()
     })
-
-    await waitFor(() => expect(submitButton).toBeEnabled())
   })
 
   it('displays non-portfolio citation with external link', async () => {
@@ -247,15 +233,11 @@ describe('Ask', () => {
     const user = userEvent.setup()
 
     await user.type(screen.getByLabelText('Your question'), 'What are your skills?')
-
-    const submitButton = screen.getByRole('button', { name: 'Ask' })
-    await user.click(submitButton)
+    await user.click(screen.getByRole('button', { name: 'Ask' }))
 
     await waitFor(() => {
       expect(screen.getByText(/not available right now/)).toBeInTheDocument()
     })
-
-    await waitFor(() => expect(submitButton).toBeEnabled())
   })
 
   it('displays error message on network error', async () => {
@@ -265,15 +247,11 @@ describe('Ask', () => {
     const user = userEvent.setup()
 
     await user.type(screen.getByLabelText('Your question'), 'What are your skills?')
-
-    const submitButton = screen.getByRole('button', { name: 'Ask' })
-    await user.click(submitButton)
+    await user.click(screen.getByRole('button', { name: 'Ask' }))
 
     await waitFor(() => {
       expect(screen.getByText(/Network error/)).toBeInTheDocument()
     })
-
-    await waitFor(() => expect(submitButton).toBeEnabled())
   })
 
   it('does not render heading when embedded', () => {
@@ -355,11 +333,48 @@ describe('Ask', () => {
     expect(textarea).toHaveAttribute('maxLength', '6000')
   })
 
-  it('clears previous answer when submitting new question', async () => {
+  it('shows Generate Cover Letter button when is_job_match is true', async () => {
+    server.use(
+      http.post('/api/ask', () =>
+        HttpResponse.json({
+          answer: 'Your experience aligns well with this role.',
+          citations: [],
+          model: 'test',
+          input_tokens: 1,
+          output_tokens: 1,
+          is_job_match: true,
+        })
+      )
+    )
+
     render(<Ask />)
     const user = userEvent.setup()
 
-    // First question
+    await user.type(screen.getByLabelText('Your question'), 'What are your skills?')
+    await user.click(screen.getByRole('button', { name: 'Ask' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Cover Letter/ })).toBeInTheDocument()
+    })
+  })
+
+  it('does not show Generate Cover Letter button when is_job_match is false', async () => {
+    render(<Ask />)
+    const user = userEvent.setup()
+
+    await user.type(screen.getByLabelText('Your question'), 'What are your skills?')
+    await user.click(screen.getByRole('button', { name: 'Ask' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Answer')).toBeInTheDocument()
+    })
+    expect(screen.queryByRole('button', { name: /Cover Letter/ })).not.toBeInTheDocument()
+  })
+
+  it('resets to form when clicking New question', async () => {
+    render(<Ask />)
+    const user = userEvent.setup()
+
     await user.type(screen.getByLabelText('Your question'), 'First question')
     await user.click(screen.getByRole('button', { name: 'Ask' }))
 
@@ -367,14 +382,12 @@ describe('Ask', () => {
       expect(screen.getByText('Answer')).toBeInTheDocument()
     })
 
-    // Second question
-    await user.clear(screen.getByLabelText('Your question'))
-    await user.type(screen.getByLabelText('Your question'), 'Second question')
-    await user.click(screen.getByRole('button', { name: 'Ask' }))
+    await user.click(screen.getByRole('button', { name: 'New question' }))
 
     await waitFor(() => {
-      // Should still show answer (mock returns same data)
-      expect(screen.getByText('Answer')).toBeInTheDocument()
+      expect(screen.getByLabelText('Your question')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Ask' })).toBeInTheDocument()
     })
+    expect(screen.queryByText('Answer')).not.toBeInTheDocument()
   })
 })

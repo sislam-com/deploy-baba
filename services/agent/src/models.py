@@ -24,6 +24,19 @@ class CoverLetterResponse(BaseModel):
     summary: str = Field(description="Brief summary of how the cover letter was tailored")
 
 
+# SSE Event models for agent streaming
+
+
+class AgentEvent(BaseModel):
+    """SSE event for agent status updates."""
+
+    agent: str = Field(
+        description="Agent name: cover_letter_writer, pdf_uploader, or link_generator"
+    )
+    status: str = Field(description="Agent status: pending, running, completed, or failed")
+    detail: str | None = Field(default=None, description="Human-readable status detail")
+
+
 class LinkedInAuthUrl(BaseModel):
     """LinkedIn OAuth2 authorization URL with CSRF state."""
 

@@ -1,12 +1,11 @@
 [project]
 name = "deploy-baba-agent"
 version = "0.1.0"
-description = "LangGraph agentic service for sislam.com — cover letter generation and portfolio actions"
+description = "PydanticAI agentic service for sislam.com — cover letter generation and portfolio actions"
 requires-python = ">=3.13"
 dependencies = [
-    "langgraph>=0.4",
-    "langchain-anthropic>=0.4",
-    "langchain-core>=0.3",
+    "pydantic-ai>=0.2",
+    "anthropic>=0.45",
     "fastapi>=0.115",
     "mangum>=0.19",
     "uvicorn>=0.34",
@@ -58,7 +57,7 @@ explicit_package_bases = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["boto3"]
+module = ["boto3", "botocore", "botocore.*", "pydantic_ai", "pydantic_ai.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

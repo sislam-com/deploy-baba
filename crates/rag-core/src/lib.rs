@@ -18,6 +18,7 @@ pub mod types;
 
 pub use error::RagError;
 pub use eval::{ResponseValidator, ValidationVerdict, ValidatorConfig};
+pub use hybrid::is_job_match_query;
 pub use hybrid::HybridRetriever;
 pub use portfolio::PortfolioDataProvider;
 pub use types::{Chunk, CitationRef, PromptBundle, RankedChunk, SourceKind};
@@ -140,14 +141,26 @@ impl PromptAssembler for DefaultPromptAssembler {
             });
         }
 
+        let is_job_match = is_job_match_query(query);
+
         let has_portfolio_sources = chunks
             .iter()
             .any(|c| c.source_kind == "portfolio" || c.source_kind == "openapi");
 
-        let preamble = if has_portfolio_sources {
-            "You are the portfolio assistant for a senior Rust engineer and cloud architect. \
+        let preamble = if is_job_match {
+            "You are Sharful Islam (Shanto), a senior Rust engineer and cloud architect. \
+             Speak in FIRST PERSON — say \"I built\", \"my experience\", \"I have\". \
+             Never say \"the portfolio owner\" or \"your experience\". \
+             The visitor has pasted a job description. Explain how YOUR experience aligns \
+             with the role. For each key requirement, describe what you built or achieved \
+             that demonstrates fit. Be specific — cite [source N] when referencing your data. \
+             If a requirement has no matching experience, say so honestly. \
+             Keep the tone professional but warm, like a confident candidate in conversation. "
+        } else if has_portfolio_sources {
+            "You are Sharful Islam (Shanto), a senior Rust engineer and cloud architect. \
+             Speak in FIRST PERSON — say \"I built\", \"my experience\", \"I designed\". \
              When sources include portfolio data (jobs, competencies, about sections), answer \
-             as the portfolio owner's assistant. When sources include API documentation, \
+             as yourself describing your own work. When sources include API documentation, \
              explain endpoints precisely with method, path, parameters, and response shapes. "
         } else {
             "You are an expert on the deploy-baba codebase. "
@@ -224,7 +237,7 @@ mod tests {
             },
         ];
         let bundle = assembler.assemble("what jobs?", &chunks);
-        assert!(bundle.system_prompt.contains("portfolio owner's assistant"));
+        assert!(bundle.system_prompt.contains("describing your own work"));
     }
 
     #[test]

@@ -18,14 +18,12 @@ async fn main() -> Result<(), Error> {
 
     let conn = rusqlite::Connection::open(&db_path)?;
     let migration_count: i64 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM _migrations",
-            [],
-            |row| row.get(0),
-        )
+        .query_row("SELECT COUNT(*) FROM _migrations", [], |row| row.get(0))
         .unwrap_or(0);
     if migration_count == 0 {
-        tracing::warn!("_migrations table empty or missing — UI service may not have initialized the DB yet");
+        tracing::warn!(
+            "_migrations table empty or missing — UI service may not have initialized the DB yet"
+        );
     } else {
         info!(migrations = migration_count, "DB schema verified");
     }

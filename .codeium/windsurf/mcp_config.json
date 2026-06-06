@@ -1,0 +1,25 @@
+{
+  "mcpServers": {
+    "mcp-rs": {
+      "command": "/Users/shantopagla/portfolio/target/release/mcp-rs",
+      "env": {
+        "MCP_RS_CONFIG": "/Users/shantopagla/portfolio/.mcp-rs.toml",
+        "RUST_LOG": "mcp_rs=warn"
+      }
+    },
+    "portfolio-rag": {
+      "command": "cargo",
+      "args": [
+        "run",
+        "--package", "portfolio-rag-mcp",
+        "--bin", "portfolio-rag-mcp",
+        "--manifest-path", "/Users/shantopagla/portfolio/Cargo.toml"
+      ],
+      "env": {
+        "DATABASE_PATH": "/Users/shantopagla/portfolio/deploy-baba.db",
+        "RAG_CORPORA_PATH": "/Users/shantopagla/portfolio",
+        "RUST_LOG": "portfolio_rag_mcp=warn"
+      }
+    }
+  }
+}

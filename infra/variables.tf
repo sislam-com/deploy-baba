@@ -142,3 +142,9 @@ variable "rag_lambda_code_path" {
   type        = string
   default     = "./build/rag-lambda.zip"
 }
+
+variable "pdf_lambda_image_uri" {
+  description = "ECR image URI for PDF Lambda (format: ACCOUNT.dkr.ecr.REGION.amazonaws.com/REPO:TAG)"
+  type        = string
+  default     = "" # Set via justfile or tfvars after building image
+}

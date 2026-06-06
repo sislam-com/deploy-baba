@@ -26,7 +26,7 @@ export default function SocialLinkDetail() {
 
   useEffect(() => {
     if (isNew) return
-    fetch('/api/social-links')
+    fetch('/api/v1/social-links')
       .then(r => r.json())
       .then((items: { id: number; platform: string; url: string; label: string; icon: string | null; visible: boolean; sort_order: number }[]) => {
         const item = items.find(s => s.id === Number(id))

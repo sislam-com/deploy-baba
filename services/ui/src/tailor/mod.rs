@@ -8,6 +8,4 @@
 //! - `generator` — LLM call: grounded rewrite of matched bullets                 (W-RST.4.5)
 //! - `renderer`  — DOCX/PDF rendering, reuses xtask path                         (W-RST.4.6)
 
-pub mod generator;
 pub mod matcher;
-pub mod parser;

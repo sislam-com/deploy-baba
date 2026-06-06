@@ -150,6 +150,10 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "036_change_tracking",
         include_str!("../migrations/036_change_tracking.sql"),
     ),
+    (
+        "037_sync_dashboard_2026-06-04",
+        include_str!("../migrations/037_sync_dashboard_2026-06-04.sql"),
+    ),
 ];
 
 /// Re-exported from `api_openapi::models::social` — the canonical SSOT.
