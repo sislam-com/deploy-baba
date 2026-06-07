@@ -151,6 +151,9 @@ lambda-deploy-all ENV="prod":
     just admin-deploy {{ ENV }}
     just contact-deploy {{ ENV }}
     just rag-deploy {{ ENV }}
+    just mcp-cloud-deploy {{ ENV }}
+    just agent-deploy {{ ENV }}
+    just pdf-deploy {{ ENV }}
 
 # Build the read-only context bundle consumed by the private cloud MCP gateway
 mcp-context-build:
@@ -200,7 +203,8 @@ mcp-cloud-smoke PROFILE="default" BASE_URL="https://sislam.com":
 
 # Run the agent service locally on :3003 with auto-reload
 agent-dev:
-    cd services/agent && UI_BASE_URL=http://localhost:3001 PYTHONPATH=src uv run uvicorn handler:app --host 0.0.0.0 --port 3003 --reload
+    cd services/agent && ANTHROPIC_API_KEY=$(cargo xtask secret get anthropic-api-key --profile {{ PROFILE }} | tail -1) \
+    UI_BASE_URL=http://localhost:3001 PYTHONPATH=src uv run uvicorn handler:app --host 0.0.0.0 --port 3003 --reload
 
 # Run agent tests
 agent-test:
@@ -222,7 +226,7 @@ agent-build:
     mkdir -p build/agent-lambda infra/build
     cd services/agent
     uv export --frozen --no-dev --no-emit-project > /tmp/agent-requirements.txt
-    uv pip install --python 3.13 --target ../../build/agent-lambda -r /tmp/agent-requirements.txt --only-binary :all: --quiet
+    uv pip install --python 3.13 --target ../../build/agent-lambda -r /tmp/agent-requirements.txt --only-binary :all: --python-platform aarch64-manylinux2014 --quiet
     cp -r src/* ../../build/agent-lambda/
     cd ../../build/agent-lambda
     zip -qr ../../infra/build/agent-lambda.zip .

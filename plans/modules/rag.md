@@ -216,7 +216,7 @@ injects this contract via `PromptBundle.system_prompt`.
 | W-RAG.6.1 | `services/ui/src/routes/api/ask.rs` + router wiring | DONE (2026-04-15) | POST /api/ask; Arc<RagStore> in AppState; WAL concurrent reader |
 | W-RAG.6.2 | Bundle `sqlite-vec` aarch64 SO into Lambda zip | DEFERRED | Brute-force cosine ANN sufficient for current corpus (~2000 chunks); sqlite-vec extension can be added when corpus grows beyond ~10k chunks |
 | W-RAG.6.3 | Rate-limit + `RAG_PUBLIC_ENABLED` feature flag | DONE (updated 2026-05-01) | `ASK_RATE_LIMIT` env var (default 2/min); IP from `x-forwarded-for` first → `ConnectInfo` → `"unknown"` (Lambda fix — was 127.0.0.1 global bucket); `RAG_PUBLIC_ENABLED=1` gate |
-| W-RAG.7.1 | Add `OpenApi` + `Portfolio` variants to `SourceKind` enum + `as_str()`/`Display` | DONE | `crates/rag-core/src/types.rs` — 6 variants |
+| W-RAG.7.1 | Add `OpenApi` + `Portfolio` variants to `SourceKind` enum + `as_str()`/`Display` | DONE | `crates/rag-core/src/types.rs` — 8 variants (Rust, Hcl, Plan, Cache, OpenApi, Portfolio, TypeScript, Python) |
 | W-RAG.7.2 | OpenAPI chunker: parse JSON spec, emit one chunk per path-operation + per component schema | DONE | `crates/rag-core/src/chunk/openapi.rs`; 6 tests |
 | W-RAG.7.3 | Portfolio data chunker: JSON-serialized jobs/competencies/about → readable prose chunks | DONE | `crates/rag-core/src/chunk/portfolio.rs`; 5 tests |
 | W-RAG.7.4 | Wire new chunkers into `chunk_file()` dispatcher | DONE | `crates/rag-core/src/chunk/mod.rs` — 2 new match arms |

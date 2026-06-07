@@ -113,6 +113,10 @@ async fn api_redirect_handler(
     axum::extract::Path(path): axum::extract::Path<String>,
 ) -> Result<Redirect, StatusCode> {
     // Preserve special paths that should not be redirected
+    if path.starts_with("v1/") || path == "v1" {
+        return Err(StatusCode::NOT_FOUND);
+    }
+
     let preserved_paths = [
         "contact",
         "contact/challenge",
@@ -121,11 +125,8 @@ async fn api_redirect_handler(
     ];
 
     if preserved_paths.contains(&path.as_str()) {
-        // These paths are handled by explicit routes above, so this handler
-        // should not match them. But just in case, return a not found.
         return Err(StatusCode::NOT_FOUND);
     }
 
-    // Redirect /api/<path> → /api/v1/<path>
     Ok(Redirect::temporary(&format!("/api/v1/{}", path)))
 }

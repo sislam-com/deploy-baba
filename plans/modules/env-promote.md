@@ -1,7 +1,7 @@
 # W-PROM: Environment Separation & Artifact Promotion
 
 **Path:** `xtask/src/deploy/promote.rs`, `infra/*.tf`, `.github/workflows/`  
-**Status:** TODO  
+**Status:** WIP  
 **Depends on:** W-CI, W-OTF, W-XT, W-MCP  
 **Depended on by:** (e2e testing, safe production deploys)
 
@@ -165,7 +165,7 @@ Key mapping: `ENV=prod` → function `deploy-baba-prod[-service]`; `ENV=dev` →
 |---|---|---|
 | W-PROM.4.23 | Update `deploy-dev.yml`: read `deploy-baba/dev/deploy-config`, target dev Lambdas | TODO |
 | W-PROM.4.24 | Update `deploy-prod.yml`: replace full rebuild with promote (keep rebuild as fallback) | TODO |
-| W-PROM.4.25 | Remove auto-promote tag from deploy-dev.yml (line 139); promotion is now explicit | TODO |
+| W-PROM.4.25 | Remove auto-promote tag from deploy-dev.yml (line 186-187); promotion is now explicit | DEFERRED — kept as interim until Phase 4 is built (2026-06-07) |
 | W-PROM.4.26 | End-to-end: push to main → CI → dev deploy → `just promote` → prod live | TODO |
 
 ## W-PROM.5 Implementation Notes
