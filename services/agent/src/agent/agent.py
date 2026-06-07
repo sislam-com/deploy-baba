@@ -111,7 +111,18 @@ def _register_tools(agent: Agent[AgentDeps, CoverLetterOutput]) -> None:
         Args:
             html: The generated cover letter HTML content.
         """
-        if not ctx.deps.pdf_lambda_name or os.environ.get("UI_BASE_URL"):
+        pdf_service_url = os.environ.get("PDF_SERVICE_URL")
+        if pdf_service_url:
+            import httpx
+
+            async with httpx.AsyncClient(timeout=30) as client:
+                resp = await client.post(
+                    f"{pdf_service_url}/convert", json={"html": html}
+                )
+                resp.raise_for_status()
+                return resp.json()["pdf_base64"]
+
+        if not ctx.deps.pdf_lambda_name:
             return base64.b64encode(html.encode()).decode()
 
         cfg = botocore.config.Config(

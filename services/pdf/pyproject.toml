@@ -7,6 +7,7 @@ dependencies = [
     "weasyprint>=62",
     "mangum>=0.19",
     "fastapi>=0.115",
+    "uvicorn>=0.34",
 ]
 
 [project.optional-dependencies]
