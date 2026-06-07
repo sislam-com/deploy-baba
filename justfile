@@ -58,7 +58,7 @@ dev:
 
 # Full quality gate (fmt + lint + test + coverage floors + audit + HCL fmt check + agent)
 quality:
-    just web-types-offline && cargo xtask quality all && just web-coverage && just agent-lint && just agent-test && just agent-build && just mcp-build && just mcp-smoke && just mcp-rag-smoke && just mcp-cloud-build && just rag-index && tofu fmt -check -recursive infra/
+    just web-types-offline && cargo xtask quality all && just web-coverage && just agent-lint && just agent-test && just agent-build && just mcp-build && just mcp-smoke && just mcp-rag-smoke && just mcp-cloud-build && just rag-index-embed && tofu fmt -check -recursive infra/
 
 # Build everything: all Rust Lambda zips + SPA + agent package + MCP gateway bundle
 build: lambda-build-all web-build agent-build mcp-cloud-build
@@ -218,7 +218,7 @@ agent-fmt:
 agent-build:
     #!/usr/bin/env bash
     set -euo pipefail
-    rm -rf build/agent-lambda
+    rm -rf build/agent-lambda infra/build/agent-lambda.zip
     mkdir -p build/agent-lambda infra/build
     cd services/agent
     uv export --frozen --no-dev --no-emit-project > /tmp/agent-requirements.txt
@@ -383,6 +383,11 @@ dev-env ENV="prod":
         printf 'export ANTHROPIC_API_KEY=%q\n' "$anthropic_key"
     fi
 
+    openai_key=$($AWS secretsmanager get-secret-value --secret-id deploy-baba/prod/openai-api-key --query SecretString --output text 2>/dev/null || echo "")
+    if [ -n "$openai_key" ] && [ "$openai_key" != "placeholder-set-via-just-secret-put" ]; then
+        printf 'export OPENAI_API_KEY=%q\n' "$openai_key"
+    fi
+
     linkedin_secret=$($AWS secretsmanager get-secret-value --secret-id deploy-baba/prod/linkedin-api-key --query SecretString --output text 2>/dev/null || echo "")
     if [ -n "$linkedin_secret" ] && [ "$linkedin_secret" != "placeholder-set-via-just-secret-put" ]; then
         client_id=$(printf '%s' "$linkedin_secret" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('client_id',''))")
@@ -488,7 +493,7 @@ dev-s3:
     wait $MOTO_PID
 
 # Start the Rust API server (:3001), Vite dev server (:3000), and agent service (:3003) in parallel.
-# Port assignments: 3000=Vite SPA, 3001=Rust API, 3002=Auth Lambda, 3003=Python Agent, 5555=Local S3
+# Port assignments: 3000=Vite SPA, 3001=Rust API, 3002=Auth Lambda, 3003=Python Agent, 3004=PDF Service, 5555=Local S3
 
 # Pre-cleans stale processes on all ports and guarantees cleanup on exit.
 dev-stack:
@@ -496,7 +501,7 @@ dev-stack:
     set -euo pipefail
 
     # Pre-empt any stale processes on our ports
-    for port in 3000 3001 3002 3003 5555; do
+    for port in 3000 3001 3002 3003 3004 5555; do
         pid=$(lsof -ti tcp:$port 2>/dev/null || true)
         if [ -n "$pid" ]; then
             echo "Port $port occupied by PID $pid — stopping..."
@@ -585,6 +590,14 @@ dev-stack:
         echo "Local S3 ready on :5555"
     fi
 
+    # Start PDF conversion service on :3004 (WeasyPrint needs homebrew libs on macOS)
+    PDF_PID=""
+    if command -v uv &>/dev/null; then
+        echo "Starting PDF service on :3004..."
+        (cd services/pdf && DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib PYTHONPATH=src uv run uvicorn handler:app --host 0.0.0.0 --port 3004 --reload) &
+        PDF_PID=$!
+    fi
+
     # Start agent service (PydanticAI) if uv is available
     AGENT_PID=""
     if command -v uv &>/dev/null; then
@@ -595,6 +608,7 @@ dev-stack:
             AWS_ACCESS_KEY_ID=testing \
             AWS_SECRET_ACCESS_KEY=testing \
             UI_BASE_URL=http://localhost:3001 \
+            PDF_SERVICE_URL=http://localhost:3004 \
             PYTHONPATH=src \
             uv run uvicorn handler:app --host 0.0.0.0 --port 3003 --reload) &
         AGENT_PID=$!
@@ -617,14 +631,16 @@ dev-stack:
         kill $API_PID 2>/dev/null || true
         kill $AUTH_PID 2>/dev/null || true
         [ -n "$AGENT_PID" ] && kill $AGENT_PID 2>/dev/null || true
+        [ -n "$PDF_PID" ] && kill $PDF_PID 2>/dev/null || true
         [ -n "$MOTO_PID" ] && kill $MOTO_PID 2>/dev/null || true
         sleep 1
         kill -9 $WEB_PID 2>/dev/null || true
         kill -9 $API_PID 2>/dev/null || true
         kill -9 $AUTH_PID 2>/dev/null || true
         [ -n "$AGENT_PID" ] && kill -9 $AGENT_PID 2>/dev/null || true
+        [ -n "$PDF_PID" ] && kill -9 $PDF_PID 2>/dev/null || true
         [ -n "$MOTO_PID" ] && kill -9 $MOTO_PID 2>/dev/null || true
-        for port in 3000 3001 3002 3003 5555; do
+        for port in 3000 3001 3002 3003 3004 5555; do
             pid=$(lsof -ti tcp:$port 2>/dev/null || true)
             [ -n "$pid" ] && kill -9 "$pid" 2>/dev/null || true
         done
@@ -779,6 +795,12 @@ resume PROFILE="default" DB="deploy-baba.db":
 
 # Index all corpora (Rust, HCL, plans) into the RAG FTS index
 rag-index DB="deploy-baba.db":
+    cargo xtask rag ingest --db-path {{ DB }}
+
+# Index all corpora with embeddings (fetches OPENAI_API_KEY from Secrets Manager)
+rag-index-embed DB="deploy-baba.db" PROFILE="default":
+    just aws-check {{ PROFILE }} && \
+    OPENAI_API_KEY=$(cargo xtask secret get openai-api-key --profile {{ PROFILE }} | tail -1) \
     cargo xtask rag ingest --db-path {{ DB }}
 
 # Index all corpora + .claude/ agent cache (local dev only)
