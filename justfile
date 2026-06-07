@@ -58,7 +58,7 @@ dev:
 
 # Full quality gate (fmt + lint + test + coverage floors + audit + HCL fmt check + agent)
 quality:
-    just web-types-offline && cargo xtask quality all && just web-coverage && just agent-lint && just agent-test && just agent-build && just mcp-build && just mcp-smoke && just mcp-rag-smoke && just mcp-cloud-build && just rag-index && tofu fmt -check -recursive infra/
+    just web-types-offline && cargo xtask quality all && just web-coverage && just agent-lint && just agent-test && just agent-build && just mcp-build && just mcp-smoke && just mcp-rag-smoke && just mcp-cloud-build && just rag-index-embed && tofu fmt -check -recursive infra/
 
 # Build everything: all Rust Lambda zips + SPA + agent package + MCP gateway bundle
 build: lambda-build-all web-build agent-build mcp-cloud-build
@@ -218,7 +218,7 @@ agent-fmt:
 agent-build:
     #!/usr/bin/env bash
     set -euo pipefail
-    rm -rf build/agent-lambda
+    rm -rf build/agent-lambda infra/build/agent-lambda.zip
     mkdir -p build/agent-lambda infra/build
     cd services/agent
     uv export --frozen --no-dev --no-emit-project > /tmp/agent-requirements.txt
@@ -381,6 +381,11 @@ dev-env ENV="prod":
     anthropic_key=$($AWS secretsmanager get-secret-value --secret-id deploy-baba/prod/anthropic-api-key --query SecretString --output text 2>/dev/null || echo "")
     if [ -n "$anthropic_key" ] && [ "$anthropic_key" != "placeholder-set-via-just-secret-put" ]; then
         printf 'export ANTHROPIC_API_KEY=%q\n' "$anthropic_key"
+    fi
+
+    openai_key=$($AWS secretsmanager get-secret-value --secret-id deploy-baba/prod/openai-api-key --query SecretString --output text 2>/dev/null || echo "")
+    if [ -n "$openai_key" ] && [ "$openai_key" != "placeholder-set-via-just-secret-put" ]; then
+        printf 'export OPENAI_API_KEY=%q\n' "$openai_key"
     fi
 
     linkedin_secret=$($AWS secretsmanager get-secret-value --secret-id deploy-baba/prod/linkedin-api-key --query SecretString --output text 2>/dev/null || echo "")
@@ -790,6 +795,12 @@ resume PROFILE="default" DB="deploy-baba.db":
 
 # Index all corpora (Rust, HCL, plans) into the RAG FTS index
 rag-index DB="deploy-baba.db":
+    cargo xtask rag ingest --db-path {{ DB }}
+
+# Index all corpora with embeddings (fetches OPENAI_API_KEY from Secrets Manager)
+rag-index-embed DB="deploy-baba.db" PROFILE="default":
+    just aws-check {{ PROFILE }} && \
+    OPENAI_API_KEY=$(cargo xtask secret get openai-api-key --profile {{ PROFILE }} | tail -1) \
     cargo xtask rag ingest --db-path {{ DB }}
 
 # Index all corpora + .claude/ agent cache (local dev only)
