@@ -117,7 +117,11 @@ async def match_keywords(
         "body": json.dumps({"job_description": job_description}),
         "isBase64Encoded": False,
     }
-    result = _lambda_invoke(fn, event)
+    try:
+        result = _lambda_invoke(fn, event)
+    except RuntimeError as exc:
+        logger.warning("tailor/match unavailable via Lambda invoke (%s) — skipping", exc)
+        return []
     body = json.loads(result.get("body", "[]"))
     if isinstance(body, dict):
         return cast(list[dict[str, Any]], body.get("matches", body.get("bullets", [])))

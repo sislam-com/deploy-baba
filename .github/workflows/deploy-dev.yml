@@ -183,5 +183,7 @@ jobs:
       - name: Create dev-vX.Y.Z tag
         run: cargo run -q -p xtask -- release tag --kind dev --push
 
+      # INTERIM: Auto-promote to prod until W-PROM Phase 4 (just promote) is built.
+      # Remove when W-PROM.4.25 is complete — promotion will then be explicit.
       - name: Promote dev-vX.Y.Z to vX.Y.Z (triggers prod deploy)
         run: cargo run -q -p xtask -- release promote --push

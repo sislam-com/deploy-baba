@@ -1,5 +1,5 @@
 # deploy-baba — Plan Index
-**GitHub:** `sislam-com/deploy-baba` | **Last updated:** 2026-05-28
+**GitHub:** `sislam-com/deploy-baba` | **Last updated:** 2026-06-07
 **Source repo:** `~/shanto` (Baba Toolchain, ~85K LOC) | **Status:** ~90% complete (microservices transformation in progress)
 
 See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming rules.
@@ -40,7 +40,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | rag | W-RAG | `crates/rag-core/`, `crates/rag-sqlite/`, `crates/portfolio-rag-mcp/` | DONE | P1–P6 complete; 9 corpora (TypeScript + Python added); eval suite + MCP tools; hybrid FTS/ANN via RRF; sqlite-vec native ANN deferred (W-RAG.6.2) |
 | gdrive-planning | W-GDR | `justfile`, `.claude/settings.json`, `.github/workflows/` | TODO | Drive MCP plan export/import (W-GDR.4.1–4.3); Stop hook quality gate (W-GDR.4.4); evaluated from Gemini proposal 2026-04-15 |
 | ai-dlc | W-AIL | `.claude/agents/`, `.claude/skills/` | DONE | plan-doctor + drift-detector subagents; /plan-sync, /cache-refresh, /memory-curate skills; weekly schedule |
-| ci | W-CI | `.github/workflows/` | WIP | Code complete (C.1 + C.2 DONE). W-CI.4.9 RESOLVED 2026-05-04 — GH Variables replaced by SM fetch (DRL-2026-05-04-sislam-outage); bootstrap ARNs set. Remaining: W-CI.4.5 (dev Lambda workspace), W-CI.4.10 (production env gate) |
+| ci | W-CI | `.github/workflows/` | DONE | Code complete (C.1 + C.2 DONE). W-CI.4.5 DONE (dev workspace). W-CI.4.9 RESOLVED (SM fetch). W-CI.4.10 DONE (production env gate). All 17 items complete. |
 | web | W-WEB | `web/` | DONE | All 15 Askama templates replaced; Askama removed; CF→S3 direct serving (EFS sync dropped 2026-05-04, DRL-2026-05-04-sislam-outage); SEO prerender deferred to W-WEB.5 (P3) |
 | dev-environment | W-DEV | `scripts/`, `.devcontainer/` | DONE | bootstrap-tfstate.sh; dev-doctor.sh; devcontainer; initial-setup.md |
 | api-versioning | W-VER | `services/ui/src/middleware/`, `services/ui/src/router.rs` | DONE | URL-based versioning with /api/v1/ paths; backward-compatible redirects; deprecation middleware; OpenAPI version metadata |
@@ -50,7 +50,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | mcp-cloud | W-MCP | `crates/mcp-rs/`, `services/mcp-gateway/` | WIP | Private MCP gateway; local mcp-rs + cloud Cognito-authenticated Lambda gateway (ADR-028) |
 | env-promote | W-PROM | `xtask/src/deploy/promote.rs`, `infra/*.tf`, `.github/workflows/` | WIP | Phase 1 DONE (workspace refactoring); Phase 1.5 TODO (deploy recipe alignment — W-XT.4.9); Phase 2–5 TODO (infra param, dev workspace, promote cmd, CI) |
 | saas-onboard | W-SAAS | `xtask/src/onboard.rs`, `crates/portfolio-rag-mcp/`, `services/ui/src/routes/api/eval.rs` | WIP | Project onboarding for external repos; eval dashboard; project_health MCP tool (ADR-030) |
-| agent | W-AGT | `services/agent/` (Python/PydanticAI) | WIP | PydanticAI agent DONE (ADR-035); infra DONE; cover letter flow DONE; remaining: routing, UI, rate limit, CI |
+| agent | W-AGT | `services/agent/` (Python/PydanticAI) | DONE | PydanticAI agent (ADR-035); infra; cover letter flow; routing; CoverLetter.tsx; rate limit; CI — all complete (2026-06-05) |
 | linkedin-sync | W-LINK | `services/ui/src/routes/api/linkedin.rs`, `web/src/routes/dashboard/LinkedInSync.tsx` | WIP | LinkedIn data import (CSV export); admin diff UI; sync status badges on Jobs/Challenges; secret pre-wired |
 
 ---
@@ -70,7 +70,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 9. ~~**W-WEB.4.9**~~ **DONE** — Askama removed; 15 templates deleted (Phase D.5).
 10. ~~**Local deploy pipeline**~~ **DONE** — `xtask deploy spa`, `just deploy-full/spa-deploy/lambda-wait`, `/deploy --full` skill extended.
 11. **W-AIL.4.7** — Wire weekly schedule (`dbb-plan-sync`, `dbb-memory-curate`) via `/schedule`.
-12. **W-CI.4.5, 4.9, 4.10** — Manual one-time steps: dev Lambda workspace, GitHub Variables, `production` environment gate.
+12. ~~**W-CI.4.5, 4.9, 4.10**~~ — **DONE** — Dev Lambda workspace created; GH Variables replaced by SM fetch (DRL-2026-05-04); `production` environment gate created.
 
 ---
 
@@ -99,15 +99,15 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 5. **W-PROM Phase 1.5 + W-XT.4.9** — Align deploy recipes with workspace convention: generalize xtask `deploy lambda` for all packages; replace raw `aws` CLI; add `ENV` param; fix function naming to `deploy-baba-{env}[-{service}]` — **TODO**
 6. ~~**W-OTF.4.1–4.7**~~ — **DONE 2026-05-01** — `tofu` v1.11.5 installed; `just infra-plan deploy-baba` clean. HCL fixes: duplicate `aws_caller_identity`, duplicate `file_system_config`, lifecycle `filter {}`. See DRL-2026-05-01-infra-plan-blockers.
 
-### P1.5 — Agentic Cover Letter (ADR-032/033/034/035)
+### P1.5 — Agentic Cover Letter (ADR-032/033/034/035) — **DONE**
 1. ~~**W-AGT.4.1**~~ — Scaffold `services/agent/` — **DONE** (2026-05-24)
 2. ~~**W-AGT.4.2–4.8**~~ — PydanticAI agent + pre-grounding + handler + tests + web hook — **DONE** (2026-06-05, ADR-035)
 3. ~~**W-AGT.4.9**~~ — `agent-lambda.tf` — **DONE** (2026-06-04)
-4. **W-AGT.4.3** — Add `POST /api/v1/tailor/match` thin Rust endpoint exposing `matcher.rs`
-5. **W-AGT.4.10–4.11** — IAM updates, S3 lifecycle rule
-6. **W-AGT.4.12** — Service-protocol routing from UI Lambda to agent Lambda
-7. **W-AGT.4.13** — CoverLetter.tsx: agent stream UI, cover letter preview, PDF download
-8. **W-AGT.4.14, 4.16** — Rate limiting, CI workflow
+4. ~~**W-AGT.4.3**~~ — `POST /api/v1/tailor/match` thin Rust endpoint — **DONE** (2026-06-05)
+5. ~~**W-AGT.4.10–4.11**~~ — IAM updates, S3 lifecycle rule — **DONE** (2026-06-04)
+6. ~~**W-AGT.4.12**~~ — CloudFront→APIGW→Agent routing — **DONE** (2026-06-04)
+7. ~~**W-AGT.4.13**~~ — CoverLetter.tsx: agent stream UI, cover letter preview, PDF download — **DONE** (2026-06-05)
+8. ~~**W-AGT.4.14, 4.16**~~ — Rate limiting, CI workflow — **DONE** (2026-06-05)
 
 ### P2 — Quality Gate
 5. ~~**W-DX.3**~~ — Per-crate README files (10 library crates) — **DONE** (MIT license for all 10 crates: config-core, config-toml, config-yaml, config-json, api-core, api-openapi, api-graphql, api-grpc, api-merger, infra-types)

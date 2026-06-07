@@ -290,7 +290,7 @@ async def cover_letter_stream(
     )
 
 
-handler = Mangum(app, lifespan="off")
+handler = Mangum(app, lifespan="auto")
 
 if __name__ == "__main__":
     import uvicorn

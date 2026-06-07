@@ -259,7 +259,7 @@ adds filtered retrieval. No LLM cost. Ships independently of Phases 5–7.
 | # | Work item | Task | Notes |
 |---|-----------|------|-------|
 | 9.1 | W-RAG.7.1–7.4 | Add `OpenApi`+`Portfolio` SourceKind variants, 2 new chunkers, wire into dispatcher | No LLM cost; extends existing chunker pattern |
-| 9.2 | W-RAG.7.5 | Extend `xtask rag ingest` to emit 6 corpora (OpenAPI spec + portfolio data from SQLite) | Requires `api_openapi` dep in xtask |
+| 9.2 | W-RAG.7.5 | Extend `xtask rag ingest` to emit 9 corpora (OpenAPI spec + portfolio data from SQLite + TypeScript + Python) | Requires `api_openapi` dep in xtask |
 | 9.3 | W-RAG.8.1–8.2 | Portfolio-aware prompt assembly + filtered retrieval | `retrieve_filtered()` with `source_kind` clause |
 
 **Exit criteria:**

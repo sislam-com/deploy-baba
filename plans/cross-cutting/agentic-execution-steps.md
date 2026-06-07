@@ -899,7 +899,7 @@ cargo test -p rag-core
 **Full verification sequence:**
 ```
 just quality                                           # workspace green
-just rag-index                                         # re-index with 6 corpora
+just rag-index                                         # re-index with 9 corpora
 just rag-query "GET /api/jobs"                         # OpenAPI chunks
 just rag-query "AWS"                                   # portfolio chunks
 just ask "What AWS experience does the owner have?"    # agentic answer with tool calls
