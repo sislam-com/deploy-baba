@@ -243,17 +243,18 @@ impl Db {
             tracing::info!("Applying migration: {}", name);
             if let Err(e) = conn.execute_batch(sql) {
                 // A prior run of this migration can crash partway through
-                // (e.g. Lambda cold-start timeout) after an ALTER TABLE
-                // succeeded but before the completion INSERT below recorded
-                // it as applied. The next attempt re-runs the whole batch
-                // from the top and immediately re-fails on that same
-                // already-applied ALTER TABLE, forever. Retry
-                // statement-by-statement and skip only that specific,
-                // already-applied-column error so the rest of the migration
-                // (new tables, seed data) can still complete.
-                if e.to_string().contains("duplicate column name") {
+                // (e.g. Lambda cold-start timeout) after some of its
+                // statements (an ALTER TABLE, a plain non-idempotent INSERT)
+                // already succeeded, but before the completion INSERT below
+                // recorded it as applied. The next attempt re-runs the whole
+                // batch from the top and immediately re-fails on that same
+                // already-applied statement, forever. Retry
+                // statement-by-statement and skip only statements whose
+                // failure means "this exact effect already exists" so the
+                // rest of the migration can still complete.
+                if is_already_applied_error(&e.to_string()) {
                     tracing::warn!(
-                        "Migration {} hit an already-applied ALTER TABLE — retrying statement-by-statement: {}",
+                        "Migration {} hit an already-applied statement — retrying statement-by-statement: {}",
                         name, e
                     );
                     // Not a naive `sql.split(';')` — migration file comments
@@ -262,7 +263,7 @@ impl Db {
                     // boundaries.
                     for stmt in split_sql_statements(sql) {
                         if let Err(e) = conn.execute_batch(&stmt) {
-                            if e.to_string().contains("duplicate column name") {
+                            if is_already_applied_error(&e.to_string()) {
                                 tracing::warn!("Skipping already-applied statement in {}", name);
                                 continue;
                             }
@@ -281,6 +282,13 @@ impl Db {
 
         Ok(())
     }
+}
+
+/// True if a SQLite error means "this statement's effect already exists"
+/// rather than a genuine failure — i.e. safe to skip when retrying a
+/// partially-applied migration statement-by-statement.
+fn is_already_applied_error(msg: &str) -> bool {
+    msg.contains("duplicate column name") || msg.contains("UNIQUE constraint failed")
 }
 
 /// Splits a SQL script into individual top-level statements, respecting
@@ -652,12 +660,28 @@ mod tests {
                 .unwrap();
             }
 
-            // Simulate a crashed prior run of 024_resume_cleanup: its first
-            // ALTER TABLE succeeded but the migration was never recorded as
-            // applied in _migrations (e.g. a Lambda cold-start timeout
-            // between the ALTER and the completion INSERT).
+            // Simulate a crashed prior run of 024_resume_cleanup that got
+            // partway through — both ALTER TABLEs and the skill_categories
+            // seed INSERT succeeded (this is the actual state observed in
+            // the 2026-08-09 production incident) — but crashed before
+            // reaching curated_skills/education or the completion INSERT
+            // into _migrations.
             conn.execute_batch(
-                "ALTER TABLE jobs ADD COLUMN resume_display TEXT NOT NULL DEFAULT 'full';",
+                "ALTER TABLE jobs ADD COLUMN resume_display TEXT NOT NULL DEFAULT 'full';
+                ALTER TABLE job_details ADD COLUMN resume_visible INTEGER NOT NULL DEFAULT 1;
+                CREATE TABLE IF NOT EXISTS skill_categories (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    slug TEXT NOT NULL UNIQUE,
+                    name TEXT NOT NULL,
+                    sort_order INTEGER NOT NULL
+                );
+                INSERT INTO skill_categories (slug, name, sort_order) VALUES
+                    ('languages',      'Languages & Runtimes', 0),
+                    ('frameworks',     'Frameworks',           1),
+                    ('ai-ml',          'AI / ML',              2),
+                    ('aws',            'AWS',                  3),
+                    ('infrastructure', 'Infrastructure',       4),
+                    ('practices',      'Practices',            5);",
             )
             .unwrap();
         }
