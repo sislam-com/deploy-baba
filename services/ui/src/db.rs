@@ -241,7 +241,38 @@ impl Db {
             }
 
             tracing::info!("Applying migration: {}", name);
-            conn.execute_batch(sql)?;
+            if let Err(e) = conn.execute_batch(sql) {
+                // A prior run of this migration can crash partway through
+                // (e.g. Lambda cold-start timeout) after an ALTER TABLE
+                // succeeded but before the completion INSERT below recorded
+                // it as applied. The next attempt re-runs the whole batch
+                // from the top and immediately re-fails on that same
+                // already-applied ALTER TABLE, forever. Retry
+                // statement-by-statement and skip only that specific,
+                // already-applied-column error so the rest of the migration
+                // (new tables, seed data) can still complete.
+                if e.to_string().contains("duplicate column name") {
+                    tracing::warn!(
+                        "Migration {} hit an already-applied ALTER TABLE — retrying statement-by-statement: {}",
+                        name, e
+                    );
+                    // Not a naive `sql.split(';')` — migration file comments
+                    // (`-- ...`) can contain semicolons of their own, which
+                    // a plain string split would mistake for statement
+                    // boundaries.
+                    for stmt in split_sql_statements(sql) {
+                        if let Err(e) = conn.execute_batch(&stmt) {
+                            if e.to_string().contains("duplicate column name") {
+                                tracing::warn!("Skipping already-applied statement in {}", name);
+                                continue;
+                            }
+                            return Err(e.into());
+                        }
+                    }
+                } else {
+                    return Err(e.into());
+                }
+            }
             conn.execute(
                 "INSERT INTO _migrations (name) VALUES (?1)",
                 rusqlite::params![name],
@@ -250,6 +281,62 @@ impl Db {
 
         Ok(())
     }
+}
+
+/// Splits a SQL script into individual top-level statements, respecting
+/// `--` line comments, `/* */` block comments, and `'...'` string literals
+/// (with `''`-escaped quotes) so semicolons inside those don't get mistaken
+/// for statement boundaries. Used only for the migration-runner's
+/// statement-by-statement retry fallback in `run_migrations`.
+fn split_sql_statements(sql: &str) -> Vec<String> {
+    let mut statements = Vec::new();
+    let mut current = String::new();
+    let mut chars = sql.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        current.push(c);
+        match c {
+            '-' if chars.peek() == Some(&'-') => {
+                for nc in chars.by_ref() {
+                    current.push(nc);
+                    if nc == '\n' {
+                        break;
+                    }
+                }
+            }
+            '/' if chars.peek() == Some(&'*') => {
+                current.push(chars.next().unwrap());
+                while let Some(nc) = chars.next() {
+                    current.push(nc);
+                    if nc == '*' && chars.peek() == Some(&'/') {
+                        current.push(chars.next().unwrap());
+                        break;
+                    }
+                }
+            }
+            '\'' => {
+                while let Some(nc) = chars.next() {
+                    current.push(nc);
+                    if nc == '\'' {
+                        if chars.peek() == Some(&'\'') {
+                            current.push(chars.next().unwrap());
+                            continue;
+                        }
+                        break;
+                    }
+                }
+            }
+            ';' => {
+                statements.push(std::mem::take(&mut current));
+            }
+            _ => {}
+        }
+    }
+    if !current.trim().is_empty() {
+        statements.push(current);
+    }
+    statements.retain(|s| !s.trim().is_empty());
+    statements
 }
 
 #[async_trait]
@@ -516,5 +603,95 @@ impl PortfolioDataProvider for Db {
             .collect();
 
         Ok(challenges)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Regression test for a live incident: a migration that ALTERs an
+    /// existing table can crash-loop forever if a prior run applied the
+    /// ALTER TABLE but crashed before the completion INSERT into
+    /// `_migrations` — every retry re-runs the whole batch from the top and
+    /// immediately re-fails on the now-duplicate column. Simulates that
+    /// stuck state directly (bypassing run_migrations for the setup) and
+    /// asserts Db::open recovers and completes the rest of the migration.
+    #[test]
+    fn stuck_migration_recovers_and_completes() {
+        let path = std::env::temp_dir().join(format!(
+            "db_rs_test_{}.sqlite3",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&path);
+        let path_str = path.to_str().unwrap();
+
+        {
+            // Run the real migration chain up through the one immediately
+            // before 024_resume_cleanup, exactly like a normal fresh DB.
+            let conn = Connection::open(path_str).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE _migrations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE,
+                    applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+                );",
+            )
+            .unwrap();
+
+            for (name, sql) in MIGRATIONS {
+                let name: &str = name;
+                if name == "024_resume_cleanup" {
+                    break;
+                }
+                conn.execute_batch(sql).unwrap();
+                conn.execute(
+                    "INSERT INTO _migrations (name) VALUES (?1)",
+                    rusqlite::params![name],
+                )
+                .unwrap();
+            }
+
+            // Simulate a crashed prior run of 024_resume_cleanup: its first
+            // ALTER TABLE succeeded but the migration was never recorded as
+            // applied in _migrations (e.g. a Lambda cold-start timeout
+            // between the ALTER and the completion INSERT).
+            conn.execute_batch(
+                "ALTER TABLE jobs ADD COLUMN resume_display TEXT NOT NULL DEFAULT 'full';",
+            )
+            .unwrap();
+        }
+
+        let db = Db::open(path_str).expect("Db::open should recover from the stuck migration");
+        let conn = db.conn.lock().unwrap();
+
+        let migrated: bool = conn
+            .query_row(
+                "SELECT COUNT(*) > 0 FROM _migrations WHERE name = '024_resume_cleanup'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(migrated, "024_resume_cleanup should be marked applied");
+
+        let has_column: bool = conn
+            .prepare("PRAGMA table_info(job_details)")
+            .unwrap()
+            .query_map([], |row| row.get::<_, String>(1))
+            .unwrap()
+            .filter_map(|r| r.ok())
+            .any(|col| col == "resume_visible");
+        assert!(
+            has_column,
+            "the rest of 024_resume_cleanup (job_details.resume_visible) should have run"
+        );
+
+        let curated_skills: i64 = conn
+            .query_row("SELECT COUNT(*) FROM curated_skills", [], |row| row.get(0))
+            .unwrap();
+        assert!(curated_skills > 0, "seed data should have been inserted");
+
+        drop(conn);
+        let _ = std::fs::remove_file(&path);
     }
 }
