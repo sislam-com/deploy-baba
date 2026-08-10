@@ -153,7 +153,7 @@ lambda-deploy-all ENV="prod":
     just rag-deploy {{ ENV }}
     just mcp-cloud-deploy {{ ENV }}
     just agent-deploy {{ ENV }}
-    just pdf-deploy {{ ENV }}
+    -just pdf-deploy {{ ENV }}
 
 # Promote dev artifacts to prod (Lambda code + SPA copy, no rebuild)
 promote:
