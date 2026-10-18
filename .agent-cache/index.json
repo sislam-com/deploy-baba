@@ -275,7 +275,7 @@
     "upsert_convention": "ADR-010 — INSERT … ON CONFLICT(natural_key) DO UPDATE SET …; banned: INSERT OR IGNORE, INSERT OR REPLACE, split UPDATE+INSERT"
   },
   "git": {
-    "branch": "pydantic-ai",
+    "branch": "devstack-realign",
     "last_commit": "fix: don't let pdf-deploy's Docker dependency block the rest of lambda-deploy-all",
     "remote": "git@github.com:shantopagla/deploy-baba.git",
     "sha": "cef6f39452be99f02037c155dba7df33a51748c8",

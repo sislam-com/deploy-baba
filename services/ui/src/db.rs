@@ -632,10 +632,7 @@ mod tests {
     /// asserts Db::open recovers and completes the rest of the migration.
     #[test]
     fn stuck_migration_recovers_and_completes() {
-        let path = std::env::temp_dir().join(format!(
-            "db_rs_test_{}.sqlite3",
-            std::process::id()
-        ));
+        let path = std::env::temp_dir().join(format!("db_rs_test_{}.sqlite3", std::process::id()));
         let _ = std::fs::remove_file(&path);
         let path_str = path.to_str().unwrap();
 
