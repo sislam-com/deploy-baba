@@ -116,11 +116,19 @@ resource "aws_secretsmanager_secret" "deploy_config" {
 resource "aws_secretsmanager_secret_version" "deploy_config" {
   secret_id = aws_secretsmanager_secret.deploy_config.id
   secret_string = jsonencode({
-    spa_bucket    = aws_s3_bucket.spa.id
-    cloudfront_id = local.is_prod_cdn ? aws_cloudfront_distribution.main[0].id : var.dev_cloudfront_id
-    ui_fn_name    = aws_lambda_function.baba.function_name
-    agent_fn_name = aws_lambda_function.agent.function_name
-    fn_url        = "https://${local.effective_domain}"
+    spa_bucket          = aws_s3_bucket.spa.id
+    cloudfront_id       = local.is_prod_cdn ? aws_cloudfront_distribution.main[0].id : (local.is_dev_cdn ? aws_cloudfront_distribution.dev[0].id : "")
+    ui_fn_name          = aws_lambda_function.baba.function_name
+    agent_fn_name       = aws_lambda_function.agent.function_name
+    email_fn_name       = aws_lambda_function.email.function_name
+    llm_proxy_fn_name   = aws_lambda_function.llm_proxy.function_name
+    auth_fn_name        = aws_lambda_function.auth.function_name
+    portfolio_fn_name   = aws_lambda_function.portfolio.function_name
+    admin_fn_name       = aws_lambda_function.admin.function_name
+    contact_fn_name     = aws_lambda_function.contact.function_name
+    rag_fn_name         = aws_lambda_function.rag.function_name
+    mcp_gateway_fn_name = aws_lambda_function.mcp_gateway.function_name
+    fn_url              = "https://${local.effective_domain}"
   })
 }
 

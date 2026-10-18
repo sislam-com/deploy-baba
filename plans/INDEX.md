@@ -28,7 +28,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | dx-justfile | W-DX | `justfile`, `docs/`, `examples/` | WIP | Per-crate READMEs DONE (10 crates, MIT license); examples TODO, integration tests TODO
 | auth | W-AUTH | `services/auth/` (extracted Lambda) | DONE | Standalone Cognito Lambda on :3002; W-AGW routes `/auth/*` to it |
 | service-protocol | W-SVP | `crates/service-protocol/` | DONE | ServiceRequest/ServiceResponse types; TargetService routing; Lambda name generation |
-| api-gateway | W-AGW | `services/ui/` (routing layer) | WIP | Routing middleware with Lambda SDK invoke; per-service circuit breakers; correlation IDs |
+| api-gateway | W-AGW | `services/ui/` (routing layer) | TODO | Routing middleware with Lambda SDK invoke; per-service circuit breakers; correlation IDs |
 | about | W-ABT | `services/ui/src/routes/api/about.rs`, `services/ui/migrations/008-009` | DONE | Templates deleted (D.5); data served via JSON API to SPA |
 | social-links | W-SL | `services/ui/src/db.rs`, `services/ui/src/routes/api/admin.rs`, `services/ui/migrations/010-011` | DONE | Templates deleted (D.5); nav loop now in React Layout.tsx |
 | contact-form | W-CTF | `services/email/`, `services/ui/src/routes/contact.rs`, `infra/ses.tf`, `infra/email-lambda.tf`, `infra/apigateway.tf` | DONE | e2e test (W-CTF.4.12) — smoke tests created in services/ui/tests/contact_smoke.rs |
@@ -48,7 +48,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | resilience | W-RES | `services/ui/src/middleware/` | DONE | `rate_limit_middleware` (100 req/60s per IP+endpoint); `CircuitBreaker` around LLM calls (5 failures → 60s open); `validate_request_middleware` (1 MB body guard); `RetryPolicy` available for handler retry |
 | module-decomposition | W-MOD | `services/ui/src/modules/` | TODO | Logical module separation (portfolio, rag, admin, auth); independent testing per module; module-specific metrics |
 | mcp-cloud | W-MCP | `crates/mcp-rs/`, `services/mcp-gateway/` | WIP | Private MCP gateway; local mcp-rs + cloud Cognito-authenticated Lambda gateway (ADR-028) |
-| env-promote | W-PROM | `xtask/src/deploy/promote.rs`, `infra/*.tf`, `.github/workflows/` | WIP | Phases 0–4 DONE; Phase 5 needs `just infra-apply` (IAM update for promote) + e2e verification; auto-promote tag kept as interim |
+| env-promote | W-PROM | `xtask/src/deploy/promote.rs`, `infra/*.tf`, `.github/workflows/` | WIP | Phases 0–5 DONE (all 10 zip-based Lambdas covered by promote + dev/prod CI; auto-promote tag retired, `just promote` is the sole path to prod); needs `just infra-apply` + e2e verification |
 | saas-onboard | W-SAAS | `xtask/src/onboard.rs`, `crates/portfolio-rag-mcp/`, `services/ui/src/routes/api/eval.rs` | WIP | Project onboarding for external repos; eval dashboard; project_health MCP tool (ADR-030) |
 | agent | W-AGT | `services/agent/` (Python/PydanticAI) | DONE | PydanticAI agent (ADR-035); infra; cover letter flow; routing; CoverLetter.tsx; rate limit; CI — all complete (2026-06-05) |
 | linkedin-sync | W-LINK | `services/ui/src/routes/api/linkedin.rs`, `web/src/routes/dashboard/LinkedInSync.tsx` | WIP | LinkedIn data import (CSV export); admin diff UI; sync status badges on Jobs/Challenges; secret pre-wired |
@@ -124,7 +124,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 16. ~~**W-CTF.4.13**~~ — Acknowledgement email to submitter — **DONE** (SES production access granted 2026-04-08; `SES_ACK_FROM_EMAIL` restored; external Gmail delivery verified. See `DRL-2026-04-07-ses-sandbox-ack` (RESOLVED).)
 17. ~~**W-CHL.4.1–4.9**~~ — Challenges feature + admin CRUD + RAG corpus integration — **DONE** (migration 022, API routes, admin dashboard, RAG 7th corpus integration)
 18. ~~**W-CHL.4.10–4.13, 4.14–4.21**~~ — Challenges remaining features + markdown SSOT pivot — **DONE** (public portfolio pages, search/filter, then content/challenges/*.md source-of-truth pivot 2026-07-08 per ADR-036 — admin CRUD removed; evaluation metrics (W-CHL.4.12) still deferred)
-19. **W-LLM.4.1–4.4** — LLM provider abstraction + Claude reference adapter (see `plans/modules/llm-core.md`) — TODO
+19. ~~**W-LLM.4.1–4.4**~~ — LLM provider abstraction + Claude reference adapter (see `plans/modules/llm-core.md`) — **DONE** (W-LLM.4.1–4.16)
 18. **W-RST.4.1–4.10** — AI Resume Tailor pipeline on W-LLM (see `plans/modules/resume-tailor.md`) — TODO; BLOCKED-on-deploy for items 4.3/4.4/4.5 until W-SEC deployed + `anthropic-api-key` in SM
 
 ### P2.7 — SaaS AI-DLC (ADR-030)
@@ -234,6 +234,7 @@ See `plans/CONVENTIONS.md` for notation system, domain codes, and file naming ru
 | DRL-2026-05-04-adr015-feature-flag-not-implemented | 2026-05-04 | ADR-015 rule 3 claims feature-flag adapter selection; actual uses llm-proxy Lambda | **RESOLVED** — ADR-015 rule 3 updated to describe runtime provider selection via llm-proxy |
 | DRL-2026-05-09-rag-challenges-corpus | 2026-05-09 | Challenges 7th corpus undocumented in plan system (W-RAG, W-CHL, ADR-016) | 7 entries; 6 RESOLVED, 1 PENDING (cache refresh) |
 | DRL-2026-05-28-rag-quality-p6 | 2026-05-28 | RAG quality P6: TypeScript + Python corpora, FTS improvements, aliasing split, MCP eval tools, sync agent, plan drift | 9 entries; all RESOLVED |
+| DRL-2026-10-15-dev-stack-port-shadowing | 2026-10-15 | dev-stack: Vite drifted onto :3001 and proxied to itself (EADDRNOTAVAIL); preflight kill bug; stale port docs | 3 entries; all RESOLVED |
 
 ---
 
@@ -299,7 +300,7 @@ shantopagla/deploy-baba/
 ├── infra/                  # OpenTofu (Lambda + EFS + S3 + EventBridge)
 ├── examples/               # 4 standalone examples
 ├── docs/                   # aws-setup.md, architecture.md, etc.
-└── plans/                  # This plan system (replaces PLAN.md monolith)
+└── plans/                  # This plan system (replaced the PLAN.md monolith, removed 2026-10-15 — see git history)
     ├── INDEX.md            # ← you are here
     ├── CONVENTIONS.md
     ├── adr/

@@ -286,9 +286,14 @@ impl Db {
 
 /// True if a SQLite error means "this statement's effect already exists"
 /// rather than a genuine failure — i.e. safe to skip when retrying a
-/// partially-applied migration statement-by-statement.
+/// partially-applied migration statement-by-statement. Covers the general
+/// class of "already applied" errors (not just the two that have actually
+/// crash-looped prod so far) so a new statement type in a future migration
+/// doesn't require another live hotfix.
 fn is_already_applied_error(msg: &str) -> bool {
-    msg.contains("duplicate column name") || msg.contains("UNIQUE constraint failed")
+    msg.contains("duplicate column name")
+        || msg.contains("UNIQUE constraint failed")
+        || msg.contains("already exists")
 }
 
 /// Splits a SQL script into individual top-level statements, respecting
@@ -717,5 +722,28 @@ mod tests {
 
         drop(conn);
         let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn already_applied_error_covers_known_and_general_cases() {
+        // The two error strings actually seen in the 2026-08-09 incident.
+        assert!(is_already_applied_error(
+            "duplicate column name: resume_display"
+        ));
+        assert!(is_already_applied_error(
+            "UNIQUE constraint failed: skill_categories.slug"
+        ));
+        // General "already exists" class — not yet observed in prod, but the
+        // same failure mode (a statement re-run after a crashed partial
+        // migration) for CREATE TABLE / CREATE INDEX without IF NOT EXISTS.
+        assert!(is_already_applied_error(
+            "table skill_categories already exists"
+        ));
+        assert!(is_already_applied_error(
+            "index idx_job_details_job_id already exists"
+        ));
+        // A genuine failure must still propagate.
+        assert!(!is_already_applied_error("no such table: jobs"));
+        assert!(!is_already_applied_error("syntax error near \"SELCT\""));
     }
 }

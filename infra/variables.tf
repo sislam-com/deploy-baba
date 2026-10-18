@@ -149,39 +149,10 @@ variable "pdf_lambda_image_uri" {
   default     = "" # Set via justfile or tfvars after building image
 }
 
-# ─── Dev-origin bootstrap overrides (ADR-029 CDN separation) ──────────────────
-# The dev CloudFront distribution is a singleton managed in the default/prod
-# workspace, but its origins are dev-workspace resources (separate tfstate).
-# These are plain outputs from the dev workspace with no natural cross-state
-# reference, so — same pattern as pdf_lambda_image_uri above — they're pasted
-# into terraform.tfvars once after `just infra-apply dev`:
-#   tofu -chdir=infra output -raw function_url          → dev_ui_lambda_url
-#   tofu -chdir=infra output -raw auth_function_url     → dev_auth_lambda_url
-#   tofu -chdir=infra output -raw contact_api_endpoint  → dev_apigw_endpoint
-# dev_cloudfront_id is the reverse direction: read from the default workspace
-# (`tofu output -raw dev_cloudfront_distribution_id`) after Phase 2 below, then
-# pasted into terraform.tfvars for the *dev* workspace apply.
-
-variable "dev_ui_lambda_url" {
-  description = "Dev UI Lambda Function URL — origin for the dev CloudFront distribution"
-  type        = string
-  default     = ""
-}
-
-variable "dev_auth_lambda_url" {
-  description = "Dev auth Lambda Function URL — origin for the dev CloudFront distribution"
-  type        = string
-  default     = ""
-}
-
-variable "dev_apigw_endpoint" {
-  description = "Dev contact API Gateway invoke endpoint — origin for the dev CloudFront distribution"
-  type        = string
-  default     = ""
-}
-
-variable "dev_cloudfront_id" {
-  description = "Dev CloudFront distribution ID — written into deploy-baba/dev/deploy-config by the dev workspace apply"
-  type        = string
-  default     = ""
-}
+# ─── Dev CDN separation (ADR-029) ─────────────────────────────────────────────
+# The dev CloudFront distribution and its dev.${domain_name} Route53 records are
+# owned by the *dev* workspace and resolve their origins from dev's own state,
+# so no cross-workspace bootstrap variables are needed. `just infra-apply dev`
+# and `just infra-apply` (prod) are fully independent — neither reads the
+# other's outputs. The shared wildcard ACM cert and hosted zone are read via
+# data sources (see acm.tf, cdn.tf).

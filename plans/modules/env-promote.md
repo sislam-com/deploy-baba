@@ -1,7 +1,7 @@
 # W-PROM: Environment Separation & Artifact Promotion
 
 **Path:** `xtask/src/deploy/promote.rs`, `infra/*.tf`, `.github/workflows/`  
-**Status:** WIP — Phases 0–4 DONE; Phase 5 needs infra-apply (IAM update) + e2e verification  
+**Status:** WIP — Phases 0–5 DONE (auto-promote retired); needs `just infra-apply` + e2e verification  
 **Depends on:** W-CI, W-OTF, W-XT, W-MCP  
 **Depended on by:** (e2e testing, safe production deploys)
 
@@ -154,7 +154,7 @@ Dev workspace exists (`tofu workspace list` shows `dev`). CI deploys to dev on e
 
 | ID | Task | Status |
 |---|---|---|
-| W-PROM.4.18 | Create `xtask/src/deploy/promote.rs`: download dev Lambda zips, upload to prod | DONE |
+| W-PROM.4.18 | Create `xtask/src/deploy/promote.rs`: download dev Lambda zips, upload to prod | DONE — covers all 10 zip-based services (ui, agent, email, llm-proxy, auth, portfolio, admin, contact, rag, mcp-gateway); pdf is Docker/ECR-image based and out of scope (2026-09-10) |
 | W-PROM.4.19 | S3 server-side copy (dev SPA → prod SPA, preserving cache-control + stale deletion) | DONE |
 | W-PROM.4.20 | CloudFront invalidation + smoke test in promote flow | DONE |
 | W-PROM.4.21 | Release tag creation (vX.Y.Z) on successful promote (`--skip-tag` to opt out) | DONE |
@@ -164,10 +164,51 @@ Dev workspace exists (`tofu workspace list` shows `dev`). CI deploys to dev on e
 
 | ID | Task | Status |
 |---|---|---|
-| W-PROM.4.23 | `deploy-dev.yml` reads `deploy-baba/dev/deploy-config`, targets dev Lambdas | DONE |
-| W-PROM.4.24 | `promote.yml` workflow_dispatch: artifact promote (rebuild fallback kept in `deploy-prod.yml`) | DONE |
-| W-PROM.4.25 | Remove auto-promote tag from deploy-dev.yml (line 186-187); promotion is now explicit | DEFERRED — kept as interim; both paths (tag-promote + artifact-promote) coexist (2026-06-07) |
-| W-PROM.4.26 | End-to-end: push to main → CI → dev deploy → `just promote` → prod live | TODO — requires `just infra-apply` to update prod CI role IAM, then manual test |
+| W-PROM.4.23 | `deploy-dev.yml` reads `deploy-baba/dev/deploy-config`, targets dev Lambdas | DONE — now builds+deploys all 10 zip-based services, not just ui/agent (2026-09-10) |
+| W-PROM.4.24 | `promote.yml` workflow_dispatch: artifact promote (rebuild fallback kept in `deploy-prod.yml`) | DONE — `deploy-prod.yml` rebuild fallback extended to the same 10-service set for parity (2026-09-10) |
+| W-PROM.4.25 | Remove auto-promote tag from deploy-dev.yml (line 186-187); promotion is now explicit | DONE — auto-tag-promote step removed from `deploy-dev.yml`; `just promote` / `promote.yml` workflow_dispatch is now the sole path to prod (2026-09-10) |
+| W-PROM.4.26 | End-to-end: push to main → CI → dev deploy → `just promote` → prod live | TODO — `ci-oidc.tf` IAM already wildcards `${project}-{env}*`, no policy change needed; still requires `just infra-apply` (to land the new `deploy-config` secret fields) and a manual end-to-end test |
+
+## W-PROM.4b CDN Ownership Separation (2026-09-12)
+
+Previously `aws_cloudfront_distribution.dev` and the `dev.sislam.com` Route53
+records were gated `is_prod_cdn` — i.e. owned by the **prod** workspace — while
+their origins were **dev** workspace resources, bridged by hand-pasted
+`terraform.tfvars` values (`dev_ui_lambda_url`, `dev_auth_lambda_url`,
+`dev_apigw_endpoint`, `dev_cloudfront_id`). Those were empty, so every
+`just infra-apply` failed with `origin.N.domain_name must not be empty`: a prod
+apply broken by dev resources.
+
+Now each workspace owns its own distribution and resolves origins from its own
+state (`cdn.tf`: `is_dev_cdn`, `manages_cdn`, `cdn_name_suffix`). The shared
+wildcard cert is read via `data.aws_acm_certificate.wildcard` in non-prod
+(`acm.tf`, `local.cdn_certificate_arn`); the hosted zone via the existing
+`data.aws_route53_zone.main`. All four bootstrap variables are deleted. Prod
+keeps unsuffixed OAC/policy names so its live distribution is undisturbed.
+
+**Apply order matters for the one-time transition** — `dev_a`/`dev_aaaa` are
+currently in *prod* state:
+
+1. `just infra-apply` — drops the `dev.sislam.com` alias from `main` and
+   releases the dev records from prod state (dev.sislam.com goes dark).
+2. `just infra-apply dev` — creates the dev distribution + records
+   (CloudFront propagation ~5–15 min).
+
+### ⚠️ Open hazard: prod-named resource in dev state
+
+`aws_cloudwatch_event_rule.backup_schedule` in the **dev** workspace state
+points at the live **prod** rule (`deploy-baba-prod-backup-schedule`, confirmed
+by ARN). A `just infra-apply dev` would replace it — destroying prod's backup
+schedule — before creating the dev-named one. Prod state legitimately owns that
+same rule, so the fix is to drop the stale dev pointer (no AWS change):
+
+```
+tofu -chdir=infra workspace select dev
+tofu -chdir=infra state rm aws_cloudwatch_event_rule.backup_schedule
+```
+
+Do this **before** the first `just infra-apply dev`. Every other resource in dev
+state is correctly `deploy-baba-dev-*` named.
 
 ## W-PROM.5 Implementation Notes
 

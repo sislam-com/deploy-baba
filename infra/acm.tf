@@ -1,7 +1,9 @@
 # Managed wildcard cert: covers sislam.com + *.sislam.com (prod singleton)
 #
-# Shared across all environments. Dev workspace skips cert creation — it
-# re-uses the existing wildcard cert via the shared CloudFront distribution.
+# Shared across all environments. The dev workspace skips cert creation and
+# looks the issued cert up by domain instead (see data source below), so each
+# workspace can own its own CloudFront distribution without one environment's
+# apply depending on the other's state.
 
 locals {
   is_prod_acm = var.environment == "prod"
@@ -44,4 +46,22 @@ resource "aws_acm_certificate_validation" "wildcard" {
   count                   = local.is_prod_acm ? 1 : 0
   certificate_arn         = aws_acm_certificate.wildcard[0].arn
   validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]
+}
+
+# Non-prod workspaces read the prod-owned wildcard cert instead of creating one.
+# `*.${var.domain_name}` is covered by the SAN, so dev.${var.domain_name} can use it.
+data "aws_acm_certificate" "wildcard" {
+  count       = local.is_prod_acm ? 0 : 1
+  domain      = var.domain_name
+  statuses    = ["ISSUED"]
+  most_recent = true
+}
+
+locals {
+  # The cert ARN this workspace's CloudFront distribution should present.
+  # Prod uses the validation resource (which blocks until the cert is usable);
+  # dev uses the data-source lookup of that same already-validated cert.
+  cdn_certificate_arn = local.is_prod_acm ? (
+    length(aws_acm_certificate_validation.wildcard) > 0 ? aws_acm_certificate_validation.wildcard[0].certificate_arn : ""
+  ) : data.aws_acm_certificate.wildcard[0].arn
 }

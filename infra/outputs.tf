@@ -4,12 +4,12 @@ output "function_url" {
 }
 
 output "auth_function_url" {
-  description = "Auth Lambda Function URL — read from the dev workspace to bootstrap dev_auth_lambda_url"
+  description = "Auth Lambda Function URL for this workspace's environment"
   value       = aws_lambda_function_url.auth.function_url
 }
 
 output "contact_api_endpoint" {
-  description = "Contact API Gateway invoke endpoint — read from the dev workspace to bootstrap dev_apigw_endpoint"
+  description = "Contact API Gateway invoke endpoint for this workspace's environment"
   value       = aws_apigatewayv2_api.contact.api_endpoint
 }
 
@@ -64,8 +64,8 @@ output "cloudfront_domain_name" {
 }
 
 output "dev_cloudfront_distribution_id" {
-  description = "Dev CloudFront distribution ID — paste into terraform.tfvars as dev_cloudfront_id, then `just infra-apply dev`"
-  value       = local.is_prod_cdn ? aws_cloudfront_distribution.dev[0].id : ""
+  description = "Dev CloudFront distribution ID (only set in the dev workspace, which owns it)"
+  value       = local.is_dev_cdn ? aws_cloudfront_distribution.dev[0].id : ""
 }
 
 output "site_url" {

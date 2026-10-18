@@ -70,10 +70,13 @@ Checks each tool and prints a colour status table. Checks:
     "ghcr.io/devcontainers/features/github-cli:1": {}
   },
   "postCreateCommand": "bash scripts/dev-doctor.sh && cargo build --workspace && pnpm --dir web install",
-  "forwardPorts": [3000, 5173],
+  "forwardPorts": [3000, 3001, 3002, 3003, 3004],
   "portsAttributes": {
-    "3000": { "label": "Lambda (local)" },
-    "5173": { "label": "Vite dev server" }
+    "3000": { "label": "Vite dev server (SPA + proxy)" },
+    "3001": { "label": "ui service (local API)" },
+    "3002": { "label": "auth service" },
+    "3003": { "label": "agent service" },
+    "3004": { "label": "pdf service" }
   },
   "customizations": {
     "vscode": {
@@ -84,6 +87,19 @@ Checks each tool and prints a colour status table. Checks:
 ```
 
 OpenTofu is not installed as a devcontainer feature (no official feature exists). Add via `postCreateCommand` `sudo apt-get install -y opentofu` or the opentofu install script.
+
+### Local port registry (`just dev-stack`)
+
+| Port | Process | Notes |
+|---|---|---|
+| 3000 | Vite dev server (SPA + proxy) | **Pinned** — Cognito callback/logout URLs (`infra/cognito.tf`), `APP_DOMAIN` default (`services/ui/src/auth.rs`), LinkedIn OAuth redirect (`services/agent/src/linkedin_oauth.py`). `strictPort: true` in `web/vite.config.ts` |
+| 3001 | `deploy-baba-ui` (Rust API) | Proxy target for `/api`, `/auth/*`, `/resume`; agent reaches it via `UI_SERVICE_URL`/`UI_BASE_URL` |
+| 3002 | `auth-lambda` | Proxy target for `/api/auth` |
+| 3003 | agent (uvicorn) | Proxy target for `/api/v1/agent` |
+| 3004 | pdf (uvicorn) | Agent `PDF_SERVICE_URL` |
+| 5555 | moto S3 emulator | Agent artifact bucket |
+
+Proxy targets use `127.0.0.1`, not `localhost`: all backends bind IPv4 only. The dev-stack preflight kills only listeners that belong to this stack. If a foreign process holds one of these ports, the run aborts (DRL-2026-10-15).
 
 ## W-DEV.4 Work Items
 
@@ -98,13 +114,14 @@ OpenTofu is not installed as a devcontainer feature (no official feature exists)
 | W-DEV.4.7 | `just sso-login` recipe + dev-stack env-strip | DONE | `aws sso login --profile deploy-baba`; `just ui` + `just dev-stack` strip stale static keys and set `AWS_PROFILE=deploy-baba` (mirrors njnewsroomproject pattern) |
 | W-DEV.4.8 | dev-stack ANTHROPIC_API_KEY_ARN wiring | DONE | `just ui` + `just dev-stack` set `ANTHROPIC_API_KEY_ARN=root-anthropic-access-key`; `init_anthropic_key()` (services/ui/src/main.rs:34) fetches it via `secretsmanager:GetSecretValue` at cold start, reusing the Lambda-side dual-mode loader |
 | W-DEV.4.9 | `just dev-env` recipe — unified dev env config | DONE | Fetches Cognito pool/client/domain from SSM + JWKS from public endpoint; layers Anthropic ARN + RAG_PUBLIC_ENABLED + APP_DOMAIN; sourced by `just ui`/`just dev-stack` via `eval "$(just dev-env)"`; eliminates dev-mode auth bypass |
+| W-DEV.4.10 | dev-stack port hardening | DONE | Vite `strictPort` + IPv4 proxy targets; preflight matches LISTEN only, kills own processes only, aborts on foreign listener; devcontainer ports synced; see DRL-2026-10-15-dev-stack-port-shadowing |
 
 ## W-DEV.5 Test Strategy
 
 - `bash scripts/bootstrap-tfstate.sh` — run twice; second run should print "already exists" for both resources and exit 0.
 - `bash scripts/dev-doctor.sh` — run in a fresh Codespaces environment; all checks green after `postCreateCommand` completes.
 - `just infra-bootstrap` — calls the script and passes through its exit code.
-- `.devcontainer/` — open repo in GitHub Codespaces; `postCreateCommand` completes without error; `just dev` passes; Vite dev server starts on :5173; Lambda binary starts on :3000.
+- `.devcontainer/` — open repo in GitHub Codespaces; `postCreateCommand` completes without error; `just dev` passes; Vite dev server starts on :3000; ui service starts on :3001.
 
 ## W-DEV.6 Cross-References
 

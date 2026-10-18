@@ -85,7 +85,7 @@ Update `git.sha`, `last_updated`, and the relevant component's `git_sha_at_scan`
 | `database` | Engine, location, migration path |
 | `key_commands` | All `just` commands |
 | `known_patterns` | Error handling, async, templating conventions |
-| `adrs` | All 34 architecture decisions at a glance |
+| `adrs` | All 36 architecture decisions at a glance |
 
 ### Cache management
 - `just cache-status` — show cache age and staleness vs current HEAD
@@ -204,7 +204,7 @@ Key commands:
 - `just dev-stack` — start local dev stack with all services
 - `just cache-status` / `just cache-refresh` — check / rebuild agent cache
 
-### Architecture Decisions (34 ADRs — ADR-001 through ADR-034)
+### Architecture Decisions (36 ADRs — ADR-001 through ADR-036)
 
 Key decisions:
 - **ADR-001:** justfile-only interface — xtask is internal plumbing, never invoked directly
@@ -221,6 +221,8 @@ Key decisions:
 - **ADR-029:** Dev/Prod Separation and Promote — environment promotion workflow
 - **ADR-031:** Lambda Microservices Architecture — per-service Lambda functions
 - **ADR-034:** Agent Lambda Deployment — agentic service deployment pattern
+- **ADR-035:** PydanticAI Agent Migration — agent service built on PydanticAI
+- **ADR-036:** Challenges Content as Markdown SSOT — `content/challenges/*.md` synced into SQLite
 
 Full list: `plans/adr/`
 
@@ -249,9 +251,9 @@ Entry point: `plans/INDEX.md` — lists all modules, ADRs, cross-cutting concern
 
 Structure under `plans/`:
 - `modules/` — 42 per-component plans (incl. ai-dlc, ci, web, rag, agent, linkedin-sync, challenges, mcp-cloud, env-promote)
-- `adr/` — 34 architecture decision records (ADR-001 through ADR-034)
+- `adr/` — 36 architecture decision records (ADR-001 through ADR-036)
 - `cross-cutting/` — 12 shared concern files (incl. ai-dlc.md, aws-architecture.md, quality-gates.md, llm-policy.md)
-- `drift/` — 23 drift logs (format: `DRL-YYYY-MM-DD-topic`)
+- `drift/` — 24 drift logs (format: `DRL-YYYY-MM-DD-topic`)
 
 AI-DLC session lifecycle: `plans/cross-cutting/ai-dlc.md` — covers the 6 stages (Startup → Planning → Implementation → Verification → Maintenance → Commit). Run `/plan-sync` at the end of any implementation session to sync module Status fields, INDEX.md, and ADR back-references.
 

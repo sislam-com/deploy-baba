@@ -34,6 +34,14 @@ jobs:
           echo "CLOUDFRONT_ID=$(echo "$SECRET" | jq -r .cloudfront_id)" >> "$GITHUB_ENV"
           echo "UI_FN_NAME=$(echo "$SECRET" | jq -r .ui_fn_name)" >> "$GITHUB_ENV"
           echo "AGENT_FN_NAME=$(echo "$SECRET" | jq -r .agent_fn_name)" >> "$GITHUB_ENV"
+          echo "EMAIL_FN_NAME=$(echo "$SECRET" | jq -r .email_fn_name)" >> "$GITHUB_ENV"
+          echo "LLM_PROXY_FN_NAME=$(echo "$SECRET" | jq -r .llm_proxy_fn_name)" >> "$GITHUB_ENV"
+          echo "AUTH_FN_NAME=$(echo "$SECRET" | jq -r .auth_fn_name)" >> "$GITHUB_ENV"
+          echo "PORTFOLIO_FN_NAME=$(echo "$SECRET" | jq -r .portfolio_fn_name)" >> "$GITHUB_ENV"
+          echo "ADMIN_FN_NAME=$(echo "$SECRET" | jq -r .admin_fn_name)" >> "$GITHUB_ENV"
+          echo "CONTACT_FN_NAME=$(echo "$SECRET" | jq -r .contact_fn_name)" >> "$GITHUB_ENV"
+          echo "RAG_FN_NAME=$(echo "$SECRET" | jq -r .rag_fn_name)" >> "$GITHUB_ENV"
+          echo "MCP_GATEWAY_FN_NAME=$(echo "$SECRET" | jq -r .mcp_gateway_fn_name)" >> "$GITHUB_ENV"
           echo "FN_URL=$(echo "$SECRET" | jq -r .fn_url)" >> "$GITHUB_ENV"
 
       # ── Build Lambda ──────────────────────────────────────────────────────────
@@ -95,6 +103,60 @@ jobs:
         run: |
           aws lambda wait function-updated \
             --function-name "$AGENT_FN_NAME" \
+            --region us-east-1
+
+      # ── Build + deploy the remaining Rust service Lambdas ─────────────────────
+      # Rebuild fallback for parity with deploy-dev.yml (env-promote.md W-PROM) —
+      # the primary path to prod is `just promote` (artifact copy from dev);
+      # this workflow only runs on a direct vX.Y.Z tag push.
+
+      - name: Build + deploy remaining service Lambdas
+        run: |
+          set -euo pipefail
+          declare -A PKG=(
+            [EMAIL_FN_NAME]=email-lambda
+            [LLM_PROXY_FN_NAME]=llm-proxy
+            [AUTH_FN_NAME]=auth-lambda
+            [PORTFOLIO_FN_NAME]=portfolio-lambda
+            [ADMIN_FN_NAME]=admin-lambda
+            [CONTACT_FN_NAME]=contact-lambda
+            [RAG_FN_NAME]=rag-lambda
+          )
+          for var in "${!PKG[@]}"; do
+            pkg="${PKG[$var]}"
+            fn_name="${!var}"
+            echo "── Building ${pkg} → ${fn_name} ──"
+            cargo lambda build --release --package "$pkg" --target aarch64-unknown-linux-gnu
+            zip -j "infra/build/${pkg}.zip" "target/lambda/${pkg}/bootstrap"
+            aws lambda update-function-code \
+              --function-name "$fn_name" \
+              --zip-file "fileb://infra/build/${pkg}.zip" \
+              --architectures arm64 \
+              --region us-east-1
+            aws lambda wait function-updated \
+              --function-name "$fn_name" \
+              --region us-east-1
+          done
+
+      # ── Build + deploy the MCP gateway Lambda ─────────────────────────────────
+
+      - uses: extractions/setup-just@v3
+
+      - name: Build MCP gateway Lambda zip
+        run: just mcp-cloud-build
+
+      - name: Update MCP gateway Lambda code
+        run: |
+          aws lambda update-function-code \
+            --function-name "$MCP_GATEWAY_FN_NAME" \
+            --zip-file fileb://infra/build/mcp-gateway-lambda.zip \
+            --architectures arm64 \
+            --region us-east-1
+
+      - name: Wait for MCP gateway Lambda update
+        run: |
+          aws lambda wait function-updated \
+            --function-name "$MCP_GATEWAY_FN_NAME" \
             --region us-east-1
 
       # ── Build + deploy SPA ────────────────────────────────────────────────────

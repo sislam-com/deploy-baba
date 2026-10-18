@@ -18,7 +18,7 @@ import httpx
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 
-_UI_BASE = os.environ.get("UI_SERVICE_URL", "http://localhost:3000")
+_UI_BASE = os.environ.get("UI_SERVICE_URL", "http://localhost:3001")
 
 
 class RAGReport(BaseModel):

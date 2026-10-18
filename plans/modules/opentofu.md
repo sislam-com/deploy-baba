@@ -196,7 +196,7 @@ curl -fsSL https://get.opentofu.org/install-opentofu.sh | sh -s -- --install-met
 
 **Already clean (no action):**
 - `README.md` — 0 terraform references
-- `PLAN.md` — archived
+- `PLAN.md` — removed 2026-10-15 (superseded by plans/INDEX.md; see git history)
 - `plans/modules/terraform.md`, `plans/drift/DRL-*`, `plans/adr/ADR-*` — historical/intentional
 
 **Files to update (prose only, 9 files):**
@@ -223,7 +223,7 @@ curl -fsSL https://get.opentofu.org/install-opentofu.sh | sh -s -- --install-met
 **Intentionally NOT changed:**
 - AWS resource names: DynamoDB `terraform-lock`, S3 key `terraform.tfstate`, IAM SIDs — deployed names
 - HCL `terraform {}` block — syntax, not product name
-- Archived/historical: PLAN.md, terraform.md, drift logs, ADRs
+- Archived/historical: terraform.md, drift logs, ADRs
 
 ### Dependency Order
 ```

@@ -1,5 +1,5 @@
 # W-CI: CI/CD Pipeline
-**Path:** `.github/workflows/` | **Status:** WIP
+**Path:** `.github/workflows/` | **Status:** DONE
 **Coverage floor:** n/a | **Depends on:** W-OTF, W-WEB, W-XT | **Depended on by:** (deployed binaries + SPA)
 
 ## W-CI.1 Purpose

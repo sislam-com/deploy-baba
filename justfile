@@ -508,15 +508,29 @@ dev-stack:
     #!/usr/bin/env bash
     set -euo pipefail
 
-    # Pre-empt any stale processes on our ports
+    # Pre-empt stale dev-stack processes on our ports. Only listeners are matched
+    # (never connected clients), and only processes belonging to this stack are
+    # killed — a foreign listener aborts the run, since :3000 is pinned by the
+    # Cognito/LinkedIn OAuth redirects and Vite must not drift onto :3001.
+    repo_root="$(pwd)"
     for port in 3000 3001 3002 3003 3004 5555; do
-        pid=$(lsof -ti tcp:$port 2>/dev/null || true)
-        if [ -n "$pid" ]; then
-            echo "Port $port occupied by PID $pid — stopping..."
-            kill "$pid" 2>/dev/null || true
-            sleep 0.5
-            kill -9 "$pid" 2>/dev/null || true
-        fi
+        for pid in $(lsof -ti tcp:$port -sTCP:LISTEN 2>/dev/null || true); do
+            # A reloader parent (uvicorn --reload) takes its worker down with it,
+            # so a later PID in the list may already be gone.
+            kill -0 "$pid" 2>/dev/null || continue
+            cmd=$(ps -o command= -p "$pid" 2>/dev/null || true)
+            cwd=$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' || true)
+            if [[ "$cwd" == "$repo_root"* ]] || [[ "$cmd" =~ deploy-baba|auth-lambda|uvicorn|moto_server|vite ]]; then
+                echo "Port $port held by stale dev-stack PID $pid — stopping..."
+                kill "$pid" 2>/dev/null || true
+                sleep 0.5
+                kill -9 "$pid" 2>/dev/null || true
+            else
+                echo "✗ Port $port is held by a foreign process (PID $pid): $cmd" >&2
+                echo "  Stop it or move it to another port, then re-run 'just dev-stack'." >&2
+                exit 1
+            fi
+        done
     done
 
     # If a local DB exists, validate it; if not, try S3 sync then fall back to fresh-from-migrations
@@ -622,6 +636,7 @@ dev-stack:
             AWS_ACCESS_KEY_ID=testing \
             AWS_SECRET_ACCESS_KEY=testing \
             UI_BASE_URL=http://localhost:3001 \
+            UI_SERVICE_URL=http://localhost:3001 \
             PDF_SERVICE_URL=http://localhost:3004 \
             PYTHONPATH=src \
             uv run uvicorn handler:app --host 0.0.0.0 --port 3003 --reload) &

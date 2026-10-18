@@ -1,5 +1,5 @@
 # W-VER: api-versioning
-**Path:** `services/ui/src/middleware/`, `services/ui/src/router.rs` | **Status:** Done
+**Path:** `services/ui/src/middleware/`, `services/ui/src/router.rs` | **Status:** DONE
 **Coverage floor:** 80% | **Depends on:** W-UI, W-APIO | **Depended on by:** W-OBS, W-RES
 
 ---

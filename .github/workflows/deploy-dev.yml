@@ -39,6 +39,14 @@ jobs:
           echo "CLOUDFRONT_ID=$(echo "$SECRET" | jq -r .cloudfront_id)" >> "$GITHUB_ENV"
           echo "UI_FN_NAME=$(echo "$SECRET" | jq -r .ui_fn_name)" >> "$GITHUB_ENV"
           echo "AGENT_FN_NAME=$(echo "$SECRET" | jq -r .agent_fn_name)" >> "$GITHUB_ENV"
+          echo "EMAIL_FN_NAME=$(echo "$SECRET" | jq -r .email_fn_name)" >> "$GITHUB_ENV"
+          echo "LLM_PROXY_FN_NAME=$(echo "$SECRET" | jq -r .llm_proxy_fn_name)" >> "$GITHUB_ENV"
+          echo "AUTH_FN_NAME=$(echo "$SECRET" | jq -r .auth_fn_name)" >> "$GITHUB_ENV"
+          echo "PORTFOLIO_FN_NAME=$(echo "$SECRET" | jq -r .portfolio_fn_name)" >> "$GITHUB_ENV"
+          echo "ADMIN_FN_NAME=$(echo "$SECRET" | jq -r .admin_fn_name)" >> "$GITHUB_ENV"
+          echo "CONTACT_FN_NAME=$(echo "$SECRET" | jq -r .contact_fn_name)" >> "$GITHUB_ENV"
+          echo "RAG_FN_NAME=$(echo "$SECRET" | jq -r .rag_fn_name)" >> "$GITHUB_ENV"
+          echo "MCP_GATEWAY_FN_NAME=$(echo "$SECRET" | jq -r .mcp_gateway_fn_name)" >> "$GITHUB_ENV"
           echo "FN_URL=$(echo "$SECRET" | jq -r .fn_url)" >> "$GITHUB_ENV"
 
       # ── Build Lambda ──────────────────────────────────────────────────────────
@@ -113,6 +121,64 @@ jobs:
             --function-name "$AGENT_FN_NAME" \
             --region us-east-1
 
+      # ── Build + deploy the remaining Rust service Lambdas ─────────────────────
+      # email/llm-proxy/auth/portfolio/admin/contact/rag each build+deploy the
+      # same way as the UI Lambda above — looped to avoid 7x copy-pasted steps.
+      # Keeps dev fully fresh so `just promote` always has correct artifacts to
+      # copy to prod for every service, not just ui/agent.
+
+      - name: Build + deploy remaining service Lambdas
+        run: |
+          set -euo pipefail
+          declare -A PKG=(
+            [EMAIL_FN_NAME]=email-lambda
+            [LLM_PROXY_FN_NAME]=llm-proxy
+            [AUTH_FN_NAME]=auth-lambda
+            [PORTFOLIO_FN_NAME]=portfolio-lambda
+            [ADMIN_FN_NAME]=admin-lambda
+            [CONTACT_FN_NAME]=contact-lambda
+            [RAG_FN_NAME]=rag-lambda
+          )
+          for var in "${!PKG[@]}"; do
+            pkg="${PKG[$var]}"
+            fn_name="${!var}"
+            echo "── Building ${pkg} → ${fn_name} ──"
+            cargo lambda build --release --package "$pkg" --target aarch64-unknown-linux-gnu
+            zip -j "infra/build/${pkg}.zip" "target/lambda/${pkg}/bootstrap"
+            aws lambda update-function-code \
+              --function-name "$fn_name" \
+              --zip-file "fileb://infra/build/${pkg}.zip" \
+              --architectures arm64 \
+              --region us-east-1
+            aws lambda wait function-updated \
+              --function-name "$fn_name" \
+              --region us-east-1
+          done
+
+      # ── Build + deploy the MCP gateway Lambda ─────────────────────────────────
+      # Its build (mcp-cloud-build) bundles plan/ADR/migration context alongside
+      # the binary and is nontrivial enough to keep as a single justfile recipe
+      # rather than duplicating it here — install `just` and reuse it directly.
+
+      - uses: extractions/setup-just@v3
+
+      - name: Build MCP gateway Lambda zip
+        run: just mcp-cloud-build
+
+      - name: Update MCP gateway Lambda code
+        run: |
+          aws lambda update-function-code \
+            --function-name "$MCP_GATEWAY_FN_NAME" \
+            --zip-file fileb://infra/build/mcp-gateway-lambda.zip \
+            --architectures arm64 \
+            --region us-east-1
+
+      - name: Wait for MCP gateway Lambda update
+        run: |
+          aws lambda wait function-updated \
+            --function-name "$MCP_GATEWAY_FN_NAME" \
+            --region us-east-1
+
       # ── Build + deploy SPA ────────────────────────────────────────────────────
 
       - uses: pnpm/action-setup@v5
@@ -183,7 +249,6 @@ jobs:
       - name: Create dev-vX.Y.Z tag
         run: cargo run -q -p xtask -- release tag --kind dev --push
 
-      # INTERIM: Auto-promote to prod until W-PROM Phase 4 (just promote) is built.
-      # Remove when W-PROM.4.25 is complete — promotion will then be explicit.
-      - name: Promote dev-vX.Y.Z to vX.Y.Z (triggers prod deploy)
-        run: cargo run -q -p xtask -- release promote --push
+      # Promotion to prod is explicit — dispatch promote.yml (`just promote`)
+      # after verifying this dev-vX.Y.Z build on dev.sislam.com (ADR-029,
+      # W-PROM.4.25). Prod no longer ships automatically on every push.

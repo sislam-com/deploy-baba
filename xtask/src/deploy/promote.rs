@@ -15,6 +15,14 @@ struct EnvConfig {
     cloudfront_id: String,
     ui_fn_name: String,
     agent_fn_name: String,
+    email_fn_name: String,
+    llm_proxy_fn_name: String,
+    auth_fn_name: String,
+    portfolio_fn_name: String,
+    admin_fn_name: String,
+    contact_fn_name: String,
+    rag_fn_name: String,
+    mcp_gateway_fn_name: String,
     fn_url: String,
 }
 
@@ -40,6 +48,23 @@ impl EnvConfig {
             cloudfront_id: v["cloudfront_id"].as_str().unwrap_or_default().to_owned(),
             ui_fn_name: v["ui_fn_name"].as_str().unwrap_or_default().to_owned(),
             agent_fn_name: v["agent_fn_name"].as_str().unwrap_or_default().to_owned(),
+            email_fn_name: v["email_fn_name"].as_str().unwrap_or_default().to_owned(),
+            llm_proxy_fn_name: v["llm_proxy_fn_name"]
+                .as_str()
+                .unwrap_or_default()
+                .to_owned(),
+            auth_fn_name: v["auth_fn_name"].as_str().unwrap_or_default().to_owned(),
+            portfolio_fn_name: v["portfolio_fn_name"]
+                .as_str()
+                .unwrap_or_default()
+                .to_owned(),
+            admin_fn_name: v["admin_fn_name"].as_str().unwrap_or_default().to_owned(),
+            contact_fn_name: v["contact_fn_name"].as_str().unwrap_or_default().to_owned(),
+            rag_fn_name: v["rag_fn_name"].as_str().unwrap_or_default().to_owned(),
+            mcp_gateway_fn_name: v["mcp_gateway_fn_name"]
+                .as_str()
+                .unwrap_or_default()
+                .to_owned(),
             fn_url: v["fn_url"].as_str().unwrap_or_default().to_owned(),
         })
     }
@@ -55,9 +80,33 @@ pub async fn promote(profile: Option<String>, skip_tag: bool) -> anyhow::Result<
     let lambda_client = LambdaClient::new(&aws_config);
     let s3_client = S3Client::new(&aws_config);
 
-    // 1. Promote Lambda functions
+    // 1. Promote Lambda functions (zip-based services only — the PDF Lambda
+    // is a Docker/ECR image and is promoted separately via `just pdf-deploy`)
     promote_lambda(&lambda_client, &dev.ui_fn_name, &prod.ui_fn_name).await?;
     promote_lambda(&lambda_client, &dev.agent_fn_name, &prod.agent_fn_name).await?;
+    promote_lambda(&lambda_client, &dev.email_fn_name, &prod.email_fn_name).await?;
+    promote_lambda(
+        &lambda_client,
+        &dev.llm_proxy_fn_name,
+        &prod.llm_proxy_fn_name,
+    )
+    .await?;
+    promote_lambda(&lambda_client, &dev.auth_fn_name, &prod.auth_fn_name).await?;
+    promote_lambda(
+        &lambda_client,
+        &dev.portfolio_fn_name,
+        &prod.portfolio_fn_name,
+    )
+    .await?;
+    promote_lambda(&lambda_client, &dev.admin_fn_name, &prod.admin_fn_name).await?;
+    promote_lambda(&lambda_client, &dev.contact_fn_name, &prod.contact_fn_name).await?;
+    promote_lambda(&lambda_client, &dev.rag_fn_name, &prod.rag_fn_name).await?;
+    promote_lambda(
+        &lambda_client,
+        &dev.mcp_gateway_fn_name,
+        &prod.mcp_gateway_fn_name,
+    )
+    .await?;
 
     // 2. Promote SPA (S3 server-side copy)
     promote_spa(&s3_client, &dev.spa_bucket, &prod.spa_bucket).await?;

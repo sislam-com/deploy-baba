@@ -66,7 +66,9 @@ Promote copies artifacts from dev to prod without rebuilding. This guarantees pr
 
 ```
 just promote
-  1. For each Lambda (ui, email, llm-proxy, mcp-gateway):
+  1. For each zip-based Lambda (ui, agent, email, llm-proxy, auth, portfolio,
+     admin, contact, rag, mcp-gateway — pdf is ECR-image based, promoted
+     separately via `just pdf-deploy`):
      - Download code zip from dev function
      - Upload to prod function
      - Wait for active
